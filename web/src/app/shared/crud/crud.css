@@ -1,0 +1,57 @@
+/* Solo lo propio de esta pantalla: el resto (tabla, modal, acciones, mensajes)
+   vive en styles.css porque lo comparte con Prendas y variantes. */
+
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.buscador {
+  width: 210px;
+}
+
+.col-acciones {
+  width: 150px;
+}
+.pie {
+  margin-top: 10px;
+}
+
+.fila-color {
+  display: flex;
+  gap: 8px;
+}
+.selector-color {
+  width: 46px;
+  height: 38px;
+  padding: 2px;
+  border: 1.5px solid var(--linea);
+  border-radius: 10px;
+  background: var(--suave);
+  cursor: pointer;
+}
+
+.advertencia {
+  font-size: 12.5px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+
+@media (max-width: 620px) {
+  .buscador {
+    width: 100%;
+  }
+}

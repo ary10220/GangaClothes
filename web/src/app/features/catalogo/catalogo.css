@@ -1,0 +1,171 @@
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--papel);
+}
+
+/* ------------------------------------------------------------ barra superior */
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 26px;
+  background: #fff;
+  border-bottom: 1.5px solid var(--linea);
+}
+.topnav .logo {
+  font-size: 17px;
+}
+.seccion {
+  font-size: 12.5px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--ganga);
+  padding-bottom: 2px;
+}
+.yo {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--suave);
+  border: 1px solid var(--linea);
+  border-radius: 99px;
+  padding: 5px 13px;
+  color: var(--gris);
+}
+.acceso {
+  padding: 6px 13px;
+  font-size: 11.5px;
+}
+.yo + .acceso,
+.topnav > .acceso {
+  margin-left: auto;
+}
+.yo + .acceso {
+  margin-left: 0;
+}
+
+/* ------------------------------------------------------------------- layout */
+.cuerpo {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  align-items: start;
+}
+
+.filtros {
+  border-right: 1.5px solid var(--linea);
+  padding: 20px 18px 30px;
+  min-height: calc(100vh - 54px);
+}
+.filtros .campo {
+  margin-bottom: 6px;
+}
+.filtros .ceja {
+  margin: 16px 0 8px;
+}
+.filtros .chip {
+  font-family: inherit;
+}
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.swatch-boton {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--linea);
+  cursor: pointer;
+  padding: 0;
+}
+.swatch-boton.on {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+.limpiar {
+  margin-top: 20px;
+}
+
+main {
+  padding: 20px 26px 44px;
+  min-width: 0;
+}
+.cabecera {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* ------------------------------------------------------------------ tarjetas */
+.grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+}
+.tarjeta {
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  overflow: hidden;
+  background: #fff;
+}
+.foto {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ecece5;
+}
+.foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.datos {
+  padding: 10px 12px 13px;
+}
+.nombre {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.marca {
+  font-size: 11px;
+  color: var(--gris);
+  margin-top: 1px;
+}
+.precio {
+  font-family: var(--mono);
+  color: var(--ganga);
+  font-weight: 700;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.disponibilidad {
+  font-size: 10.5px;
+  color: var(--ok);
+  margin-top: 3px;
+}
+.disponibilidad.sin-stock {
+  color: var(--alerta);
+}
+.tallas {
+  margin-top: 6px;
+}
+
+@media (max-width: 780px) {
+  .cuerpo {
+    grid-template-columns: 1fr;
+  }
+  .filtros {
+    border-right: none;
+    border-bottom: 1.5px solid var(--linea);
+    min-height: 0;
+  }
+}

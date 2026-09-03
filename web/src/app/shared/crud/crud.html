@@ -1,0 +1,211 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>{{ config().titulo }}</h1>
+    @if (config().nota) {
+      <span class="ceja">{{ config().nota }}</span>
+    }
+  </div>
+
+  @if (archivable()) {
+    <app-selector-estado [(valor)]="estado" />
+  }
+
+  <input
+    type="search"
+    class="campo buscador"
+    placeholder="⌕ Buscar…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+  <button type="button" class="btn rosa" (click)="abrirNuevo()">+ Nuevo</button>
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else if (enEstado().length === 0) {
+  <div class="mensaje vacio">
+    <p>{{ mensajeVacio() }}</p>
+    @if (filas().length === 0) {
+      <button type="button" class="btn rosa" (click)="abrirNuevo()">Crear el primero</button>
+    } @else if (estado() !== 'inactivos' && archivados() > 0) {
+      <button type="button" class="btn linea" (click)="estado.set('inactivos')">Ver inactivos</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <p class="mensaje">Ningun registro coincide con «{{ busqueda() }}».</p>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-indice">#</th>
+          @for (campo of camposTabla(); track campo.nombre) {
+            <th>{{ campo.etiqueta }}</th>
+          }
+          @if (muestraEstado()) {
+            <th>Estado</th>
+          }
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of visibles(); track fila.id; let i = $index) {
+          <tr [class.inactiva]="esInactivo(fila)">
+            <!-- numero correlativo de la vista, no el id: se recalcula con el filtro -->
+            <td class="mono col-indice">{{ i + 1 }}</td>
+            @for (campo of camposTabla(); track campo.nombre) {
+              <td [class.mono]="campo.tipo === 'numero' || campo.tipo === 'fecha'">
+                @if (campo.tipo === 'color') {
+                  <span class="swatch" [style.background]="hex(fila, campo)"></span>
+                  <span class="mono">{{ textoCelda(fila, campo) }}</span>
+                } @else {
+                  {{ textoCelda(fila, campo) }}
+                }
+              </td>
+            }
+            @if (muestraEstado()) {
+              <td>
+                <span class="estado" [class.ok]="!esInactivo(fila)" [class.bajo]="esInactivo(fila)">
+                  {{ esInactivo(fila) ? 'Inactivo' : 'Activo' }}
+                </span>
+              </td>
+            }
+            <td class="col-acciones">
+              <button type="button" class="enlace" (click)="abrirEdicion(fila)">Editar</button>
+              <span class="separador">·</span>
+              @if (esInactivo(fila)) {
+                <button
+                  type="button"
+                  class="enlace reactivar"
+                  [disabled]="reactivando() === fila.id"
+                  (click)="reactivar(fila)"
+                >
+                  {{ reactivando() === fila.id ? 'Reactivando…' : 'Reactivar' }}
+                </button>
+              } @else {
+                <button type="button" class="enlace peligro" (click)="pedirBorrado(fila)">Eliminar</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- ------------------------------------------------ modal crear / editar -->
+@if (modalAbierto()) {
+  <div class="fondo" (click)="cerrarTodo()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="ceja">{{ editando() ? 'Editar' : 'Nuevo registro' }}</div>
+      <h2>{{ encabezado() | titlecase }}</h2>
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()" novalidate>
+        <div class="rejilla">
+          @for (campo of config().campos; track campo.nombre) {
+            <div class="grupo" [class.completo]="campo.ancho === 'completo'">
+              <label class="etiqueta" [for]="'c-' + campo.nombre">
+                {{ campo.etiqueta }}@if (campo.requerido) {<b class="req">*</b>}
+              </label>
+
+              @switch (campo.tipo) {
+                @case ('select') {
+                  <select
+                    [id]="'c-' + campo.nombre"
+                    class="campo"
+                    [class.invalido]="invalido(campo)"
+                    [formControlName]="campo.nombre"
+                  >
+                    <option value="">— elegir —</option>
+                    @for (opcion of opciones()[campo.nombre] ?? []; track opcion.id) {
+                      <option [value]="opcion.id">{{ opcion.etiqueta }}</option>
+                    }
+                  </select>
+                }
+                @case ('parrafo') {
+                  <textarea
+                    [id]="'c-' + campo.nombre"
+                    class="campo"
+                    rows="3"
+                    [class.invalido]="invalido(campo)"
+                    [formControlName]="campo.nombre"
+                    [placeholder]="campo.marcador ?? ''"
+                  ></textarea>
+                }
+                @case ('color') {
+                  <div class="fila-color">
+                    <input
+                      [id]="'c-' + campo.nombre"
+                      type="color"
+                      class="selector-color"
+                      [formControlName]="campo.nombre"
+                    />
+                    <input type="text" class="campo mono" [formControlName]="campo.nombre" />
+                  </div>
+                }
+                @default {
+                  <input
+                    [id]="'c-' + campo.nombre"
+                    [type]="campo.tipo === 'numero' ? 'number' : campo.tipo === 'fecha' ? 'date' : 'text'"
+                    class="campo"
+                    [class.invalido]="invalido(campo)"
+                    [formControlName]="campo.nombre"
+                    [placeholder]="campo.marcador ?? ''"
+                  />
+                }
+              }
+
+              @if (invalido(campo)) {
+                <p class="ayuda-error">{{ campo.etiqueta }} es obligatorio.</p>
+              }
+            </div>
+          }
+        </div>
+
+        @if (errorFormulario()) {
+          <p class="error-servidor">{{ errorFormulario() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarTodo()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------ modal de confirmacion -->
+@if (aEliminar(); as fila) {
+  <div class="fondo" (click)="cerrarTodo()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Eliminar «{{ titulo(fila) }}»?</h2>
+      <p class="advertencia">
+        Si {{ config().singular }} tiene registros asociados, el sistema la desactivara en lugar de borrarla, o
+        rechazara la operacion.
+      </p>
+
+      @if (errorEliminar()) {
+        <p class="error-servidor">{{ errorEliminar() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" (click)="cerrarTodo()">Cancelar</button>
+        <button type="button" class="btn peligro" [disabled]="eliminando()" (click)="confirmarBorrado()">
+          {{ eliminando() ? 'Eliminando…' : 'Si, eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

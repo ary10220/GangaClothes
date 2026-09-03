@@ -14,7 +14,12 @@ from app.core.deps import get_db, require_roles
 def crud_router(model, nombre: str, campos: dict, roles=("administrador",)) -> APIRouter:
     """campos: {"nombre_campo": (tipo, default)} — usar ... como default para requerido."""
     In = create_model(f"{nombre.title()}In", **campos)
-    Upd = create_model(f"{nombre.title()}Upd", **{k: (t | None, None) for k, (t, _d) in campos.items()})
+    campos_upd = {k: (t | None, None) for k, (t, _d) in campos.items()}
+    # Las tablas con bandera `activo` se archivan en vez de borrarse: el PUT
+    # tiene que poder volver a activarlas (y desactivarlas a mano).
+    if hasattr(model, "activo"):
+        campos_upd["activo"] = (bool | None, None)
+    Upd = create_model(f"{nombre.title()}Upd", **campos_upd)
     router = APIRouter()
     admin = require_roles(*roles)
 

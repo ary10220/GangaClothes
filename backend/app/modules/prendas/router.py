@@ -101,7 +101,14 @@ def crear_variante(id: int, datos: VarianteIn, db=Depends(get_db), _=Depends(adm
 
 @router.get("/{id}/variantes", summary="Variantes de una prenda")
 def variantes(id: int, db=Depends(get_db), _=Depends(admin)):
-    return [to_dict(v) for v in db.query(Variante).filter(Variante.prenda_id == id).all()]
+    filas = db.query(Variante).filter(Variante.prenda_id == id).all()
+    # El panel necesita saber si la variante ya tiene cargado su recurso del
+    # probador (CU24); se agrega al listado para no pedir un GET por variante.
+    salida = []
+    for v in filas:
+        assets = db.query(AssetAR).filter(AssetAR.variante_id == v.id).count()
+        salida.append({**to_dict(v), "assets_ar": assets, "tiene_asset_ar": assets > 0})
+    return salida
 
 
 @router.post("/variantes/{variante_id}/asset-ar", status_code=201,

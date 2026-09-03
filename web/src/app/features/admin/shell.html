@@ -1,0 +1,41 @@
+<div class="panel">
+  <aside class="lateral">
+    <div class="cabecera">
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <div class="ceja">panel interno</div>
+    </div>
+
+    <nav>
+      @for (grupo of menu(); track grupo.titulo) {
+        <div class="grupo">
+          <div class="ceja titulo">{{ grupo.titulo }}</div>
+          @for (item of grupo.items; track item.ruta) {
+            @if (item.disponible) {
+              <a
+                [routerLink]="item.ruta"
+                routerLinkActive="on"
+                [routerLinkActiveOptions]="{ exact: item.ruta === '/admin' }"
+                >{{ item.etiqueta }}</a
+              >
+            } @else {
+              <span class="pronto">{{ item.etiqueta }}<i>pronto</i></span>
+            }
+          }
+        </div>
+      }
+    </nav>
+  </aside>
+
+  <div class="contenido">
+    <header class="superior">
+      <div class="yo">
+        <b>{{ sesion.nombreCompleto() }}</b> · {{ sesion.rolPrincipal() }}
+      </div>
+      <button type="button" class="btn linea salir" (click)="salir()">Cerrar sesion</button>
+    </header>
+
+    <main>
+      <router-outlet />
+    </main>
+  </div>
+</div>

@@ -1,0 +1,119 @@
+.panel {
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  min-height: 100vh;
+}
+
+/* ---------- barra lateral ---------- */
+.lateral {
+  background: var(--tinta);
+  color: #fff;
+  padding: 22px 0 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.cabecera {
+  padding: 0 20px;
+}
+.cabecera .logo {
+  font-size: 18px;
+}
+.cabecera .ceja {
+  color: #8b929c;
+  margin-top: 4px;
+}
+
+nav {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.grupo {
+  display: flex;
+  flex-direction: column;
+}
+.grupo .titulo {
+  color: #7a818b;
+  padding: 0 20px;
+  margin-bottom: 6px;
+}
+nav a,
+nav .pronto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 20px;
+  font-size: 12.5px;
+  color: #c8ccd2;
+  border-left: 3px solid transparent;
+}
+nav a:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.05);
+}
+nav a.on {
+  color: #fff;
+  font-weight: 700;
+  border-left-color: var(--ganga);
+  background: rgba(232, 23, 93, 0.12);
+}
+nav .pronto {
+  color: #656b74;
+  cursor: not-allowed;
+}
+nav .pronto i {
+  font-family: var(--mono);
+  font-style: normal;
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1px solid #3a3f47;
+  border-radius: 99px;
+  padding: 2px 6px;
+}
+
+/* ---------- area de trabajo ---------- */
+.contenido {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.superior {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 12px 26px;
+  background: #fff;
+  border-bottom: 1.5px solid var(--linea);
+}
+.yo {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  background: var(--suave);
+  border: 1px solid var(--linea);
+  border-radius: 99px;
+  padding: 5px 13px;
+  color: var(--gris);
+}
+.yo b {
+  color: var(--tinta);
+}
+.salir {
+  padding: 6px 13px;
+  font-size: 11.5px;
+}
+main {
+  padding: 22px 26px 40px;
+  flex: 1;
+}
+
+@media (max-width: 780px) {
+  .panel {
+    grid-template-columns: 1fr;
+  }
+  .lateral {
+    padding-bottom: 16px;
+  }
+}

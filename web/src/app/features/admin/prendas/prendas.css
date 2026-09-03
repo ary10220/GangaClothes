@@ -1,0 +1,104 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.buscador {
+  width: 230px;
+}
+.pie {
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------ tabla de prendas */
+.num {
+  text-align: right;
+}
+.margen {
+  color: var(--ok);
+  font-weight: 700;
+}
+.marca {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+}
+.col-acciones {
+  width: 210px;
+}
+tr.abierta {
+  background: #fdf1f5;
+}
+tr.abierta:hover {
+  background: #fdf1f5;
+}
+
+/* --------------------------------------------------- detalle de variantes */
+.detalle {
+  margin-top: 26px;
+  border-top: 2px solid var(--tinta);
+  padding-top: 18px;
+}
+.cabecera-detalle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cabecera-detalle > div:first-child {
+  margin-right: auto;
+}
+.cabecera-detalle h2 {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 2px;
+}
+.cerrar {
+  background: none;
+  border: 1.5px solid var(--linea);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: var(--gris);
+  font-size: 12px;
+  line-height: 1;
+}
+.cerrar:hover {
+  border-color: var(--tinta);
+  color: var(--tinta);
+}
+.detalle .col-acciones {
+  width: 150px;
+}
+
+/* -------------------------------------------------------------- modales */
+.modal.ancho {
+  max-width: 620px;
+}
+.advertencia {
+  font-size: 12px;
+  color: var(--gris);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+@media (max-width: 620px) {
+  .buscador {
+    width: 100%;
+  }
+}
