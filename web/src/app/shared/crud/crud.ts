@@ -6,7 +6,9 @@ import { forkJoin } from 'rxjs';
 import { mensajeDeError } from '../../core/errores.interceptor';
 import { Notificaciones } from '../../core/notificaciones';
 import { RecursoService, Registro } from '../../core/recurso.service';
-import { CampoCrud, ConfigCrud, FiltroEstado, Opcion } from './config';
+import { esInactivo, filtrarPorEstado, FiltroEstado, textoPie, textoVacio } from '../estado/estado';
+import { SelectorEstado } from '../estado/selector-estado';
+import { CampoCrud, ConfigCrud, Opcion } from './config';
 
 /** Un hex de 3 digitos (#D33) no sirve para <input type="color">: se expande a 6. */
 function normalizarHex(valor: unknown): string {
@@ -23,7 +25,7 @@ function normalizarHex(valor: unknown): string {
  */
 @Component({
   selector: 'app-crud',
-  imports: [ReactiveFormsModule, TitleCasePipe],
+  imports: [ReactiveFormsModule, TitleCasePipe, SelectorEstado],
   templateUrl: './crud.html',
   styleUrl: './crud.css',
   host: { '(document:keydown.escape)': 'cerrarTodo()' },
@@ -68,18 +70,9 @@ export class Crud {
   readonly muestraEstado = computed(() => this.archivable() && this.estado() === 'todos');
 
   /** Filas del estado elegido, antes de aplicar la busqueda. */
-  readonly enEstado = computed(() => {
-    const filas = this.filas();
-    if (!this.archivable()) return filas;
-    switch (this.estado()) {
-      case 'activos':
-        return filas.filter((f) => !this.esInactivo(f));
-      case 'inactivos':
-        return filas.filter((f) => this.esInactivo(f));
-      default:
-        return filas;
-    }
-  });
+  readonly enEstado = computed(() =>
+    this.archivable() ? filtrarPorEstado(this.filas(), this.estado()) : this.filas(),
+  );
 
   readonly visibles = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
@@ -94,36 +87,15 @@ export class Crud {
     );
   });
 
-  readonly archivados = computed(() => this.filas().filter((f) => this.esInactivo(f)).length);
+  readonly archivados = computed(() => this.filas().filter((f) => esInactivo(f)).length);
 
-  /** "3 activos", "1 inactivo", "4 registros"; con busqueda activa, "2 de 5 activos". */
-  readonly pie = computed(() => {
-    const mostrados = this.visibles().length;
-    const total = this.enEstado().length;
-    const nombre = this.sustantivo(total);
-    return mostrados === total ? `${total} ${nombre}` : `${mostrados} de ${total} ${nombre}`;
-  });
+  readonly pie = computed(() =>
+    textoPie(this.visibles().length, this.enEstado().length, this.estado(), this.archivable()),
+  );
 
-  private sustantivo(cantidad: number): string {
-    if (!this.archivable() || this.estado() === 'todos') {
-      return cantidad === 1 ? 'registro' : 'registros';
-    }
-    if (this.estado() === 'activos') return cantidad === 1 ? 'activo' : 'activos';
-    return cantidad === 1 ? 'inactivo' : 'inactivos';
-  }
-
-  /** Texto del estado vacio: cambia si lo que falta es solo en esta vista. */
-  readonly mensajeVacio = computed(() => {
-    if (this.filas().length === 0) return `Todavia no hay registros en ${this.config().titulo.toLowerCase()}.`;
-    if (this.estado() === 'inactivos') return 'No hay registros archivados.';
-    const archivados = this.archivados();
-    if (archivados > 0) {
-      return archivados === 1
-        ? 'No hay registros activos. Hay 1 archivado: miralo en «Inactivos».'
-        : `No hay registros activos. Hay ${archivados} archivados: miralos en «Inactivos».`;
-    }
-    return `Todavia no hay registros en ${this.config().titulo.toLowerCase()}.`;
-  });
+  readonly mensajeVacio = computed(() =>
+    textoVacio(this.filas().length, this.archivados(), this.estado(), this.config().titulo),
+  );
 
   constructor() {
     // Las 7 pantallas comparten instancia de componente: al cambiar de ruta
@@ -333,7 +305,7 @@ export class Crud {
   }
 
   esInactivo(fila: Registro): boolean {
-    return 'activo' in fila && fila['activo'] === false;
+    return esInactivo(fila);
   }
 
   /** Nombre legible de una fila, para el mensaje de confirmacion. */

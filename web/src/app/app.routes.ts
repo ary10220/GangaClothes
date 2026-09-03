@@ -54,6 +54,12 @@ export const routes: Routes = [
       rutaCrud('colecciones', COLECCIONES),
       rutaCrud('ciudades', CIUDADES),
       rutaCrud('sucursales', SUCURSALES),
+      {
+        path: 'prendas',
+        canActivate: [rolGuard],
+        data: SOLO_ADMIN,
+        loadComponent: () => import('./features/admin/prendas/prendas').then((m) => m.Prendas),
+      },
     ],
   },
   { path: '', pathMatch: 'full', redirectTo: 'login' },

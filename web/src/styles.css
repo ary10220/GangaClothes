@@ -208,3 +208,156 @@ td {
   gap: 8px;
   max-width: 380px;
 }
+
+/* ---------- piezas compartidas por las pantallas de administracion ---------- */
+.marco-tabla {
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  overflow: hidden;
+  background: #fff;
+}
+.marco-tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+.marco-tabla tbody tr:hover {
+  background: var(--suave);
+}
+tr.inactiva td:not(.col-acciones) {
+  opacity: 0.45;
+}
+.col-indice {
+  width: 46px;
+  color: var(--gris);
+}
+.col-acciones {
+  white-space: nowrap;
+}
+
+.swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1.5px solid var(--linea);
+  vertical-align: -2px;
+  margin-right: 5px;
+}
+
+/* acciones en linea dentro de una tabla */
+.enlace {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--tinta);
+  font-weight: 600;
+  cursor: pointer;
+}
+.enlace:hover {
+  color: var(--ganga);
+}
+.enlace.peligro:hover {
+  color: var(--alerta);
+}
+.enlace.reactivar {
+  color: var(--ok);
+}
+.enlace:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.separador {
+  color: var(--linea);
+  margin: 0 5px;
+}
+
+/* mensajes de carga / vacio / error */
+.mensaje {
+  font-size: 13px;
+  color: var(--gris);
+  padding: 26px 0;
+}
+.mensaje.vacio,
+.mensaje.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: #fff;
+  border: 1.5px dashed var(--linea);
+  border-radius: 13px;
+  padding: 40px 20px;
+}
+.mensaje.error {
+  border-color: var(--alerta);
+  color: var(--alerta);
+}
+
+/* ---------- modales ---------- */
+.fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 22, 26, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 800;
+}
+.modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  background: #fff;
+  border: 2px solid var(--tinta);
+  border-radius: 16px;
+  padding: 22px 24px;
+  box-shadow: 0 14px 34px rgba(20, 22, 26, 0.3);
+}
+.modal.angosto {
+  max-width: 420px;
+}
+.modal h2 {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 3px 0 16px;
+}
+.rejilla {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.grupo.completo {
+  grid-column: 1 / -1;
+}
+.req {
+  color: var(--ganga);
+  margin-left: 2px;
+}
+.error-servidor {
+  background: #fce9e2;
+  color: var(--alerta);
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 12px;
+  margin-top: 14px;
+}
+.acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+.btn.peligro {
+  background: var(--alerta);
+  border-color: var(--alerta);
+}
+
+@media (max-width: 620px) {
+  .rejilla {
+    grid-template-columns: 1fr;
+  }
+}

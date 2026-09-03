@@ -1,0 +1,437 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Prendas y variantes</h1>
+    <span class="ceja">CU7 · el margen alimenta el reporte de ganancia promedio</span>
+  </div>
+
+  <app-selector-estado [(valor)]="estado" />
+
+  <input
+    type="search"
+    class="campo buscador"
+    placeholder="⌕ Buscar por nombre o marca…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+  <button type="button" class="btn rosa" (click)="abrirNuevaPrenda()">+ Nueva prenda</button>
+</div>
+
+<!-- ------------------------------------------------------ tabla de prendas -->
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else if (enEstado().length === 0) {
+  <div class="mensaje vacio">
+    <p>{{ mensajeVacio() }}</p>
+    @if (prendas().length === 0) {
+      <button type="button" class="btn rosa" (click)="abrirNuevaPrenda()">Crear la primera</button>
+    } @else if (estado() !== 'inactivos' && archivados() > 0) {
+      <button type="button" class="btn linea" (click)="estado.set('inactivos')">Ver inactivas</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <p class="mensaje">Ninguna prenda coincide con «{{ busqueda() }}».</p>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-indice">#</th>
+          <th>Prenda</th>
+          <th>Categoria</th>
+          <th>Coleccion</th>
+          <th class="num">Precio</th>
+          <th class="num">Costo</th>
+          <th class="num">Margen</th>
+          @if (muestraEstado()) {
+            <th>Estado</th>
+          }
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (prenda of visibles(); track prenda.id; let i = $index) {
+          <tr [class.inactiva]="esInactiva(prenda)" [class.abierta]="abierta()?.id === prenda.id">
+            <td class="mono col-indice">{{ i + 1 }}</td>
+            <td>
+              <b>{{ prenda['nombre'] }}</b>
+              @if (prenda['marca']) {
+                <span class="marca">{{ prenda['marca'] }}</span>
+              }
+            </td>
+            <td>{{ nombreDe(categorias(), prenda['categoria_id']) }}</td>
+            <td>{{ nombreDe(colecciones(), prenda['coleccion_id']) }}</td>
+            <td class="mono num">{{ moneda(prenda['precio_venta']) }}</td>
+            <td class="mono num">{{ moneda(prenda['costo']) }}</td>
+            <td class="mono num margen">+{{ moneda(margen(prenda)) }}</td>
+            @if (muestraEstado()) {
+              <td>
+                <span class="estado" [class.ok]="!esInactiva(prenda)" [class.bajo]="esInactiva(prenda)">
+                  {{ esInactiva(prenda) ? 'Inactiva' : 'Activa' }}
+                </span>
+              </td>
+            }
+            <td class="col-acciones">
+              <button type="button" class="enlace" (click)="abrirEdicionPrenda(prenda)">Editar</button>
+              <span class="separador">·</span>
+              <button type="button" class="enlace" (click)="abrir(prenda)">Variantes</button>
+              <span class="separador">·</span>
+              @if (esInactiva(prenda)) {
+                <button
+                  type="button"
+                  class="enlace reactivar"
+                  [disabled]="cambiandoEstado() === prenda.id"
+                  (click)="cambiarEstado(prenda, true)"
+                >
+                  Reactivar
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="enlace peligro"
+                  [disabled]="cambiandoEstado() === prenda.id"
+                  (click)="cambiarEstado(prenda, false)"
+                >
+                  Archivar
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- --------------------------------------------- detalle: sub-tabla variantes -->
+@if (abierta(); as prenda) {
+  <section class="detalle">
+    <div class="cabecera-detalle">
+      <div>
+        <div class="ceja">Variantes talla-color</div>
+        <h2>{{ prenda['nombre'] }}</h2>
+      </div>
+      <button type="button" class="btn linea" (click)="abrirNuevaVariante()">+ Nueva variante</button>
+      <button type="button" class="cerrar" aria-label="Cerrar detalle" (click)="cerrarDetalle()">✕</button>
+    </div>
+
+    @if (cargandoVariantes()) {
+      <p class="mensaje">Cargando variantes…</p>
+    } @else if (variantes().length === 0) {
+      <div class="mensaje vacio">
+        <p>Esta prenda no tiene variantes todavia.</p>
+        <button type="button" class="btn rosa" (click)="abrirNuevaVariante()">Crear la primera</button>
+      </div>
+    } @else {
+      <div class="marco-tabla">
+        <table>
+          <thead>
+            <tr>
+              <th class="col-indice">#</th>
+              <th>SKU</th>
+              <th>Talla</th>
+              <th>Color</th>
+              <th>Recurso AR</th>
+              <th class="col-acciones">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (v of variantes(); track v.id; let i = $index) {
+              <tr>
+                <td class="mono col-indice">{{ i + 1 }}</td>
+                <td class="mono">{{ v['sku'] }}</td>
+                <td>{{ nombreDe(tallas(), v['talla_id']) }}</td>
+                <td>
+                  <span class="swatch" [style.background]="hexDeColor(v['color_id'])"></span>
+                  {{ nombreDe(colores(), v['color_id']) }}
+                </td>
+                <td>
+                  @if (tieneAsset(v)) {
+                    <span class="estado ok">PNG ✓</span>
+                  } @else {
+                    <span class="estado bajo">Falta PNG</span>
+                  }
+                </td>
+                <td class="col-acciones">
+                  <button type="button" class="enlace" (click)="abrirAsset(v)">
+                    {{ tieneAsset(v) ? 'Agregar recurso' : 'Registrar recurso' }}
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="ceja pie">
+        {{ variantes().length }} {{ variantes().length === 1 ? 'variante' : 'variantes' }} · el sku lo genera el
+        backend
+      </p>
+    }
+  </section>
+}
+
+<!-- ------------------------------------------------- modal crear / editar prenda -->
+@if (modalPrenda()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal ancho" (click)="$event.stopPropagation()">
+      <div class="ceja">{{ editando() ? 'Editar' : 'Nueva prenda' }}</div>
+      <h2>Prenda</h2>
+
+      <form [formGroup]="formPrenda" (ngSubmit)="guardarPrenda()" novalidate>
+        <div class="rejilla">
+          <div class="grupo completo">
+            <label class="etiqueta" for="p-nombre">Nombre<b class="req">*</b></label>
+            <input
+              id="p-nombre"
+              type="text"
+              class="campo"
+              [class.invalido]="invalidoPrenda('nombre')"
+              formControlName="nombre"
+              placeholder="Polera basica algodon"
+            />
+            @if (invalidoPrenda('nombre')) {
+              <p class="ayuda-error">El nombre es obligatorio.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-categoria">Categoria<b class="req">*</b></label>
+            <select
+              id="p-categoria"
+              class="campo"
+              [class.invalido]="invalidoPrenda('categoria_id')"
+              formControlName="categoria_id"
+            >
+              <option value="">— elegir —</option>
+              @for (c of categorias(); track c.id) {
+                <option [value]="c.id">{{ c['nombre'] }}</option>
+              }
+            </select>
+            @if (invalidoPrenda('categoria_id')) {
+              <p class="ayuda-error">Elegi una categoria.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-coleccion">Coleccion</label>
+            <select id="p-coleccion" class="campo" formControlName="coleccion_id">
+              <option value="">— sin coleccion —</option>
+              @for (c of colecciones(); track c.id) {
+                <option [value]="c.id">{{ c['nombre'] }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-marca">Marca</label>
+            <input id="p-marca" type="text" class="campo" formControlName="marca" placeholder="GangaBasics" />
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-genero">Genero</label>
+            <select id="p-genero" class="campo" formControlName="genero">
+              <option value="">— sin especificar —</option>
+              @for (g of generos; track g) {
+                <option [value]="g">{{ g }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-precio">Precio de venta (Bs)<b class="req">*</b></label>
+            <input
+              id="p-precio"
+              type="number"
+              step="0.01"
+              min="0"
+              class="campo"
+              [class.invalido]="invalidoPrenda('precio_venta')"
+              formControlName="precio_venta"
+              placeholder="79.90"
+            />
+            @if (invalidoPrenda('precio_venta')) {
+              <p class="ayuda-error">Ingresa un precio valido.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-costo">Costo (Bs)<b class="req">*</b></label>
+            <input
+              id="p-costo"
+              type="number"
+              step="0.01"
+              min="0"
+              class="campo"
+              [class.invalido]="invalidoPrenda('costo')"
+              formControlName="costo"
+              placeholder="45.00"
+            />
+            @if (invalidoPrenda('costo')) {
+              <p class="ayuda-error">Ingresa un costo valido.</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="p-imagen">URL de imagen</label>
+            <input
+              id="p-imagen"
+              type="text"
+              class="campo"
+              formControlName="imagen_url"
+              placeholder="https://…/polera.jpg"
+            />
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="p-descripcion">Descripcion</label>
+            <textarea id="p-descripcion" class="campo" rows="3" formControlName="descripcion"></textarea>
+          </div>
+        </div>
+
+        @if (errorPrenda()) {
+          <p class="error-servidor">{{ errorPrenda() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ---------------------------------------------------- modal nueva variante -->
+@if (modalVariante()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Nueva variante</div>
+      <h2>{{ abierta()?.['nombre'] }}</h2>
+
+      <form [formGroup]="formVariante" (ngSubmit)="guardarVariante()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="v-talla">Talla<b class="req">*</b></label>
+            <select id="v-talla" class="campo" [class.invalido]="invalidoVariante('talla_id')" formControlName="talla_id">
+              <option value="">— elegir —</option>
+              @for (t of tallas(); track t.id) {
+                <option [value]="t.id">{{ t['nombre'] }}</option>
+              }
+            </select>
+            @if (invalidoVariante('talla_id')) {
+              <p class="ayuda-error">Elegi una talla.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="v-color">Color<b class="req">*</b></label>
+            <select id="v-color" class="campo" [class.invalido]="invalidoVariante('color_id')" formControlName="color_id">
+              <option value="">— elegir —</option>
+              @for (c of colores(); track c.id) {
+                <option [value]="c.id">{{ c['nombre'] }}</option>
+              }
+            </select>
+            @if (invalidoVariante('color_id')) {
+              <p class="ayuda-error">Elegi un color.</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="v-imagen">URL de imagen</label>
+            <input id="v-imagen" type="text" class="campo" formControlName="imagen_url" placeholder="opcional" />
+          </div>
+        </div>
+
+        <p class="advertencia">
+          El SKU lo genera el backend combinando prenda, talla y color; para esta prenda saldra como
+          <span class="mono">P{{ abierta()?.id }}-T…-C…</span>
+        </p>
+
+        @if (errorVariante()) {
+          <p class="error-servidor">{{ errorVariante() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardandoVariante()">
+            {{ guardandoVariante() ? 'Creando…' : 'Crear variante' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------------ modal recurso AR -->
+@if (varianteAsset(); as variante) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Recurso del probador virtual · CU24</div>
+      <h2 class="mono">{{ variante['sku'] }}</h2>
+
+      <form [formGroup]="formAsset" (ngSubmit)="guardarAsset()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="a-tipo">Tipo<b class="req">*</b></label>
+            <select id="a-tipo" class="campo" formControlName="tipo">
+              <option value="png_overlay">png_overlay</option>
+              <option value="modelo_3d">modelo_3d</option>
+            </select>
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="a-escala">Escala<b class="req">*</b></label>
+            <input
+              id="a-escala"
+              type="number"
+              step="0.1"
+              min="0.01"
+              class="campo"
+              [class.invalido]="invalidoAsset('escala')"
+              formControlName="escala"
+            />
+            @if (invalidoAsset('escala')) {
+              <p class="ayuda-error">La escala debe ser mayor que cero.</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="a-url">URL del recurso<b class="req">*</b></label>
+            <input
+              id="a-url"
+              type="text"
+              class="campo"
+              [class.invalido]="invalidoAsset('url_recurso')"
+              formControlName="url_recurso"
+              placeholder="https://…/polera-m-rojo.png"
+            />
+            @if (invalidoAsset('url_recurso')) {
+              <p class="ayuda-error">La URL es obligatoria.</p>
+            }
+          </div>
+        </div>
+
+        <p class="advertencia">Para el probador se usa un PNG con fondo transparente.</p>
+
+        @if (errorAsset()) {
+          <p class="error-servidor">{{ errorAsset() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardandoAsset()">
+            {{ guardandoAsset() ? 'Registrando…' : 'Registrar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -8,17 +8,7 @@
   </div>
 
   @if (archivable()) {
-    <div class="filtro-estado" role="group" aria-label="Filtrar por estado">
-      <button type="button" class="chip" [class.on]="estado() === 'activos'" (click)="estado.set('activos')">
-        Activos
-      </button>
-      <button type="button" class="chip" [class.on]="estado() === 'inactivos'" (click)="estado.set('inactivos')">
-        Inactivos
-      </button>
-      <button type="button" class="chip" [class.on]="estado() === 'todos'" (click)="estado.set('todos')">
-        Todos
-      </button>
-    </div>
+    <app-selector-estado [(valor)]="estado" />
   }
 
   <input

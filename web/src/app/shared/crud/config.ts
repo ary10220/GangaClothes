@@ -1,3 +1,7 @@
+import { FiltroEstado } from '../estado/estado';
+
+export type { FiltroEstado };
+
 export type TipoCampo = 'texto' | 'parrafo' | 'numero' | 'fecha' | 'color' | 'select';
 
 export interface CampoCrud {
@@ -41,7 +45,6 @@ export interface ConfigCrud {
   archivable?: boolean;
 }
 
-export type FiltroEstado = 'activos' | 'inactivos' | 'todos';
 
 export interface Opcion {
   id: number;

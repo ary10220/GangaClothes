@@ -1,4 +1,6 @@
-/* ---------------------------------------------------------- encabezado */
+/* Solo lo propio de esta pantalla: el resto (tabla, modal, acciones, mensajes)
+   vive en styles.css porque lo comparte con Prendas y variantes. */
+
 .encabezado {
   display: flex;
   align-items: center;
@@ -21,152 +23,11 @@ h1 {
   width: 210px;
 }
 
-/* chips de Activos / Inactivos / Todos */
-.filtro-estado {
-  display: flex;
-  gap: 0;
-}
-.filtro-estado .chip {
-  font-family: inherit;
-  margin: 0 6px 0 0;
-}
-
-/* --------------------------------------------------------------- tabla */
-.marco-tabla {
-  border: 1.5px solid var(--linea);
-  border-radius: 13px;
-  overflow: hidden;
-  background: #fff;
-}
-tbody tr:last-child td {
-  border-bottom: none;
-}
-tbody tr:hover {
-  background: var(--suave);
-}
-tr.inactiva td:not(.col-acciones) {
-  opacity: 0.45;
-}
-.col-indice {
-  width: 46px;
-  color: var(--gris);
-}
 .col-acciones {
   width: 150px;
-  white-space: nowrap;
 }
 .pie {
   margin-top: 10px;
-}
-
-.swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-  border: 1.5px solid var(--linea);
-  vertical-align: -2px;
-  margin-right: 5px;
-}
-
-.enlace {
-  background: none;
-  border: none;
-  padding: 0;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--tinta);
-  font-weight: 600;
-  cursor: pointer;
-}
-.enlace:hover {
-  color: var(--ganga);
-}
-.enlace.peligro:hover {
-  color: var(--alerta);
-}
-.enlace.reactivar {
-  color: var(--ok);
-}
-.enlace.reactivar:hover {
-  color: var(--ok);
-  text-decoration: underline;
-}
-.enlace:disabled {
-  opacity: 0.5;
-  cursor: default;
-  text-decoration: none;
-}
-.separador {
-  color: var(--linea);
-  margin: 0 5px;
-}
-
-/* ------------------------------------------------- mensajes de estado */
-.mensaje {
-  font-size: 13px;
-  color: var(--gris);
-  padding: 26px 0;
-}
-.mensaje.vacio,
-.mensaje.error {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  text-align: center;
-  background: #fff;
-  border: 1.5px dashed var(--linea);
-  border-radius: 13px;
-  padding: 40px 20px;
-}
-.mensaje.error {
-  border-color: var(--alerta);
-  color: var(--alerta);
-}
-
-/* -------------------------------------------------------------- modal */
-.fondo {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 22, 26, 0.45);
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  z-index: 800;
-}
-.modal {
-  width: 100%;
-  max-width: 560px;
-  max-height: 88vh;
-  overflow-y: auto;
-  background: #fff;
-  border: 2px solid var(--tinta);
-  border-radius: 16px;
-  padding: 22px 24px;
-  box-shadow: 0 14px 34px rgba(20, 22, 26, 0.3);
-}
-.modal.angosto {
-  max-width: 420px;
-}
-.modal h2 {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin: 3px 0 16px;
-}
-
-.rejilla {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.grupo.completo {
-  grid-column: 1 / -1;
-}
-.req {
-  color: var(--ganga);
-  margin-left: 2px;
 }
 
 .fila-color {
@@ -183,35 +44,13 @@ tr.inactiva td:not(.col-acciones) {
   cursor: pointer;
 }
 
-.error-servidor {
-  background: #fce9e2;
-  color: var(--alerta);
-  border-radius: 8px;
-  padding: 9px 11px;
-  font-size: 12px;
-  margin-top: 14px;
-}
 .advertencia {
   font-size: 12.5px;
   color: var(--gris);
   line-height: 1.5;
 }
 
-.acciones {
-  display: flex;
-  justify-content: flex-end;
-  gap: 9px;
-  margin-top: 18px;
-}
-.btn.peligro {
-  background: var(--alerta);
-  border-color: var(--alerta);
-}
-
 @media (max-width: 620px) {
-  .rejilla {
-    grid-template-columns: 1fr;
-  }
   .buscador {
     width: 100%;
   }

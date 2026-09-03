@@ -1,0 +1,164 @@
+<!-- ------------------------------------------------------------- barra superior -->
+<header class="topnav">
+  <div class="logo">Ganga<b>Clothes</b></div>
+  <span class="seccion">Catalogo</span>
+
+  @if (sesion.autenticado()) {
+    <span class="yo">{{ sesion.nombreCompleto() }} · {{ sesion.rolPrincipal() }}</span>
+    @if (esPersonal()) {
+      <a class="btn linea acceso" routerLink="/admin">Ir al panel</a>
+    }
+  } @else {
+    <a class="btn linea acceso" routerLink="/login">Iniciar sesion</a>
+  }
+</header>
+
+<div class="cuerpo">
+  <!-- ------------------------------------------------------------- filtros -->
+  <aside class="filtros">
+    <input
+      type="search"
+      class="campo"
+      placeholder="⌕ Buscar prenda…"
+      [value]="textoBusqueda()"
+      (input)="escribir($any($event.target).value)"
+    />
+
+    @if (temporadas().length) {
+      <div class="ceja">Temporada</div>
+      <div>
+        @for (t of temporadas(); track t.id) {
+          <button
+            type="button"
+            class="chip"
+            [class.on]="activo('temporada_id', t.id)"
+            (click)="alternar('temporada_id', t.id)"
+          >
+            {{ t['nombre'] }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (categorias().length) {
+      <div class="ceja">Categoria</div>
+      <div>
+        @for (c of categorias(); track c.id) {
+          <button
+            type="button"
+            class="chip"
+            [class.on]="activo('categoria_id', c.id)"
+            (click)="alternar('categoria_id', c.id)"
+          >
+            {{ c['nombre'] }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (tallas().length) {
+      <div class="ceja">Talla</div>
+      <div>
+        @for (t of tallas(); track t.id) {
+          <button
+            type="button"
+            class="chip"
+            [class.on]="activo('talla_id', t.id)"
+            (click)="alternar('talla_id', t.id)"
+          >
+            {{ t['nombre'] }}
+          </button>
+        }
+      </div>
+    }
+
+    @if (colores().length) {
+      <div class="ceja">Color</div>
+      <div class="swatches">
+        @for (c of colores(); track c.id) {
+          <button
+            type="button"
+            class="swatch-boton"
+            [class.on]="activo('color_id', c.id)"
+            [style.background]="hexDeColor(c)"
+            [title]="c['nombre']"
+            [attr.aria-label]="c['nombre']"
+            [attr.aria-pressed]="activo('color_id', c.id)"
+            (click)="alternar('color_id', c.id)"
+          ></button>
+        }
+      </div>
+    }
+
+    @if (sucursales().length) {
+      <div class="ceja">Sucursal</div>
+      <select class="campo" (change)="elegirSucursal($any($event.target).value)">
+        <option value="">Todas las sucursales</option>
+        @for (s of sucursales(); track s.id) {
+          <option [value]="s.id">{{ s['nombre'] }}</option>
+        }
+      </select>
+    }
+
+    @if (hayFiltros()) {
+      <button type="button" class="btn linea bloque limpiar" (click)="limpiar()">Limpiar filtros</button>
+    }
+  </aside>
+
+  <!-- ------------------------------------------------------------ resultados -->
+  <main>
+    <div class="cabecera">
+      <h1>Catalogo</h1>
+      @if (!cargando() && !error()) {
+        <span class="ceja">
+          {{ prendas().length }} {{ prendas().length === 1 ? 'prenda' : 'prendas' }}
+          @if (nombreSucursal()) {
+            · disponibilidad en {{ nombreSucursal() }}
+          }
+        </span>
+      }
+    </div>
+
+    @if (cargando()) {
+      <p class="mensaje">Cargando catalogo…</p>
+    } @else if (error()) {
+      <div class="mensaje error"><p>{{ error() }}</p></div>
+    } @else if (prendas().length === 0) {
+      <div class="mensaje vacio">
+        <p>Ninguna prenda coincide con los filtros elegidos.</p>
+        @if (hayFiltros()) {
+          <button type="button" class="btn rosa" (click)="limpiar()">Limpiar filtros</button>
+        }
+      </div>
+    } @else {
+      <div class="grilla">
+        @for (prenda of prendas(); track prenda.id) {
+          <article class="tarjeta">
+            <div class="foto">
+              @if (prenda.imagen_url) {
+                <img [src]="prenda.imagen_url" [alt]="prenda.nombre" />
+              } @else {
+                <svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="#9AA0A6" stroke-width="1.4">
+                  <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z" />
+                </svg>
+              }
+            </div>
+            <div class="datos">
+              <div class="nombre">{{ prenda.nombre }}</div>
+              @if (prenda.marca) {
+                <div class="marca">{{ prenda.marca }}</div>
+              }
+              <div class="precio">Bs {{ precio(prenda.precio_venta) }}</div>
+              <div class="disponibilidad" [class.sin-stock]="!hayStock(prenda)">
+                ● {{ textoDisponibilidad(prenda) }}
+              </div>
+              @if (tallasDe(prenda).length) {
+                <div class="tallas ceja">{{ tallasDe(prenda).join(' · ') }}</div>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </main>
+</div>

@@ -39,7 +39,7 @@ export const MENU: GrupoMenu[] = [
   },
   {
     titulo: 'Productos',
-    items: [{ etiqueta: 'Prendas y variantes', ruta: '/admin/prendas', roles: ADMIN, disponible: false }],
+    items: [{ etiqueta: 'Prendas y variantes', ruta: '/admin/prendas', roles: ADMIN, disponible: true }],
   },
   {
     titulo: 'Operacion',
