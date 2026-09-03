@@ -1,0 +1,24 @@
+<div class="titulo">
+  <h1>Hola, {{ sesion.usuario()?.nombre }}</h1>
+  <span class="ceja">iteracion 1 · catalogos base, red de tiendas y prendas</span>
+</div>
+
+<p class="intro">
+  Sesion iniciada como <b>{{ sesion.rolPrincipal() }}</b>. El menu lateral muestra unicamente las secciones
+  habilitadas para tu rol.
+</p>
+
+<div class="ceja seccion">Registros en la base de datos</div>
+
+@if (cargando()) {
+  <p class="cargando">Consultando la API…</p>
+} @else {
+  <div class="fichas">
+    @for (ficha of fichas(); track ficha.etiqueta) {
+      <div class="ficha">
+        <div class="numero">{{ ficha.total ?? '—' }}</div>
+        <div class="ceja">{{ ficha.etiqueta }}</div>
+      </div>
+    }
+  </div>
+}

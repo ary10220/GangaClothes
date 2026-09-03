@@ -1,0 +1,74 @@
+<div class="pantalla">
+  <div class="tarjeta">
+    <!-- panel de marca -->
+    <aside class="marca">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#E8175D" stroke-width="1.6">
+        <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z" />
+      </svg>
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <p>Catalogo por temporadas, reservas para el vestidor, probador virtual y ventas en un solo lugar.</p>
+      <div class="ceja roles">roles · administrador / encargado / cajero / cliente</div>
+    </aside>
+
+    <!-- formulario -->
+    <section class="formulario">
+      <h1>Bienvenido de vuelta</h1>
+
+      <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <div class="grupo">
+          <label class="etiqueta" for="email">Correo electronico</label>
+          <input
+            id="email"
+            type="email"
+            class="campo"
+            [class.invalido]="invalido('email')"
+            formControlName="email"
+            placeholder="admin@gangaclothes.com"
+            autocomplete="username"
+          />
+          @if (invalido('email')) {
+            <p class="ayuda-error">Ingresa un correo valido.</p>
+          }
+        </div>
+
+        <div class="grupo">
+          <label class="etiqueta" for="password">Contrasena</label>
+          <input
+            id="password"
+            type="password"
+            class="campo"
+            [class.invalido]="invalido('password')"
+            formControlName="password"
+            placeholder="••••••••"
+            autocomplete="current-password"
+          />
+          @if (invalido('password')) {
+            <p class="ayuda-error">La contrasena debe tener al menos 6 caracteres.</p>
+          }
+        </div>
+
+        @if (error()) {
+          <p class="error-servidor">{{ error() }}</p>
+        }
+
+        <button type="submit" class="btn bloque" [disabled]="enviando()">
+          {{ enviando() ? 'Verificando…' : 'Iniciar sesion' }}
+        </button>
+      </form>
+
+      <p class="nuevo">¿Cliente nuevo? <b>Crear cuenta</b></p>
+
+      <!-- atajo de demostracion: cuentas de backend/seed.py, solo en local -->
+      @if (mostrarCuentasDemo) {
+      <div class="demo">
+        <div class="ceja">cuentas de prueba (seed)</div>
+        <div>
+          @for (cuenta of cuentasDemo; track cuenta.email) {
+            <button type="button" class="chip" (click)="usar(cuenta)">{{ cuenta.rol }}</button>
+          }
+        </div>
+      </div>
+      }
+    </section>
+  </div>
+</div>
