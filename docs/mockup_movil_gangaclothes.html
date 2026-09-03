@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GangaClothes · Mockup App Móvil (Flutter)</title>
+<style>
+  :root{
+    --papel:#F2F2ED; --tinta:#14161A; --ganga:#E8175D; --ok:#1F7A5C;
+    --alerta:#C93400; --linea:#D9D9D2; --carbon:#1D2025; --gris:#6B6F76;
+    --mono:ui-monospace,'SF Mono','Cascadia Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--papel);color:var(--tinta);
+    font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    padding:34px 18px 70px}
+  .marca{max-width:1080px;margin:0 auto 8px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .logo{font-weight:900;font-size:30px;letter-spacing:-.03em;text-transform:uppercase}
+  .logo b{color:var(--ganga)}
+  .marca small{font-family:var(--mono);font-size:11px;color:var(--gris);letter-spacing:.12em;text-transform:uppercase}
+  .nota{max-width:1080px;margin:0 auto 30px;font-size:13px;color:var(--gris)}
+  .grilla{max-width:1080px;margin:0 auto;display:flex;flex-wrap:wrap;gap:46px 34px;justify-content:center}
+
+  /* ---------- etiqueta colgante (firma) ---------- */
+  .colgante{position:relative;width:300px}
+  .tag{position:absolute;top:-26px;left:16px;z-index:5;transform:rotate(-4deg);
+    background:#FFFDF8;border:1.5px solid var(--tinta);border-radius:4px 12px 4px 4px;
+    padding:5px 12px 5px 24px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;
+    box-shadow:2px 3px 0 rgba(20,22,26,.16)}
+  .tag::before{content:"";position:absolute;left:8px;top:50%;transform:translateY(-50%);
+    width:7px;height:7px;border:1.5px solid var(--tinta);border-radius:50%;background:var(--papel)}
+  .tag b{color:var(--ganga);font-weight:700}
+
+  /* ---------- marco de teléfono ---------- */
+  .fono{width:300px;height:628px;background:#fff;border:2px solid var(--tinta);
+    border-radius:34px;overflow:hidden;display:flex;flex-direction:column;
+    box-shadow:0 14px 34px rgba(20,22,26,.14)}
+  .status{height:30px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 18px;font-family:var(--mono);font-size:10px;color:var(--gris);flex:none}
+  .muesca{width:78px;height:16px;background:var(--tinta);border-radius:9px;margin:0 auto}
+  .pantalla{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:10px 14px 8px}
+  .navbar{flex:none;border-top:1px solid var(--linea);display:flex;background:#fff}
+  .navbar span{flex:1;text-align:center;padding:8px 0 10px;font-size:9.5px;color:var(--gris)}
+  .navbar span i{display:block;font-style:normal;font-size:15px;line-height:1.25}
+  .navbar .on{color:var(--ganga);font-weight:700}
+
+  h3{font-size:19px;font-weight:800;letter-spacing:-.02em;margin:4px 0 10px}
+  .ceja{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--gris)}
+
+  .campo{border:1.5px solid var(--linea);border-radius:11px;padding:10px 12px;font-size:12.5px;
+    color:var(--gris);margin-bottom:9px;background:#FBFBF8}
+  .btn{display:block;text-align:center;background:var(--tinta);color:#fff;border-radius:11px;
+    padding:11px;font-size:13px;font-weight:700;margin-top:4px}
+  .btn.rosa{background:var(--ganga)}
+  .btn.linea{background:#fff;color:var(--tinta);border:1.5px solid var(--tinta)}
+  .chip{display:inline-block;border:1.5px solid var(--linea);border-radius:99px;
+    padding:4px 11px;font-size:11px;margin:0 5px 6px 0;color:var(--gris)}
+  .chip.on{border-color:var(--tinta);background:var(--tinta);color:#fff}
+
+  .tarjeta{border:1.5px solid var(--linea);border-radius:13px;overflow:hidden;background:#fff}
+  .fotoprod{height:86px;display:flex;align-items:center;justify-content:center;background:#ECECE5}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .cards .tarjeta p{font-size:11px;padding:7px 8px 2px;font-weight:600;line-height:1.25}
+  .precio{font-family:var(--mono);font-size:11.5px;color:var(--ganga);font-weight:700;padding:0 8px 8px}
+
+  .swatch{width:15px;height:15px;border-radius:50%;display:inline-block;border:1.5px solid var(--linea);margin-right:6px;vertical-align:middle}
+  .fila-suc{display:flex;justify-content:space-between;font-size:11.5px;padding:6px 2px;border-bottom:1px dashed var(--linea)}
+  .disp{font-family:var(--mono);font-weight:700;color:var(--ok)}
+  .disp.no{color:var(--alerta)}
+
+  /* cámara del probador */
+  .camara{flex:1;border-radius:14px;overflow:hidden;position:relative;background:#17191D;margin-bottom:8px}
+  .hud{position:absolute;top:8px;left:8px;right:8px;display:flex;justify-content:space-between;z-index:3}
+  .hud span{font-family:var(--mono);font-size:9px;color:#fff;background:rgba(20,22,26,.55);
+    border:1px solid rgba(255,255,255,.25);border-radius:99px;padding:3px 8px}
+  .obturador{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:3;
+    width:44px;height:44px;border-radius:50%;border:3px solid #fff;background:rgba(255,255,255,.18)}
+  .miniprenda{position:absolute;bottom:12px;right:10px;z-index:3;display:flex;gap:6px}
+  .miniprenda i{width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center}
+
+  .siluetas{display:flex;gap:9px;margin:8px 0 10px}
+  .sil{flex:1;border:1.5px solid var(--linea);border-radius:12px;padding:8px 4px 5px;text-align:center;font-size:9.5px;color:var(--gris)}
+  .sil.on{border-color:var(--ganga);box-shadow:0 0 0 2px rgba(232,23,93,.18);color:var(--tinta);font-weight:700}
+
+  .ticket{border:1.5px dashed var(--tinta);border-radius:4px;background:#FFFDF6;
+    font-family:var(--mono);font-size:11px;padding:10px 12px;line-height:1.75}
+  .ticket .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1.5px dashed var(--tinta);margin-top:5px;padding-top:5px}
+  .stripe{display:flex;align-items:center;gap:7px;border:1.5px solid var(--linea);border-radius:11px;padding:9px 11px;font-size:11.5px;margin:9px 0 3px}
+  .stripe b{background:#635BFF;color:#fff;border-radius:5px;padding:2px 7px;font-size:10.5px}
+  .test{font-family:var(--mono);font-size:9.5px;color:var(--alerta);letter-spacing:.08em}
+  .linea-item{display:flex;justify-content:space-between;font-size:11.5px;padding:5px 0;border-bottom:1px solid var(--linea)}
+</style>
+</head>
+<body>
+
+<div class="marca">
+  <div class="logo">Ganga<b>Clothes</b></div>
+  <small>App móvil · Flutter · Prototipo de interfaz — sección 2.1.5</small>
+</div>
+<p class="nota">Cada etiqueta indica el caso de uso que cubre la pantalla. Capturar cada teléfono para el informe y replicar en Figma solo si la docente lo exige.</p>
+
+<div class="grilla">
+
+  <!-- ============ LOGIN ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU20</b> · Iniciar sesión</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla" style="justify-content:center">
+        <div style="text-align:center;margin-bottom:18px">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="#14161A" stroke-width="1.6">
+            <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z"/>
+          </svg>
+          <div class="logo" style="font-size:23px">Ganga<b>Clothes</b></div>
+          <div class="ceja" style="margin-top:2px">Moda a tu medida, a precio de ganga</div>
+        </div>
+        <div class="campo">Correo electrónico</div>
+        <div class="campo">Contraseña</div>
+        <div class="btn">Iniciar sesión</div>
+        <div class="btn linea" style="margin-top:9px">Crear cuenta</div>
+        <p style="text-align:center;font-size:11px;color:var(--gris);margin-top:14px">¿Olvidaste tu contraseña?</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CATALOGO ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU22</b> · Catálogo y disponibilidad</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla">
+        <div class="ceja">Primavera–Verano 2026</div>
+        <h3>Catálogo</h3>
+        <div class="campo" style="margin-bottom:8px">⌕ &nbsp;Buscar prenda…</div>
+        <div style="margin-bottom:6px">
+          <span class="chip on">Todo</span><span class="chip">Poleras</span><span class="chip">Jeans</span><span class="chip">Vestidos</span>
+        </div>
+        <div style="margin-bottom:9px">
+          <span class="chip">Talla M</span><span class="chip on">Rojo</span><span class="chip">Sucursal Central</span>
+        </div>
+        <div class="cards">
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="#D33"><path d="M8 3 5 5 2 9l3 2 1-1v11h12V10l1 1 3-2-3-4-3-2a4 4 0 0 1-8 0z"/></svg>
+          </div><p>Polera básica algodón</p><div class="precio">Bs 79,90</div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="#2C4B72"><path d="M7 2h10l1 6-3 14h-3l-1-9h-.2L9 22H6L5 8z"/></svg>
+          </div><p>Pantalón jean clásico</p><div class="precio">Bs 189,90</div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="#B3475F"><path d="M9 2l3 2 3-2 2 4-2 3 2 12H7L9 9 7 6z"/></svg>
+          </div><p>Vestido floral verano</p><div class="precio">Bs 149,90</div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="#39566B"><path d="M8 3 4 6l1 5 2-1v12h4V12h2v10h4V10l2 1 1-5-4-3a4 4 0 0 1-8 0z"/></svg>
+          </div><p>Chamarra denim</p><div class="precio">Bs 229,90</div></div>
+        </div>
+      </div>
+      <div class="navbar">
+        <span class="on"><i>⌂</i>Catálogo</span><span><i>◉</i>Probador</span>
+        <span><i>⧖</i>Reservas</span><span><i>⬧</i>Carrito</span><span><i>○</i>Perfil</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DETALLE ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU22</b> · Detalle de prenda</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla">
+        <div class="fotoprod" style="height:110px;border-radius:13px;margin-bottom:9px">
+          <svg width="72" height="72" viewBox="0 0 24 24" fill="#D33"><path d="M8 3 5 5 2 9l3 2 1-1v11h12V10l1 1 3-2-3-4-3-2a4 4 0 0 1-8 0z"/></svg>
+        </div>
+        <h3 style="margin-bottom:2px">Polera básica algodón</h3>
+        <div class="precio" style="padding:0;font-size:15px;margin-bottom:8px">Bs 79,90 <span style="color:var(--gris);font-weight:400;font-size:10px">· SKU P1-T2-C3</span></div>
+        <div class="ceja" style="margin-bottom:4px">Talla</div>
+        <div><span class="chip">S</span><span class="chip on">M</span><span class="chip">L</span><span class="chip">XL</span></div>
+        <div class="ceja" style="margin:5px 0 4px">Color</div>
+        <div style="margin-bottom:7px">
+          <span class="swatch" style="background:#D33;border-color:#D33"></span>
+          <span class="swatch" style="background:#14161A"></span>
+          <span class="swatch" style="background:#fff"></span>
+          <span class="swatch" style="background:#2C4B72"></span>
+        </div>
+        <div class="ceja" style="margin-bottom:2px">Disponibilidad · talla M · rojo</div>
+        <div class="fila-suc"><span>Sucursal Central</span><span class="disp">8 disp.</span></div>
+        <div class="fila-suc"><span>Sucursal Norte</span><span class="disp">3 disp.</span></div>
+        <div class="fila-suc" style="border-bottom:none"><span>Ventura Mall</span><span class="disp no">Agotado</span></div>
+        <div class="btn rosa" style="margin-top:8px">◉ &nbsp;Probar con mi cámara</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <div class="btn linea" style="flex:1;padding:9px;font-size:11.5px">Reservar</div>
+          <div class="btn" style="flex:1;padding:9px;font-size:11.5px">Al carrito</div>
+        </div>
+      </div>
+      <div class="navbar">
+        <span class="on"><i>⌂</i>Catálogo</span><span><i>◉</i>Probador</span>
+        <span><i>⧖</i>Reservas</span><span><i>⬧</i>Carrito</span><span><i>○</i>Perfil</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PROBADOR RA ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU24</b> · Probador con RA (cámara)</div>
+    <div class="fono" style="background:var(--carbon)">
+      <div class="status" style="color:#9aa"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla" style="padding:8px 10px">
+        <div class="camara">
+          <div class="hud"><span>◉ ML Kit · 33 puntos</span><span>REC ●</span></div>
+          <svg viewBox="0 0 280 430" style="width:100%;height:100%">
+            <!-- fondo cámara -->
+            <rect width="280" height="430" fill="#1B1E23"/>
+            <rect x="0" y="330" width="280" height="100" fill="#181B1F"/>
+            <!-- esquinas de encuadre -->
+            <g stroke="#8b929c" stroke-width="2.5" fill="none" opacity=".8">
+              <path d="M18 30h-8v-8M262 22v8h8M18 400h-8v8M270 400v8h-8"/>
+              <path d="M10 30v-8h8M270 22h-8v8M10 400v8h8M262 408h8v-8"/>
+            </g>
+            <!-- persona (cámara del propio celular) -->
+            <g fill="#3A4048">
+              <circle cx="140" cy="96" r="26"/>
+              <path d="M140 122c-34 0-56 20-58 52l-8 96h22l6 120h76l6-120h22l-8-96c-2-32-24-52-58-52z"/>
+            </g>
+            <!-- prenda superpuesta escalada a hombros/caderas -->
+            <path d="M105 138l-26 14-12 24 22 12 8-8v88h86v-88l8 8 22-12-12-24-26-14c-6 12-16 18-35 18s-29-6-35-18z"
+                  fill="#D33" opacity=".93"/>
+            <path d="M118 176h44M118 190h30" stroke="#fff" stroke-opacity=".35" stroke-width="3" stroke-linecap="round"/>
+            <!-- esqueleto de pose -->
+            <g stroke="#FF5D96" stroke-width="1.6" opacity=".9">
+              <line x1="104" y1="148" x2="176" y2="148"/>
+              <line x1="104" y1="148" x2="88" y2="212"/>
+              <line x1="176" y1="148" x2="192" y2="212"/>
+              <line x1="112" y1="268" x2="168" y2="268"/>
+              <line x1="104" y1="148" x2="112" y2="268"/>
+              <line x1="176" y1="148" x2="168" y2="268"/>
+            </g>
+            <g fill="#FF2E77" stroke="#fff" stroke-width="1.4">
+              <circle cx="104" cy="148" r="5"/><circle cx="176" cy="148" r="5"/>
+              <circle cx="88" cy="212" r="4"/><circle cx="192" cy="212" r="4"/>
+              <circle cx="112" cy="268" r="5"/><circle cx="168" cy="268" r="5"/>
+            </g>
+            <text x="140" y="322" fill="#cfd4da" font-size="10" text-anchor="middle"
+                  font-family="ui-monospace,monospace">hombros 41 cm · escala 1.06</text>
+          </svg>
+          <div class="obturador"></div>
+          <div class="miniprenda">
+            <i><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M8 3 5 5 2 9l3 2 1-1v11h12V10l1 1 3-2-3-4-3-2a4 4 0 0 1-8 0z"/></svg></i>
+            <i><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M9 2l3 2 3-2 2 4-2 3 2 12H7L9 9 7 6z"/></svg></i>
+          </div>
+        </div>
+        <div class="btn rosa" style="font-size:12px;padding:9px">Guardar foto · compartir</div>
+        <p style="font-size:9.5px;color:#8b929c;text-align:center;margin-top:6px">
+          La cámara de <b style="color:#fff">tu propio teléfono</b> es el espejo — sin pantallas externas.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ AVATAR ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU23</b> · Crear mi avatar</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla">
+        <div class="ceja">Probador · modo avatar</div>
+        <h3>Mi avatar</h3>
+        <div class="ceja" style="margin-bottom:5px">1 · Elige tu contextura</div>
+        <div class="siluetas">
+          <div class="sil"><svg width="34" height="58" viewBox="0 0 40 70"><circle cx="20" cy="10" r="7" fill="#9aa0a8"/><path d="M20 18c-8 0-11 6-11 14l-2 20h6l2 16h10l2-16h6l-2-20c0-8-3-14-11-14z" fill="#9aa0a8"/></svg>Delgada</div>
+          <div class="sil on"><svg width="34" height="58" viewBox="0 0 40 70"><circle cx="20" cy="10" r="7" fill="#E8175D"/><path d="M20 18c-10 0-13 6-13 14l-2 20h7l2 16h12l2-16h7l-2-20c0-8-3-14-13-14z" fill="#E8175D"/></svg>Media</div>
+          <div class="sil"><svg width="34" height="58" viewBox="0 0 40 70"><circle cx="20" cy="10" r="7" fill="#9aa0a8"/><path d="M20 18c-12 0-15 7-15 15l-2 19h8l2 16h14l2-16h8l-2-19c0-8-3-15-15-15z" fill="#9aa0a8"/></svg>Amplia</div>
+        </div>
+        <div class="ceja" style="margin-bottom:5px">2 · Tu rostro</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:46px;height:46px;border-radius:50%;border:1.5px dashed var(--ganga);display:flex;align-items:center;justify-content:center;color:var(--ganga);font-size:17px">✚</div>
+          <div style="font-size:11px;color:var(--gris)">Sube o toma una foto.<br>Se coloca sobre el avatar.</div>
+        </div>
+        <div class="ceja" style="margin-bottom:4px">3 · Pruébate la prenda</div>
+        <div style="border:1.5px solid var(--linea);border-radius:13px;background:#ECECE5;display:flex;justify-content:center;padding:7px 0 3px">
+          <svg width="86" height="122" viewBox="0 0 60 96">
+            <circle cx="30" cy="11" r="9" fill="#C8A98F"/>
+            <path d="M30 21c-10 0-13 6-13 14l-2 20h7l2 24h12l2-24h7l-2-20c0-8-3-14-13-14z" fill="#9aa0a8"/>
+            <path d="M18 24l-8 4-3 8 7 4 2-3v22h28V37l2 3 7-4-3-8-8-4c-2 4-6 6-12 6s-10-2-12-6z" fill="#D33"/>
+          </svg>
+        </div>
+        <div class="btn" style="margin-top:9px">Guardar avatar</div>
+      </div>
+      <div class="navbar">
+        <span><i>⌂</i>Catálogo</span><span class="on"><i>◉</i>Probador</span>
+        <span><i>⧖</i>Reservas</span><span><i>⬧</i>Carrito</span><span><i>○</i>Perfil</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RESERVA ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU25–26</b> · Reservar para probar</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla">
+        <div class="ceja">Vestidores físicos</div>
+        <h3>Reservar prendas</h3>
+        <div class="linea-item"><span>Polera básica · M · Rojo</span><span style="font-family:var(--mono)">x1</span></div>
+        <div class="linea-item"><span>Jean clásico · 32 · Azul</span><span style="font-family:var(--mono)">x1</span></div>
+        <div class="linea-item" style="border-bottom:none;color:var(--gris)"><span>+ Agregar otra prenda</span><span></span></div>
+        <div class="ceja" style="margin:8px 0 5px">Sucursal para probarte</div>
+        <div class="campo" style="color:var(--tinta)">Sucursal Central · Av. Principal #123 ▾</div>
+        <div class="ceja" style="margin-bottom:5px">Día y hora aproximada</div>
+        <div style="display:flex;gap:8px">
+          <div class="campo" style="flex:1;color:var(--tinta)">Sáb 05/09 ▾</div>
+          <div class="campo" style="flex:1;color:var(--tinta)">16:30 ▾</div>
+        </div>
+        <div style="background:#FFF4F8;border:1.5px solid #F5C1D4;border-radius:11px;padding:8px 10px;font-size:10.5px;color:#8f2b4d;margin-bottom:8px">
+          La sucursal recibirá tu reserva y tendrá las prendas listas en el vestidor.
+        </div>
+        <div class="btn rosa">Confirmar reserva</div>
+        <div class="ceja" style="margin:10px 0 4px">Mis reservas</div>
+        <div class="fila-suc" style="border-bottom:none"><span>#R-014 · Central · hoy 16:30</span><span class="disp" style="color:var(--ganga)">Preparada</span></div>
+      </div>
+      <div class="navbar">
+        <span><i>⌂</i>Catálogo</span><span><i>◉</i>Probador</span>
+        <span class="on"><i>⧖</i>Reservas</span><span><i>⬧</i>Carrito</span><span><i>○</i>Perfil</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CARRITO / PAGO ============ -->
+  <div class="colgante">
+    <div class="tag"><b>CU27</b> · Carrito y pago (Stripe test)</div>
+    <div class="fono">
+      <div class="status"><span>9:41</span><div class="muesca"></div><span>▮▮▮</span></div>
+      <div class="pantalla">
+        <h3>Tu carrito</h3>
+        <div class="ticket">
+          <div style="text-align:center;letter-spacing:.18em">GANGACLOTHES</div>
+          <div style="text-align:center;font-size:9.5px">canal: móvil · venta #V-0042</div>
+          <div class="tot" style="border-top:none;margin-top:6px;font-weight:400"><span>Polera básica M/Rojo</span><span>79,90</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Jean clásico 32/Azul</span><span>189,90</span></div>
+          <div style="display:flex;justify-content:space-between;color:var(--ganga)"><span>Promo verano −10%</span><span>−26,98</span></div>
+          <div class="tot"><span>TOTAL Bs</span><span>242,82</span></div>
+        </div>
+        <div class="stripe"><b>stripe</b> Pagar con tarjeta <span class="test" style="margin-left:auto">MODO PRUEBA</span></div>
+        <div class="campo" style="font-family:var(--mono);color:var(--tinta)">4242 4242 4242 4242</div>
+        <div style="display:flex;gap:8px">
+          <div class="campo" style="flex:1;font-family:var(--mono);color:var(--tinta)">12/29</div>
+          <div class="campo" style="flex:1;font-family:var(--mono);color:var(--tinta)">CVC 123</div>
+        </div>
+        <div class="btn rosa">Pagar Bs 242,82</div>
+        <p style="font-size:9.5px;color:var(--gris);text-align:center;margin-top:7px">
+          Al pagar, el inventario de la sucursal se descuenta automáticamente.</p>
+      </div>
+      <div class="navbar">
+        <span><i>⌂</i>Catálogo</span><span><i>◉</i>Probador</span>
+        <span><i>⧖</i>Reservas</span><span class="on"><i>⬧</i>Carrito</span><span><i>○</i>Perfil</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

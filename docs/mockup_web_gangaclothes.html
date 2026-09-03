@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GangaClothes · Mockup Web (Angular)</title>
+<style>
+  :root{
+    --papel:#F2F2ED; --tinta:#14161A; --ganga:#E8175D; --ok:#1F7A5C;
+    --alerta:#C93400; --linea:#D9D9D2; --gris:#6B6F76; --suave:#FBFBF8;
+    --mono:ui-monospace,'SF Mono','Cascadia Mono',Consolas,monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--papel);color:var(--tinta);
+    font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    padding:34px 18px 70px}
+  .marca{max-width:1000px;margin:0 auto 8px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+  .logo{font-weight:900;font-size:30px;letter-spacing:-.03em;text-transform:uppercase}
+  .logo b{color:var(--ganga)}
+  .marca small{font-family:var(--mono);font-size:11px;color:var(--gris);letter-spacing:.12em;text-transform:uppercase}
+  .nota{max-width:1000px;margin:0 auto 34px;font-size:13px;color:var(--gris)}
+
+  .colgante{max-width:1000px;margin:0 auto 52px;position:relative}
+  .tag{position:absolute;top:-24px;left:20px;z-index:5;transform:rotate(-3.5deg);
+    background:#FFFDF8;border:1.5px solid var(--tinta);border-radius:4px 12px 4px 4px;
+    padding:5px 12px 5px 24px;font-family:var(--mono);font-size:11px;letter-spacing:.06em;
+    box-shadow:2px 3px 0 rgba(20,22,26,.16)}
+  .tag::before{content:"";position:absolute;left:8px;top:50%;transform:translateY(-50%);
+    width:7px;height:7px;border:1.5px solid var(--tinta);border-radius:50%;background:var(--papel)}
+  .tag b{color:var(--ganga)}
+
+  .scrollwrap{overflow-x:auto;border-radius:16px;box-shadow:0 14px 34px rgba(20,22,26,.13)}
+  .navegador{min-width:860px;background:#fff;border:2px solid var(--tinta);border-radius:16px;overflow:hidden}
+  .barra{display:flex;align-items:center;gap:10px;background:#EDEDE6;border-bottom:1.5px solid var(--linea);padding:9px 14px}
+  .barra i{width:11px;height:11px;border-radius:50%;background:#C9C9C0;display:inline-block}
+  .url{flex:1;background:#fff;border:1px solid var(--linea);border-radius:99px;
+    font-family:var(--mono);font-size:11px;color:var(--gris);padding:5px 14px}
+
+  .topnav{display:flex;align-items:center;gap:18px;padding:12px 22px;border-bottom:1.5px solid var(--linea)}
+  .topnav .logo{font-size:17px}
+  .topnav a{font-size:12.5px;color:var(--gris)}
+  .topnav a.on{color:var(--tinta);font-weight:700;border-bottom:2px solid var(--ganga);padding-bottom:2px}
+  .yo{margin-left:auto;font-family:var(--mono);font-size:10.5px;background:var(--suave);
+    border:1px solid var(--linea);border-radius:99px;padding:4px 11px;color:var(--gris)}
+
+  h3{font-size:20px;font-weight:800;letter-spacing:-.02em}
+  .ceja{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--gris)}
+  .btn{display:inline-block;background:var(--tinta);color:#fff;border-radius:10px;padding:9px 16px;font-size:12.5px;font-weight:700}
+  .btn.rosa{background:var(--ganga)}
+  .btn.linea{background:#fff;color:var(--tinta);border:1.5px solid var(--tinta)}
+  .campo{border:1.5px solid var(--linea);border-radius:10px;padding:9px 12px;font-size:12.5px;color:var(--gris);background:var(--suave)}
+  .chip{display:inline-block;border:1.5px solid var(--linea);border-radius:99px;padding:4px 12px;font-size:11.5px;margin:0 6px 8px 0;color:var(--gris)}
+  .chip.on{border-color:var(--tinta);background:var(--tinta);color:#fff}
+  .estado{font-family:var(--mono);font-size:10px;border-radius:99px;padding:3px 9px;font-weight:700}
+  .estado.ok{background:#E4F2EC;color:var(--ok)}
+  .estado.bajo{background:#FCE9E2;color:var(--alerta)}
+  .estado.rosa{background:#FCE3EC;color:var(--ganga)}
+
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--gris);text-align:left;padding:9px 10px;border-bottom:1.5px solid var(--tinta)}
+  td{padding:9px 10px;border-bottom:1px solid var(--linea)}
+  td.mono{font-family:var(--mono);font-size:11px}
+
+  .swatch{width:14px;height:14px;border-radius:50%;display:inline-block;border:1.5px solid var(--linea);vertical-align:-2px;margin-right:4px}
+  .fotoprod{height:120px;display:flex;align-items:center;justify-content:center;background:#ECECE5}
+  .tarjeta{border:1.5px solid var(--linea);border-radius:13px;overflow:hidden;background:#fff}
+  .precio{font-family:var(--mono);color:var(--ganga);font-weight:700}
+  .ticket{border:1.5px dashed var(--tinta);border-radius:4px;background:#FFFDF6;
+    font-family:var(--mono);font-size:12px;padding:14px 16px;line-height:1.9}
+  .ticket .tot{display:flex;justify-content:space-between;font-weight:700;border-top:1.5px dashed var(--tinta);margin-top:6px;padding-top:6px}
+</style>
+</head>
+<body>
+
+<div class="marca">
+  <div class="logo">Ganga<b>Clothes</b></div>
+  <small>Plataforma web · Angular · Prototipo de interfaz — sección 2.1.5</small>
+</div>
+<p class="nota">Cinco pantallas clave: acceso, tienda del cliente y los tres paneles internos (administración, inventario, caja). La etiqueta de cada marco indica el caso de uso.</p>
+
+<!-- ==================== LOGIN ==================== -->
+<div class="colgante">
+  <div class="tag"><b>CU1</b> · Iniciar sesión (todos los roles)</div>
+  <div class="scrollwrap"><div class="navegador">
+    <div class="barra"><i></i><i></i><i></i><div class="url">gangaclothes.vercel.app/login</div></div>
+    <div style="display:grid;grid-template-columns:1.1fr 1fr;min-height:330px">
+      <div style="background:var(--tinta);color:#fff;padding:38px 40px;display:flex;flex-direction:column;justify-content:center">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#E8175D" stroke-width="1.6" style="margin-bottom:14px">
+          <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z"/>
+        </svg>
+        <div style="font-weight:900;font-size:30px;letter-spacing:-.03em;text-transform:uppercase">Ganga<span style="color:var(--ganga)">Clothes</span></div>
+        <p style="font-size:13px;color:#B9BDC4;margin-top:10px;max-width:300px">
+          Catálogo por temporadas, reservas para el vestidor, probador virtual y ventas en un solo lugar.</p>
+        <div class="ceja" style="color:#8b929c;margin-top:22px">roles · administrador / encargado / cajero / cliente</div>
+      </div>
+      <div style="padding:40px 44px;display:flex;flex-direction:column;justify-content:center;gap:10px">
+        <h3 style="margin-bottom:6px">Bienvenido de vuelta</h3>
+        <div class="campo">Correo electrónico</div>
+        <div class="campo">Contraseña</div>
+        <div class="btn" style="text-align:center;margin-top:6px">Iniciar sesión</div>
+        <div style="font-size:12px;color:var(--gris);text-align:center">¿Cliente nuevo? <b style="color:var(--ganga)">Crear cuenta</b></div>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+<!-- ==================== CATALOGO CLIENTE ==================== -->
+<div class="colgante">
+  <div class="tag"><b>CU16–17</b> · Catálogo, carrito y compra</div>
+  <div class="scrollwrap"><div class="navegador">
+    <div class="barra"><i></i><i></i><i></i><div class="url">gangaclothes.vercel.app/catalogo?temporada=verano-2026</div></div>
+    <div class="topnav">
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <a class="on">Catálogo</a><a>Temporadas</a><a>Sucursales</a>
+      <span class="yo">María · cliente &nbsp;·&nbsp; ⬧ Carrito (2)</span>
+    </div>
+    <div style="display:grid;grid-template-columns:210px 1fr;gap:0">
+      <aside style="border-right:1.5px solid var(--linea);padding:18px 18px 22px">
+        <div class="ceja" style="margin-bottom:8px">Temporada</div>
+        <div><span class="chip on">Verano 2026</span><span class="chip">Escolar</span></div>
+        <div class="ceja" style="margin:10px 0 8px">Categoría</div>
+        <div><span class="chip">Poleras</span><span class="chip">Jeans</span><span class="chip">Vestidos</span></div>
+        <div class="ceja" style="margin:10px 0 8px">Talla</div>
+        <div><span class="chip">S</span><span class="chip on">M</span><span class="chip">L</span></div>
+        <div class="ceja" style="margin:10px 0 8px">Color</div>
+        <div>
+          <span class="swatch" style="background:#D33;border-color:#D33"></span>
+          <span class="swatch" style="background:#14161A"></span>
+          <span class="swatch" style="background:#fff"></span>
+          <span class="swatch" style="background:#2C4B72"></span>
+        </div>
+        <div class="ceja" style="margin:10px 0 8px">Sucursal</div>
+        <div class="campo" style="font-size:11.5px;color:var(--tinta)">Central ▾</div>
+      </aside>
+      <main style="padding:18px 22px">
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:12px">
+          <h3>Primavera–Verano 2026</h3>
+          <span class="ceja">24 prendas · con stock en Central</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="58" height="58" viewBox="0 0 24 24" fill="#D33"><path d="M8 3 5 5 2 9l3 2 1-1v11h12V10l1 1 3-2-3-4-3-2a4 4 0 0 1-8 0z"/></svg></div>
+            <div style="padding:9px 11px 11px"><div style="font-size:12px;font-weight:600">Polera básica algodón</div>
+            <div class="precio" style="font-size:13px">Bs 79,90</div>
+            <div style="font-size:10.5px;color:var(--ok);margin-top:2px">● 8 disp. en Central</div></div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="58" height="58" viewBox="0 0 24 24" fill="#2C4B72"><path d="M7 2h10l1 6-3 14h-3l-1-9h-.2L9 22H6L5 8z"/></svg></div>
+            <div style="padding:9px 11px 11px"><div style="font-size:12px;font-weight:600">Pantalón jean clásico</div>
+            <div class="precio" style="font-size:13px">Bs 189,90</div>
+            <div style="font-size:10.5px;color:var(--ok);margin-top:2px">● 5 disp. en Central</div></div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="58" height="58" viewBox="0 0 24 24" fill="#B3475F"><path d="M9 2l3 2 3-2 2 4-2 3 2 12H7L9 9 7 6z"/></svg></div>
+            <div style="padding:9px 11px 11px"><div style="font-size:12px;font-weight:600">Vestido floral verano <span class="estado rosa">−10%</span></div>
+            <div class="precio" style="font-size:13px">Bs 134,90 <s style="color:var(--gris);font-weight:400;font-size:10px">149,90</s></div>
+            <div style="font-size:10.5px;color:var(--ok);margin-top:2px">● 3 disp. en Central</div></div></div>
+          <div class="tarjeta"><div class="fotoprod">
+            <svg width="58" height="58" viewBox="0 0 24 24" fill="#39566B"><path d="M8 3 4 6l1 5 2-1v12h4V12h2v10h4V10l2 1 1-5-4-3a4 4 0 0 1-8 0z"/></svg></div>
+            <div style="padding:9px 11px 11px"><div style="font-size:12px;font-weight:600">Chamarra denim</div>
+            <div class="precio" style="font-size:13px">Bs 229,90</div>
+            <div style="font-size:10.5px;color:var(--alerta);margin-top:2px">● Agotado — ver otras sucursales</div></div></div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px">
+          <span class="btn rosa">Comprar ahora</span>
+          <span class="btn linea">Reservar para probar en tienda</span>
+        </div>
+      </main>
+    </div>
+  </div></div>
+</div>
+
+<!-- ==================== ADMIN PRENDAS ==================== -->
+<div class="colgante">
+  <div class="tag"><b>CU7</b> · Administrar prendas y variantes</div>
+  <div class="scrollwrap"><div class="navegador">
+    <div class="barra"><i></i><i></i><i></i><div class="url">gangaclothes.vercel.app/admin/prendas</div></div>
+    <div class="topnav">
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <a>Usuarios</a><a>Sucursales</a><a class="on">Prendas</a><a>Temporadas</a><a>Promociones</a><a>Reportes</a>
+      <span class="yo">Admin · administrador</span>
+    </div>
+    <div style="padding:18px 22px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <h3>Prendas y variantes</h3>
+        <span class="campo" style="flex:1;max-width:280px">⌕ Buscar por nombre o SKU…</span>
+        <span class="btn rosa">+ Nueva prenda</span>
+      </div>
+      <table>
+        <tr><th>SKU</th><th>Prenda</th><th>Talla</th><th>Color</th><th>Precio</th><th>Costo</th><th>Margen</th><th>Recurso RA</th><th>Acciones</th></tr>
+        <tr><td class="mono">P1-T2-C1</td><td>Polera básica algodón</td><td>M</td>
+            <td><span class="swatch" style="background:#D33;border-color:#D33"></span>Rojo</td>
+            <td class="mono">79,90</td><td class="mono">45,00</td><td class="mono" style="color:var(--ok)">+34,90</td>
+            <td><span class="estado ok">PNG ✓</span></td><td>Editar · Variantes</td></tr>
+        <tr><td class="mono">P1-T3-C2</td><td>Polera básica algodón</td><td>L</td>
+            <td><span class="swatch" style="background:#14161A"></span>Negro</td>
+            <td class="mono">79,90</td><td class="mono">45,00</td><td class="mono" style="color:var(--ok)">+34,90</td>
+            <td><span class="estado ok">PNG ✓</span></td><td>Editar · Variantes</td></tr>
+        <tr><td class="mono">P2-T2-C4</td><td>Pantalón jean clásico</td><td>32</td>
+            <td><span class="swatch" style="background:#2C4B72"></span>Azul</td>
+            <td class="mono">189,90</td><td class="mono">110,00</td><td class="mono" style="color:var(--ok)">+79,90</td>
+            <td><span class="estado bajo">Falta PNG</span></td><td>Editar · Variantes</td></tr>
+        <tr><td class="mono">P3-T1-C3</td><td>Vestido floral verano</td><td>S</td>
+            <td><span class="swatch" style="background:#B3475F;border-color:#B3475F"></span>Rosa</td>
+            <td class="mono">149,90</td><td class="mono">92,00</td><td class="mono" style="color:var(--ok)">+57,90</td>
+            <td><span class="estado ok">PNG ✓</span></td><td>Editar · Variantes</td></tr>
+      </table>
+      <p class="ceja" style="margin-top:12px">el margen (precio − costo) alimenta el reporte de ganancia promedio · cu19</p>
+    </div>
+  </div></div>
+</div>
+
+<!-- ==================== INVENTARIO ==================== -->
+<div class="colgante">
+  <div class="tag"><b>CU11</b> · Inventario con stock mín/máx</div>
+  <div class="scrollwrap"><div class="navegador">
+    <div class="barra"><i></i><i></i><i></i><div class="url">gangaclothes.vercel.app/admin/inventario?sucursal=central</div></div>
+    <div class="topnav">
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <a>Reservas</a><a class="on">Inventario</a><a>Compras</a><a>Movimientos</a>
+      <span class="yo">Elena · encargada Central</span>
+    </div>
+    <div style="padding:18px 22px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+        <h3>Inventario · Sucursal Central</h3>
+        <span class="estado bajo">⚠ 2 variantes bajo el mínimo</span>
+        <span class="btn linea" style="margin-left:auto">Registrar movimiento</span>
+        <span class="btn">+ Compra a proveedor</span>
+      </div>
+      <table>
+        <tr><th>SKU</th><th>Prenda / Variante</th><th>Disponible</th><th>Reservado</th><th>Mín</th><th>Máx</th><th>Estado</th><th>Acción</th></tr>
+        <tr><td class="mono">P1-T2-C1</td><td>Polera básica · M · Rojo</td>
+            <td class="mono">8</td><td class="mono">2</td><td class="mono">3</td><td class="mono">20</td>
+            <td><span class="estado ok">OK</span></td><td>Ajustar</td></tr>
+        <tr style="background:#FFF6F2">
+            <td class="mono">P2-T2-C4</td><td>Jean clásico · 32 · Azul</td>
+            <td class="mono" style="color:var(--alerta);font-weight:700">2</td><td class="mono">1</td><td class="mono">4</td><td class="mono">15</td>
+            <td><span class="estado bajo">Stock bajo</span></td><td><b style="color:var(--ganga)">Reponer →</b></td></tr>
+        <tr style="background:#FFF6F2">
+            <td class="mono">P4-T3-C2</td><td>Chamarra denim · L · Negro</td>
+            <td class="mono" style="color:var(--alerta);font-weight:700">0</td><td class="mono">0</td><td class="mono">2</td><td class="mono">10</td>
+            <td><span class="estado bajo">Agotado</span></td><td><b style="color:var(--ganga)">Reponer →</b></td></tr>
+        <tr><td class="mono">P3-T1-C3</td><td>Vestido floral · S · Rosa</td>
+            <td class="mono">6</td><td class="mono">1</td><td class="mono">2</td><td class="mono">12</td>
+            <td><span class="estado ok">OK</span></td><td>Ajustar</td></tr>
+      </table>
+      <p class="ceja" style="margin-top:12px">disponible = cantidad − reservada · la alerta se dispara al cruzar el mínimo</p>
+    </div>
+  </div></div>
+</div>
+
+<!-- ==================== CAJA ==================== -->
+<div class="colgante">
+  <div class="tag"><b>CU14–15</b> · Venta presencial y pago en caja</div>
+  <div class="scrollwrap"><div class="navegador">
+    <div class="barra"><i></i><i></i><i></i><div class="url">gangaclothes.vercel.app/caja</div></div>
+    <div class="topnav">
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <a class="on">Caja</a><a>Reservas del día</a>
+      <span class="yo">Carlos · cajero · Central</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:0">
+      <div style="padding:18px 22px;border-right:1.5px solid var(--linea)">
+        <div class="ceja" style="margin-bottom:6px">Venta #V-0043 · canal caja</div>
+        <div class="campo" style="margin-bottom:12px">⌕ Escanear o buscar SKU… &nbsp;<b style="color:var(--tinta)">P1-T2-C1</b></div>
+        <div class="ceja" style="margin-bottom:6px">Desde reserva preparada</div>
+        <div style="border:1.5px solid var(--linea);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div style="font-size:12.5px"><b>#R-014 · María Flores</b><br>
+          <span style="color:var(--gris);font-size:11px">2 prendas probadas · vestidor 3</span></div>
+          <span class="btn linea" style="padding:7px 12px;font-size:11.5px">Cargar a la venta</span>
+        </div>
+        <table>
+          <tr><th>Ítem</th><th>Cant.</th><th>P. unit</th><th>Subtotal</th></tr>
+          <tr><td>Polera básica · M · Rojo</td><td class="mono">1</td><td class="mono">79,90</td><td class="mono">79,90</td></tr>
+          <tr><td>Jean clásico · 32 · Azul</td><td class="mono">1</td><td class="mono">189,90</td><td class="mono">189,90</td></tr>
+        </table>
+      </div>
+      <div style="padding:18px 22px;background:var(--suave)">
+        <div class="ticket">
+          <div style="text-align:center;letter-spacing:.2em">GANGACLOTHES</div>
+          <div style="text-align:center;font-size:10px">Sucursal Central · caja 1 · Carlos</div>
+          <div style="display:flex;justify-content:space-between;margin-top:8px"><span>Polera básica M/Rojo</span><span>79,90</span></div>
+          <div style="display:flex;justify-content:space-between"><span>Jean clásico 32/Azul</span><span>189,90</span></div>
+          <div class="tot"><span>TOTAL Bs</span><span>269,80</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--gris)"><span>comprobante</span><span>C-000217</span></div>
+        </div>
+        <div class="ceja" style="margin:12px 0 7px">Método de pago</div>
+        <div><span class="chip on">Efectivo</span><span class="chip">Tarjeta</span><span class="chip">QR</span></div>
+        <div class="btn rosa" style="display:block;text-align:center;margin-top:8px">Cobrar Bs 269,80</div>
+        <p style="font-size:10.5px;color:var(--gris);margin-top:9px">Al cobrar: la venta pasa a <b>pagada</b>, se emite el comprobante y el stock de Central se descuenta.</p>
+      </div>
+    </div>
+  </div></div>
+</div>
+
+</body>
+</html>
