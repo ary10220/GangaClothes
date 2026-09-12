@@ -9,7 +9,7 @@ from app.modules.catalogos_base.router import router as catalogos_router
 from app.modules.usuarios.router import router as usuarios_router
 from app.modules.seguridad.router import router as seguridad_router
 from app.modules.prendas.router import router as prendas_router, publico as catalogo_publico
-from app.modules.inventario.router import router as inventario_router
+from app.modules.inventario.router import router as inventario_router, compras as compras_router
 from app.modules.reservas.router import router as reservas_router
 from app.modules.ventas.router import router as ventas_router
 from app.modules.pagos.router import router as pagos_router
@@ -40,10 +40,11 @@ app.include_router(seguridad_router, prefix="/api/seguridad", tags=["2b. Roles, 
 app.include_router(catalogos_router, prefix="/api/admin", tags=["3. Catalogos base (CU4-CU6, CU8)"])
 app.include_router(prendas_router, prefix="/api/prendas", tags=["4. Prendas y variantes (CU7)"])
 app.include_router(catalogo_publico, prefix="/api", tags=["5. Catalogo publico (CU16, CU22)"])
-app.include_router(inventario_router, prefix="/api/inventario", tags=["6. Inventario (CU10-CU12) [pendiente]"])
-app.include_router(reservas_router, prefix="/api/reservas", tags=["7. Reservas (CU13, CU25-CU26) [pendiente]"])
-app.include_router(ventas_router, prefix="/api/ventas", tags=["8. Ventas (CU14, CU17, CU27) [pendiente]"])
-app.include_router(pagos_router, prefix="/api/pagos", tags=["9. Pagos (CU15) [pendiente]"])
+app.include_router(inventario_router, prefix="/api/inventario", tags=["6. Inventario (CU11-CU12)"])
+app.include_router(compras_router, prefix="/api/compras", tags=["6b. Compras a proveedor (CU10)"])
+app.include_router(reservas_router, prefix="/api/reservas", tags=["7. Reservas (CU13, CU23-CU24)"])
+app.include_router(ventas_router, prefix="/api/ventas", tags=["8. Ventas (CU14, CU17)"])
+app.include_router(pagos_router, prefix="/api/pagos", tags=["9. Pagos (CU15, pasarela CU17)"])
 app.include_router(promociones_router, prefix="/api/promociones", tags=["10. Promociones (CU18) [pendiente]"])
 app.include_router(reportes_router, prefix="/api/reportes", tags=["11. Reportes (CU19) [pendiente]"])
 app.include_router(ia_router, prefix="/api/ia", tags=["12. IA (CU28) [pendiente]"])
