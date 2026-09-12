@@ -21,6 +21,10 @@ export const MENU: GrupoMenu[] = [
     items: [{ etiqueta: 'Panel', ruta: '/admin', roles: ['administrador', 'encargado', 'cajero'], disponible: true }],
   },
   {
+    titulo: 'Seguridad',
+    items: [{ etiqueta: 'Usuarios y roles', ruta: '/admin/usuarios', roles: ADMIN, disponible: true }],
+  },
+  {
     titulo: 'Catalogos base',
     items: [
       { etiqueta: 'Categorias', ruta: '/admin/categorias', roles: ADMIN, disponible: true },

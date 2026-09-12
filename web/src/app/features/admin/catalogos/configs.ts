@@ -10,7 +10,7 @@ export const CATEGORIAS: ConfigCrud = {
   singular: 'la categoria',
   ruta: 'admin/categorias',
   archivable: true,
-  nota: 'CU4 · tipos de prenda',
+  nota: 'tipos de prenda',
   campos: [
     { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'Poleras' },
     { nombre: 'descripcion', etiqueta: 'Descripcion', tipo: 'parrafo', ancho: 'completo' },
@@ -21,7 +21,7 @@ export const TALLAS: ConfigCrud = {
   titulo: 'Tallas',
   singular: 'la talla',
   ruta: 'admin/tallas',
-  nota: 'CU5 · el orden define como se listan',
+  nota: 'el orden define como se listan',
   campos: [
     { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'M' },
     { nombre: 'orden', etiqueta: 'Orden', tipo: 'numero', marcador: '2' },
@@ -32,7 +32,7 @@ export const COLORES: ConfigCrud = {
   titulo: 'Colores',
   singular: 'el color',
   ruta: 'admin/colores',
-  nota: 'CU5 · el hex se usa en el catalogo y el probador',
+  nota: 'el hex se usa en el catalogo y el probador',
   campos: [
     { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'Rojo' },
     { nombre: 'codigo_hex', etiqueta: 'Color', tipo: 'color' },
@@ -44,7 +44,7 @@ export const TEMPORADAS: ConfigCrud = {
   singular: 'la temporada',
   ruta: 'admin/temporadas',
   archivable: true,
-  nota: 'CU6 · agrupan colecciones por periodo',
+  nota: 'agrupan colecciones por periodo',
   campos: [
     { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'Verano 2026' },
     { nombre: 'fecha_inicio', etiqueta: 'Inicio', tipo: 'fecha' },
@@ -56,7 +56,7 @@ export const COLECCIONES: ConfigCrud = {
   titulo: 'Colecciones',
   singular: 'la coleccion',
   ruta: 'admin/colecciones',
-  nota: 'CU6 · cada coleccion pertenece a una temporada',
+  nota: 'cada coleccion pertenece a una temporada',
   campos: [
     {
       nombre: 'temporada_id',
@@ -75,7 +75,7 @@ export const CIUDADES: ConfigCrud = {
   titulo: 'Ciudades',
   singular: 'la ciudad',
   ruta: 'admin/ciudades',
-  nota: 'CU8 · donde hay sucursales',
+  nota: 'donde hay sucursales',
   campos: [
     {
       nombre: 'nombre',
@@ -93,7 +93,7 @@ export const SUCURSALES: ConfigCrud = {
   singular: 'la sucursal',
   ruta: 'admin/sucursales',
   archivable: true,
-  nota: 'CU8 · cada sucursal maneja su propio inventario',
+  nota: 'cada sucursal maneja su propio inventario',
   campos: [
     { nombre: 'ciudad_id', etiqueta: 'Ciudad', tipo: 'select', requerido: true, origen: { ruta: 'admin/ciudades' } },
     { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'Sucursal Central' },

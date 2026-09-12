@@ -1,0 +1,220 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Usuarios y roles</h1>
+    <span class="ceja">el rol define que secciones ve cada persona</span>
+  </div>
+
+  <app-selector-estado [(valor)]="estado" />
+
+  <input
+    type="search"
+    class="campo buscador"
+    placeholder="⌕ Buscar por nombre, correo o rol…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+  <button type="button" class="btn rosa" (click)="abrirNuevo()">+ Nuevo usuario</button>
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else if (enEstado().length === 0) {
+  <div class="mensaje vacio">
+    <p>{{ mensajeVacio() }}</p>
+    @if (usuarios().length === 0) {
+      <button type="button" class="btn rosa" (click)="abrirNuevo()">Crear el primero</button>
+    } @else if (estado() !== 'inactivos' && archivados() > 0) {
+      <button type="button" class="btn linea" (click)="estado.set('inactivos')">Ver inactivos</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <p class="mensaje">Ningun usuario coincide con «{{ busqueda() }}».</p>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-indice">#</th>
+          <th>Nombre</th>
+          <th>Correo</th>
+          <th>Telefono</th>
+          <th>Roles</th>
+          @if (muestraEstado()) {
+            <th>Estado</th>
+          }
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (usuario of visibles(); track usuario.id; let i = $index) {
+          <tr [class.inactiva]="esInactivo(usuario)">
+            <td class="mono col-indice">{{ i + 1 }}</td>
+            <td>
+              <b>{{ nombreCompleto(usuario) }}</b>
+              @if (esMiCuenta(usuario)) {
+                <span class="tu">tu cuenta</span>
+              }
+            </td>
+            <td class="mono">{{ usuario['email'] }}</td>
+            <td class="mono">{{ usuario['telefono'] || '—' }}</td>
+            <td>
+              @for (rol of rolesDe(usuario); track rol) {
+                <span class="estado rosa rol">{{ rol }}</span>
+              }
+            </td>
+            @if (muestraEstado()) {
+              <td>
+                <span class="estado" [class.ok]="!esInactivo(usuario)" [class.bajo]="esInactivo(usuario)">
+                  {{ esInactivo(usuario) ? 'Inactivo' : 'Activo' }}
+                </span>
+              </td>
+            }
+            <td class="col-acciones">
+              <button type="button" class="enlace" (click)="abrirEdicion(usuario)">Editar</button>
+              <span class="separador">·</span>
+              @if (esInactivo(usuario)) {
+                <button
+                  type="button"
+                  class="enlace reactivar"
+                  [disabled]="cambiandoEstado() === usuario.id"
+                  (click)="cambiarEstado(usuario, true)"
+                >
+                  Reactivar
+                </button>
+              } @else {
+                <button
+                  type="button"
+                  class="enlace peligro"
+                  [disabled]="cambiandoEstado() === usuario.id || esMiCuenta(usuario)"
+                  [title]="esMiCuenta(usuario) ? 'No puedes archivar tu propia cuenta' : ''"
+                  (click)="cambiarEstado(usuario, false)"
+                >
+                  Archivar
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- ------------------------------------------------ modal crear / editar -->
+@if (modalAbierto()) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="ceja">{{ editando() ? 'Editar' : 'Nuevo usuario' }}</div>
+      <h2>{{ editando() ? nombreCompleto(editando()!) : 'Usuario' }}</h2>
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="u-nombre">Nombre<b class="req">*</b></label>
+            <input
+              id="u-nombre"
+              type="text"
+              class="campo"
+              [class.invalido]="invalido('nombre')"
+              formControlName="nombre"
+              placeholder="Maria"
+            />
+            @if (invalido('nombre')) {
+              <p class="ayuda-error">El nombre es obligatorio.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="u-apellido">Apellido</label>
+            <input id="u-apellido" type="text" class="campo" formControlName="apellido" placeholder="Flores" />
+          </div>
+
+          @if (editando()) {
+            <div class="grupo completo">
+              <label class="etiqueta">Correo electronico</label>
+              <input type="text" class="campo mono" [value]="editando()!['email']" disabled />
+              <p class="ayuda">El correo no se puede cambiar desde aqui.</p>
+            </div>
+          } @else {
+            <div class="grupo">
+              <label class="etiqueta" for="u-email">Correo electronico<b class="req">*</b></label>
+              <input
+                id="u-email"
+                type="email"
+                class="campo"
+                [class.invalido]="invalido('email')"
+                formControlName="email"
+                placeholder="maria@correo.com"
+              />
+              @if (invalido('email')) {
+                <p class="ayuda-error">Ingresa un correo valido.</p>
+              }
+            </div>
+
+            <div class="grupo">
+              <label class="etiqueta" for="u-password">Contrasena<b class="req">*</b></label>
+              <input
+                id="u-password"
+                type="password"
+                class="campo"
+                [class.invalido]="invalido('password')"
+                formControlName="password"
+                placeholder="minimo 6 caracteres"
+                autocomplete="new-password"
+              />
+              @if (invalido('password')) {
+                <p class="ayuda-error">Debe tener al menos 6 caracteres.</p>
+              }
+            </div>
+          }
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="u-telefono">Telefono</label>
+            <input id="u-telefono" type="text" class="campo" formControlName="telefono" placeholder="70012345" />
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta">Roles<b class="req">*</b></label>
+            <div>
+              @for (rol of roles; track rol) {
+                <button
+                  type="button"
+                  class="chip"
+                  [class.on]="tieneRol(rol)"
+                  [attr.aria-pressed]="tieneRol(rol)"
+                  (click)="alternarRol(rol)"
+                >
+                  {{ rol }}
+                </button>
+              }
+            </div>
+            @if (errorRoles()) {
+              <p class="ayuda-error">Elegi al menos un rol.</p>
+            } @else {
+              <p class="ayuda">Se puede asignar mas de uno.</p>
+            }
+          </div>
+        </div>
+
+        @if (errorFormulario()) {
+          <p class="error-servidor">{{ errorFormulario() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

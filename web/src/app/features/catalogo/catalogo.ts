@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { API_URL } from '../../core/api';
+import { AuthService } from '../../core/auth.service';
 import { mensajeDeError } from '../../core/errores.interceptor';
 import { Registro, RecursoService } from '../../core/recurso.service';
 import { SesionStore } from '../../core/sesion';
@@ -52,6 +53,7 @@ type ClaveFiltro = 'categoria_id' | 'temporada_id' | 'talla_id' | 'color_id';
 export class Catalogo {
   private http = inject(HttpClient);
   private recursos = inject(RecursoService);
+  private auth = inject(AuthService);
   readonly sesion = inject(SesionStore);
 
   // ---- opciones de los filtros ----
@@ -184,6 +186,11 @@ export class Catalogo {
     this.textoBusqueda.set(texto);
     clearTimeout(this.temporizador);
     this.temporizador = setTimeout(() => this.q.set(texto), 350);
+  }
+
+  /** Cerrar sesion desde el catalogo: es la unica salida que tiene un cliente. */
+  salir(): void {
+    this.auth.salir();
   }
 
   elegirSucursal(valor: string): void {

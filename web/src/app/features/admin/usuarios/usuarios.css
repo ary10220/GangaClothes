@@ -1,0 +1,68 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.buscador {
+  width: 250px;
+}
+.pie {
+  margin-top: 10px;
+}
+
+.col-acciones {
+  width: 160px;
+}
+
+/* etiqueta de rol dentro de la tabla */
+.rol {
+  margin-right: 4px;
+  text-transform: lowercase;
+}
+.tu {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gris);
+  border: 1px solid var(--linea);
+  border-radius: 99px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+/* --------------------------------------------------------------- modal */
+.chip {
+  font-family: inherit;
+  text-transform: lowercase;
+}
+.ayuda {
+  font-size: 11px;
+  color: var(--gris);
+  margin-top: 4px;
+}
+.campo:disabled {
+  color: var(--gris);
+  cursor: not-allowed;
+}
+
+@media (max-width: 620px) {
+  .buscador {
+    width: 100%;
+  }
+}

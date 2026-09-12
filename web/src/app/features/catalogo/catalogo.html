@@ -8,6 +8,7 @@
     @if (esPersonal()) {
       <a class="btn linea acceso" routerLink="/admin">Ir al panel</a>
     }
+    <button type="button" class="btn linea acceso" (click)="salir()">Cerrar sesion</button>
   } @else {
     <a class="btn linea acceso" routerLink="/login">Iniciar sesion</a>
   }

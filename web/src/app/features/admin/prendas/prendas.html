@@ -2,7 +2,7 @@
 <div class="encabezado">
   <div class="titulo">
     <h1>Prendas y variantes</h1>
-    <span class="ceja">CU7 · el margen alimenta el reporte de ganancia promedio</span>
+    <span class="ceja">el margen alimenta el reporte de ganancia promedio</span>
   </div>
 
   <app-selector-estado [(valor)]="estado" />
@@ -374,7 +374,7 @@
 @if (varianteAsset(); as variante) {
   <div class="fondo" (click)="cerrarModales()">
     <div class="modal angosto" (click)="$event.stopPropagation()">
-      <div class="ceja">Recurso del probador virtual · CU24</div>
+      <div class="ceja">Recurso del probador virtual</div>
       <h2 class="mono">{{ variante['sku'] }}</h2>
 
       <form [formGroup]="formAsset" (ngSubmit)="guardarAsset()" novalidate>

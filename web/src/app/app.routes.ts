@@ -47,6 +47,12 @@ export const routes: Routes = [
         path: '',
         loadComponent: () => import('./features/admin/inicio/inicio').then((m) => m.AdminInicio),
       },
+      {
+        path: 'usuarios',
+        canActivate: [rolGuard],
+        data: SOLO_ADMIN,
+        loadComponent: () => import('./features/admin/usuarios/usuarios').then((m) => m.Usuarios),
+      },
       rutaCrud('categorias', CATEGORIAS),
       rutaCrud('tallas', TALLAS),
       rutaCrud('colores', COLORES),
