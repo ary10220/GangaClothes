@@ -32,6 +32,12 @@ export class AuthService {
   }
 
   salir(): void {
+    // Se avisa al backend para que el cierre quede en la bitacora, pero la
+    // sesion local se limpia igual: si el token ya vencio, salir no debe fallar.
+    const token = this.sesion.token;
+    if (token) {
+      this.http.post(`${API_URL}/auth/logout`, {}).subscribe({ error: () => {} });
+    }
     this.sesion.limpiar();
     this.router.navigate(['/login']);
   }

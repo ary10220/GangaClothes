@@ -1,13 +1,12 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 
-import { Rol } from './modelos';
 import { Notificaciones } from './notificaciones';
 import { SesionStore } from './sesion';
 
 /** Ruta inicial segun el rol: el personal va al panel, el cliente al catalogo. */
-export function rutaInicial(roles: Rol[]): string {
-  const esPersonal = (['administrador', 'encargado', 'cajero'] as Rol[]).some((r) => roles.includes(r));
+export function rutaInicial(roles: string[]): string {
+  const esPersonal = ['administrador', 'encargado', 'cajero'].some((r) => roles.includes(r));
   return esPersonal ? '/admin' : '/catalogo';
 }
 
@@ -27,7 +26,7 @@ export const rolGuard: CanActivateFn = (ruta) => {
   const sesion = inject(SesionStore);
   const router = inject(Router);
   const avisos = inject(Notificaciones);
-  const requeridos = (ruta.data['roles'] ?? []) as Rol[];
+  const requeridos = (ruta.data['roles'] ?? []) as string[];
 
   if (requeridos.length === 0 || sesion.tieneAlgunRol(...requeridos)) return true;
 

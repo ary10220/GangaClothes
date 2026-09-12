@@ -5,7 +5,10 @@ export interface Usuario {
   nombre: string;
   apellido: string | null;
   email: string;
-  roles: Rol[];
+  /** Los roles son administrables, asi que no se limitan a los del sistema. */
+  roles: string[];
+  /** Permisos que le llegan por sus roles, en formato "modulo:accion". */
+  permisos: string[];
 }
 
 export interface SesionRespuesta {

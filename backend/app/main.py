@@ -7,6 +7,7 @@ from app.core.database import Base, engine
 from app.modules.auth.router import router as auth_router
 from app.modules.catalogos_base.router import router as catalogos_router
 from app.modules.usuarios.router import router as usuarios_router
+from app.modules.seguridad.router import router as seguridad_router
 from app.modules.prendas.router import router as prendas_router, publico as catalogo_publico
 from app.modules.inventario.router import router as inventario_router
 from app.modules.reservas.router import router as reservas_router
@@ -35,6 +36,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/auth", tags=["1. Autenticacion (CU1-CU2, CU20-CU21)"])
 app.include_router(usuarios_router, prefix="/api/usuarios", tags=["2. Usuarios y roles (CU3)"])
+app.include_router(seguridad_router, prefix="/api/seguridad", tags=["2b. Roles, permisos y bitacora (CU3)"])
 app.include_router(catalogos_router, prefix="/api/admin", tags=["3. Catalogos base (CU4-CU6, CU8)"])
 app.include_router(prendas_router, prefix="/api/prendas", tags=["4. Prendas y variantes (CU7)"])
 app.include_router(catalogo_publico, prefix="/api", tags=["5. Catalogo publico (CU16, CU22)"])

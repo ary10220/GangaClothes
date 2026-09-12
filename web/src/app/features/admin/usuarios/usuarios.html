@@ -1,8 +1,8 @@
 <!-- ---------------------------------------------------------- encabezado -->
 <div class="encabezado">
   <div class="titulo">
-    <h1>Usuarios y roles</h1>
-    <span class="ceja">el rol define que secciones ve cada persona</span>
+    <h1>Usuarios</h1>
+    <span class="ceja">el rol define los permisos de cada persona</span>
   </div>
 
   <app-selector-estado [(valor)]="estado" />
@@ -184,7 +184,7 @@
           <div class="grupo completo">
             <label class="etiqueta">Roles<b class="req">*</b></label>
             <div>
-              @for (rol of roles; track rol) {
+              @for (rol of roles(); track rol) {
                 <button
                   type="button"
                   class="chip"

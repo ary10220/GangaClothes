@@ -16,7 +16,9 @@ export class SesionStore {
 
   readonly usuario = this._usuario.asReadonly();
   readonly autenticado = computed(() => this._usuario() !== null);
-  readonly roles = computed<Rol[]>(() => this._usuario()?.roles ?? []);
+  readonly roles = computed<string[]>(() => this._usuario()?.roles ?? []);
+  /** Permisos efectivos que devolvio el backend al iniciar sesion. */
+  readonly permisos = computed<string[]>(() => this._usuario()?.permisos ?? []);
   readonly nombreCompleto = computed(() => {
     const u = this._usuario();
     return u ? [u.nombre, u.apellido].filter(Boolean).join(' ') : '';
@@ -43,7 +45,7 @@ export class SesionStore {
     this._usuario.set(null);
   }
 
-  tieneAlgunRol(...roles: Rol[]): boolean {
+  tieneAlgunRol(...roles: string[]): boolean {
     return roles.some((r) => this.roles().includes(r));
   }
 

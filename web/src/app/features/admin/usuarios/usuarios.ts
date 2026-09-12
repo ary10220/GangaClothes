@@ -4,15 +4,11 @@ import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angula
 
 import { API_URL } from '../../../core/api';
 import { mensajeDeError } from '../../../core/errores.interceptor';
-import { Rol } from '../../../core/modelos';
 import { Notificaciones } from '../../../core/notificaciones';
 import { Registro } from '../../../core/recurso.service';
 import { SesionStore } from '../../../core/sesion';
 import { esInactivo, filtrarPorEstado, FiltroEstado, textoPie, textoVacio } from '../../../shared/estado/estado';
 import { SelectorEstado } from '../../../shared/estado/selector-estado';
-
-/** El backend no expone un listado de roles: son los cuatro del sistema. */
-const ROLES: Rol[] = ['administrador', 'encargado', 'cajero', 'cliente'];
 
 /**
  * Administrar usuarios y roles. No usa la fabrica generica porque los roles
@@ -32,7 +28,8 @@ export class Usuarios {
   private avisos = inject(Notificaciones);
   private sesion = inject(SesionStore);
 
-  readonly roles = ROLES;
+  /** Los roles se traen de la API: si se crea uno nuevo, aparece aca solo. */
+  readonly roles = signal<string[]>([]);
 
   // ---- listado ----
   readonly usuarios = signal<Registro[]>([]);
@@ -47,7 +44,7 @@ export class Usuarios {
   readonly guardando = signal(false);
   readonly errorFormulario = signal<string | null>(null);
   /** Los roles se manejan aparte del FormGroup porque son chips, no un control. */
-  readonly rolesElegidos = signal<Rol[]>([]);
+  readonly rolesElegidos = signal<string[]>([]);
   readonly errorRoles = signal(false);
   formulario: FormGroup = this.fb.group({});
 
@@ -74,7 +71,15 @@ export class Usuarios {
   );
 
   constructor() {
+    this.cargarRoles();
     this.cargar();
+  }
+
+  private cargarRoles(): void {
+    this.http.get<{ nombre: string; activo: boolean }[]>(`${API_URL}/seguridad/roles`).subscribe({
+      next: (filas) => this.roles.set(filas.filter((r) => r.activo).map((r) => r.nombre)),
+      error: () => this.avisos.error('No se pudieron cargar los roles disponibles.'),
+    });
   }
 
   cargar(): void {
@@ -112,7 +117,7 @@ export class Usuarios {
     this.editando.set(usuario);
     this.errorFormulario.set(null);
     this.errorRoles.set(false);
-    this.rolesElegidos.set([...((usuario['roles'] as Rol[]) ?? [])]);
+    this.rolesElegidos.set([...((usuario['roles'] as string[]) ?? [])]);
     const texto = (clave: string) =>
       usuario[clave] === null || usuario[clave] === undefined ? '' : String(usuario[clave]);
     // Al editar, el correo se muestra pero no se toca: el backend no lo actualiza.
@@ -129,14 +134,14 @@ export class Usuarios {
     return !!control && control.invalid && (control.dirty || control.touched);
   }
 
-  alternarRol(rol: Rol): void {
+  alternarRol(rol: string): void {
     this.rolesElegidos.update((actuales) =>
       actuales.includes(rol) ? actuales.filter((r) => r !== rol) : [...actuales, rol],
     );
     if (this.rolesElegidos().length > 0) this.errorRoles.set(false);
   }
 
-  tieneRol(rol: Rol): boolean {
+  tieneRol(rol: string): boolean {
     return this.rolesElegidos().includes(rol);
   }
 

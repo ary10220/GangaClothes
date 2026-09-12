@@ -1,0 +1,112 @@
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Bitacora</h1>
+    <span class="ceja">registro de acciones del sistema · no se puede editar ni borrar</span>
+  </div>
+</div>
+
+<!-- ------------------------------------------------------------- filtros -->
+<div class="filtros">
+  <div class="grupo">
+    <label class="etiqueta" for="b-modulo">Modulo</label>
+    <select id="b-modulo" class="campo" [value]="modulo()" (change)="modulo.set($any($event.target).value)">
+      <option value="">Todos</option>
+      @for (m of opciones().modulos; track m) {
+        <option [value]="m">{{ m }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="grupo">
+    <label class="etiqueta" for="b-accion">Accion</label>
+    <select id="b-accion" class="campo" [value]="accion()" (change)="accion.set($any($event.target).value)">
+      <option value="">Todas</option>
+      @for (a of opciones().acciones; track a) {
+        <option [value]="a">{{ a }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="grupo">
+    <label class="etiqueta" for="b-desde">Desde</label>
+    <input id="b-desde" type="date" class="campo" [value]="desde()" (change)="desde.set($any($event.target).value)" />
+  </div>
+
+  <div class="grupo">
+    <label class="etiqueta" for="b-hasta">Hasta</label>
+    <input id="b-hasta" type="date" class="campo" [value]="hasta()" (change)="hasta.set($any($event.target).value)" />
+  </div>
+
+  <button type="button" class="btn" (click)="buscar()">Filtrar</button>
+  @if (hayFiltros()) {
+    <button type="button" class="btn linea" (click)="limpiar()">Limpiar</button>
+  }
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (error()) {
+  <div class="mensaje error">
+    <p>{{ error() }}</p>
+    <button type="button" class="btn linea" (click)="buscar()">Reintentar</button>
+  </div>
+} @else if (eventos().length === 0) {
+  <div class="mensaje vacio">
+    <p>
+      @if (hayFiltros()) {
+        Ningun evento coincide con los filtros elegidos.
+      } @else {
+        Todavia no hay eventos registrados.
+      }
+    </p>
+    @if (hayFiltros()) {
+      <button type="button" class="btn rosa" (click)="limpiar()">Limpiar filtros</button>
+    }
+  </div>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-indice">#</th>
+          <th>Fecha</th>
+          <th>Actor</th>
+          <th>Modulo</th>
+          <th>Accion</th>
+          <th>Nivel</th>
+          <th>Detalle</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (evento of eventos(); track evento.id; let i = $index) {
+          <tr>
+            <td class="mono col-indice">{{ i + 1 }}</td>
+            <td class="mono nowrap">{{ fechaLegible(evento.fecha) }}</td>
+            <td>
+              <b>{{ partesActor(evento.actor).nombre }}</b>
+              @if (partesActor(evento.actor).correo) {
+                <span class="correo mono">{{ partesActor(evento.actor).correo }}</span>
+              }
+            </td>
+            <td>
+              <button type="button" class="enlace mono" (click)="filtrarPor(evento.modulo)">
+                {{ evento.modulo }}
+              </button>
+            </td>
+            <td class="mono">{{ evento.accion }}</td>
+            <td>
+              <span class="estado" [class]="'estado ' + claseNivel(evento.nivel)">{{ evento.nivel }}</span>
+            </td>
+            <td class="detalle">{{ evento.detalle || '—' }}</td>
+            <td class="mono">{{ evento.ip || '—' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">
+    {{ eventos().length }} {{ eventos().length === 1 ? 'evento' : 'eventos' }} · del mas reciente al mas antiguo
+  </p>
+}

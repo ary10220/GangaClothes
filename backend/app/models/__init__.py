@@ -1,5 +1,6 @@
 # Importar todos los modelos para que Base.metadata.create_all los registre.
 from app.models.usuarios import Usuario, Rol, UsuarioRol, Cliente          # noqa
+from app.models.seguridad import Permiso, RolPermiso, Bitacora             # noqa
 from app.models.sucursales import Ciudad, Sucursal                          # noqa
 from app.models.catalogo import (Categoria, Temporada, Coleccion, Talla,    # noqa
                                  Color, Prenda, Variante, AssetAR)

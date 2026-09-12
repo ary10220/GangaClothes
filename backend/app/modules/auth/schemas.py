@@ -20,6 +20,8 @@ class UsuarioOut(BaseModel):
     apellido: str | None
     email: str
     roles: list[str]
+    # Permisos que le llegan por sus roles; la web los usa para saber que puede hacer.
+    permisos: list[str] = []
 
 
 class TokenOut(BaseModel):

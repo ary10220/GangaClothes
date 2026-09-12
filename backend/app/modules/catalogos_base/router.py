@@ -23,11 +23,14 @@ router.include_router(crud_router(Coleccion, "coleccion", {
     "temporada_id": (int, ...), "nombre": (str, ...),
     "anio": (int | None, None), "descripcion": (str | None, None)}), prefix="/colecciones")
 router.include_router(crud_router(Ciudad, "ciudad", {
-    "nombre": (str, ...), "departamento": (str | None, None)}), prefix="/ciudades")
+    "nombre": (str, ...), "departamento": (str | None, None)},
+    modulo="SUCURSALES"), prefix="/ciudades")
 router.include_router(crud_router(Sucursal, "sucursal", {
     "ciudad_id": (int, ...), "nombre": (str, ...), "direccion": (str | None, None),
-    "telefono": (str | None, None), "horario": (str | None, None)}), prefix="/sucursales")
+    "telefono": (str | None, None), "horario": (str | None, None)},
+    modulo="SUCURSALES"), prefix="/sucursales")
 router.include_router(crud_router(Proveedor, "proveedor", {
     "nombre": (str, ...), "nit": (str | None, None), "contacto": (str | None, None),
     "telefono": (str | None, None), "email": (str | None, None),
-    "direccion": (str | None, None)}), prefix="/proveedores")
+    "direccion": (str | None, None)},
+    modulo="INVENTARIO"), prefix="/proveedores")

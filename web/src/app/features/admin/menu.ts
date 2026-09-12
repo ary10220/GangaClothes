@@ -22,7 +22,11 @@ export const MENU: GrupoMenu[] = [
   },
   {
     titulo: 'Seguridad',
-    items: [{ etiqueta: 'Usuarios y roles', ruta: '/admin/usuarios', roles: ADMIN, disponible: true }],
+    items: [
+      { etiqueta: 'Usuarios', ruta: '/admin/usuarios', roles: ADMIN, disponible: true },
+      { etiqueta: 'Roles y permisos', ruta: '/admin/roles', roles: ADMIN, disponible: true },
+      { etiqueta: 'Bitacora', ruta: '/admin/bitacora', roles: ADMIN, disponible: true },
+    ],
   },
   {
     titulo: 'Catalogos base',
@@ -55,7 +59,7 @@ export const MENU: GrupoMenu[] = [
 ];
 
 /** Deja solo los grupos e items que el rol del usuario puede ver. */
-export function menuParaRoles(roles: Rol[]): GrupoMenu[] {
+export function menuParaRoles(roles: string[]): GrupoMenu[] {
   return MENU.map((grupo) => ({
     ...grupo,
     items: grupo.items.filter((item) => item.roles.some((r) => roles.includes(r))),

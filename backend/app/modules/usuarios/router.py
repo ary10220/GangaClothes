@@ -1,14 +1,17 @@
 """CU3: administrar usuarios y roles (Integrante 1, Iteracion 1)."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
-from app.core.deps import get_db, require_roles
+from app.core.auditoria import registrar
+from app.core.deps import get_db, require_permiso
 from app.core.security import hash_password
 from app.models.usuarios import Usuario, UsuarioRol
 from app.modules.auth.service import asignar_rol, obtener_roles
 
 router = APIRouter()
-admin = require_roles("administrador")
+ver = require_permiso("usuarios:ver")
+crear_u = require_permiso("usuarios:crear")
+editar_u = require_permiso("usuarios:editar")
 
 
 class UsuarioCrear(BaseModel):
@@ -34,12 +37,12 @@ def _salida(db, u: Usuario) -> dict:
 
 
 @router.get("", summary="Listar usuarios")
-def listar(db=Depends(get_db), _=Depends(admin)):
+def listar(db=Depends(get_db), _=Depends(ver)):
     return [_salida(db, u) for u in db.query(Usuario).all()]
 
 
 @router.post("", status_code=201, summary="Crear usuario con roles")
-def crear(datos: UsuarioCrear, db=Depends(get_db), _=Depends(admin)):
+def crear(datos: UsuarioCrear, peticion: Request, db=Depends(get_db), usuario=Depends(crear_u)):
     if db.query(Usuario).filter(Usuario.email == datos.email).first():
         raise HTTPException(400, "Ya existe un usuario con ese correo")
     u = Usuario(nombre=datos.nombre, apellido=datos.apellido, email=datos.email,
@@ -49,11 +52,15 @@ def crear(datos: UsuarioCrear, db=Depends(get_db), _=Depends(admin)):
     for rol in datos.roles:
         asignar_rol(db, u.id, rol)
     db.commit()
+    registrar(db, modulo="USUARIOS", accion="CREAR", usuario=usuario, peticion=peticion,
+              entidad="usuario", entidad_id=u.id,
+              detalle=f"Alta de {u.email} con roles: {', '.join(datos.roles) or 'ninguno'}")
     return _salida(db, u)
 
 
 @router.put("/{id}", summary="Editar usuario / reasignar roles")
-def editar(id: int, datos: UsuarioEditar, db=Depends(get_db), _=Depends(admin)):
+def editar(id: int, datos: UsuarioEditar, peticion: Request, db=Depends(get_db),
+           usuario=Depends(editar_u)):
     u = db.get(Usuario, id)
     if u is None:
         raise HTTPException(404, "Usuario no encontrado")
@@ -66,4 +73,11 @@ def editar(id: int, datos: UsuarioEditar, db=Depends(get_db), _=Depends(admin)):
         for rol in roles:
             asignar_rol(db, u.id, rol)
     db.commit()
+    if list(cambios) == ["activo"]:
+        detalle = f"{'Reactivacion' if cambios['activo'] else 'Archivado'} de {u.email}"
+    else:
+        partes = list(cambios) + ([f"roles: {', '.join(roles)}"] if roles is not None else [])
+        detalle = f"Cambios en {u.email}: {', '.join(partes) or 'sin cambios'}"
+    registrar(db, modulo="USUARIOS", accion="EDITAR", usuario=usuario, peticion=peticion,
+              entidad="usuario", entidad_id=u.id, detalle=detalle)
     return _salida(db, u)

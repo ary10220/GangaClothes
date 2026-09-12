@@ -1,0 +1,64 @@
+.encabezado {
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* ------------------------------------------------------------- filtros */
+.filtros {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.filtros .grupo {
+  display: flex;
+  flex-direction: column;
+}
+.filtros .campo {
+  width: 170px;
+}
+
+/* --------------------------------------------------------------- tabla */
+.pie {
+  margin-top: 10px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.correo {
+  display: block;
+  font-size: 10px;
+  color: var(--gris);
+  margin-top: 1px;
+}
+.detalle {
+  font-size: 12px;
+  line-height: 1.45;
+  min-width: 220px;
+}
+.enlace.mono {
+  font-size: 11px;
+}
+
+@media (max-width: 620px) {
+  .filtros .campo {
+    width: 100%;
+  }
+  .filtros .grupo {
+    flex: 1 1 100%;
+  }
+}

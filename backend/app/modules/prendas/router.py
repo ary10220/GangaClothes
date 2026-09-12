@@ -1,11 +1,12 @@
 """CU7 (admin de prendas/variantes) y CU16/CU22 (catalogo publico).
 Integrante 1 mantiene el CRUD; Integrante 2 consume /api/catalogo desde web y movil."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from app.core.auditoria import registrar
 from app.core.database import to_dict
-from app.core.deps import get_db, require_roles
+from app.core.deps import get_db, require_permiso
 from app.models.catalogo import (AssetAR, Coleccion, Color, Prenda, Talla,
                                  Variante)
 from app.models.inventario import Inventario
@@ -13,7 +14,9 @@ from app.models.sucursales import Sucursal
 
 router = APIRouter()          # /api/prendas  (administracion)
 publico = APIRouter()         # /api/catalogo (clientes web y movil)
-admin = require_roles("administrador")
+ver = require_permiso("prendas:ver")
+crear_p = require_permiso("prendas:crear")
+editar_p = require_permiso("prendas:editar")
 
 
 class PrendaIn(BaseModel):
@@ -54,12 +57,12 @@ class AssetIn(BaseModel):
 
 
 @router.get("", summary="Listar prendas (admin)")
-def listar(db=Depends(get_db), _=Depends(admin)):
+def listar(db=Depends(get_db), _=Depends(ver)):
     return [to_dict(p) for p in db.query(Prenda).all()]
 
 
 @router.post("", status_code=201, summary="Crear prenda")
-def crear(datos: PrendaIn, db=Depends(get_db), _=Depends(admin)):
+def crear(datos: PrendaIn, peticion: Request, db=Depends(get_db), usuario=Depends(crear_p)):
     p = Prenda(**datos.model_dump())
     db.add(p)
     try:
@@ -68,23 +71,33 @@ def crear(datos: PrendaIn, db=Depends(get_db), _=Depends(admin)):
         db.rollback()
         raise HTTPException(400, "Categoria o coleccion inexistente")
     db.refresh(p)
+    registrar(db, modulo="PRENDAS", accion="CREAR", usuario=usuario, peticion=peticion,
+              entidad="prenda", entidad_id=p.id, detalle=f"Alta de prenda '{p.nombre}'")
     return to_dict(p)
 
 
 @router.put("/{id}", summary="Editar prenda")
-def editar(id: int, datos: PrendaUpd, db=Depends(get_db), _=Depends(admin)):
+def editar(id: int, datos: PrendaUpd, peticion: Request, db=Depends(get_db), usuario=Depends(editar_p)):
     p = db.get(Prenda, id)
     if p is None:
         raise HTTPException(404, "Prenda no encontrada")
-    for k, v in datos.model_dump(exclude_unset=True).items():
+    cambios = datos.model_dump(exclude_unset=True)
+    for k, v in cambios.items():
         setattr(p, k, v)
     db.commit()
     db.refresh(p)
+    if list(cambios) == ["activo"]:
+        detalle = f"{'Reactivacion' if cambios['activo'] else 'Archivado'} de prenda '{p.nombre}'"
+    else:
+        detalle = f"Cambios en prenda '{p.nombre}': {', '.join(cambios) or 'sin cambios'}"
+    registrar(db, modulo="PRENDAS", accion="EDITAR", usuario=usuario, peticion=peticion,
+              entidad="prenda", entidad_id=p.id, detalle=detalle)
     return to_dict(p)
 
 
 @router.post("/{id}/variantes", status_code=201, summary="Crear variante talla-color")
-def crear_variante(id: int, datos: VarianteIn, db=Depends(get_db), _=Depends(admin)):
+def crear_variante(id: int, datos: VarianteIn, peticion: Request, db=Depends(get_db),
+                   usuario=Depends(crear_p)):
     if db.get(Prenda, id) is None:
         raise HTTPException(404, "Prenda no encontrada")
     sku = f"P{id}-T{datos.talla_id}-C{datos.color_id}"
@@ -96,11 +109,13 @@ def crear_variante(id: int, datos: VarianteIn, db=Depends(get_db), _=Depends(adm
         db.rollback()
         raise HTTPException(400, "La combinacion talla-color ya existe o la talla/color no existe")
     db.refresh(v)
+    registrar(db, modulo="PRENDAS", accion="CREAR", usuario=usuario, peticion=peticion,
+              entidad="variante", entidad_id=v.id, detalle=f"Alta de variante {v.sku}")
     return to_dict(v)
 
 
 @router.get("/{id}/variantes", summary="Variantes de una prenda")
-def variantes(id: int, db=Depends(get_db), _=Depends(admin)):
+def variantes(id: int, db=Depends(get_db), _=Depends(ver)):
     filas = db.query(Variante).filter(Variante.prenda_id == id).all()
     # El panel necesita saber si la variante ya tiene cargado su recurso del
     # probador (CU24); se agrega al listado para no pedir un GET por variante.
@@ -113,13 +128,18 @@ def variantes(id: int, db=Depends(get_db), _=Depends(admin)):
 
 @router.post("/variantes/{variante_id}/asset-ar", status_code=201,
              summary="Registrar recurso del probador (PNG fondo transparente)")
-def crear_asset(variante_id: int, datos: AssetIn, db=Depends(get_db), _=Depends(admin)):
-    if db.get(Variante, variante_id) is None:
+def crear_asset(variante_id: int, datos: AssetIn, peticion: Request, db=Depends(get_db),
+                usuario=Depends(editar_p)):
+    variante = db.get(Variante, variante_id)
+    if variante is None:
         raise HTTPException(404, "Variante no encontrada")
     a = AssetAR(variante_id=variante_id, **datos.model_dump())
     db.add(a)
     db.commit()
     db.refresh(a)
+    registrar(db, modulo="PRENDAS", accion="CREAR", usuario=usuario, peticion=peticion,
+              entidad="asset_ar", entidad_id=a.id,
+              detalle=f"Recurso {a.tipo} para la variante {variante.sku}")
     return to_dict(a)
 
 

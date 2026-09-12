@@ -1,0 +1,217 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Roles y permisos</h1>
+    <span class="ceja">lo que se marca aqui es lo que el sistema permite hacer</span>
+  </div>
+  <button type="button" class="btn rosa" (click)="abrirNuevo()">+ Nuevo rol</button>
+</div>
+
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (error()) {
+  <div class="mensaje error">
+    <p>{{ error() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else {
+  <!-- ----------------------------------------------------- tabla de roles -->
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th class="col-indice">#</th>
+          <th>Rol</th>
+          <th>Descripcion</th>
+          <th class="num">Usuarios</th>
+          <th class="num">Permisos</th>
+          <th>Estado</th>
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (rol of roles(); track rol.id; let i = $index) {
+          <tr [class.inactiva]="!rol.activo" [class.abierta]="abierto()?.id === rol.id">
+            <td class="mono col-indice">{{ i + 1 }}</td>
+            <td>
+              <b class="nombre-rol">{{ rol.nombre }}</b>
+              @if (!rol.editable) {
+                <span class="candado" title="Siempre tiene acceso total">fijo</span>
+              }
+            </td>
+            <td>{{ rol.descripcion || '—' }}</td>
+            <td class="mono num">{{ rol.usuarios }}</td>
+            <td class="mono num">{{ rol.permisos.length }} / {{ totalPermisos() }}</td>
+            <td>
+              <span class="estado" [class.ok]="rol.activo" [class.bajo]="!rol.activo">
+                {{ rol.activo ? 'Activo' : 'Inactivo' }}
+              </span>
+            </td>
+            <td class="col-acciones">
+              <button type="button" class="enlace" (click)="abrir(rol)">
+                {{ rol.editable ? 'Permisos' : 'Ver permisos' }}
+              </button>
+              @if (rol.editable) {
+                <span class="separador">·</span>
+                <button type="button" class="enlace peligro" (click)="pedirBaja(rol)">Eliminar</button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ roles().length }} {{ roles().length === 1 ? 'rol' : 'roles' }}</p>
+
+  <!-- ------------------------------------------------ editor de permisos -->
+  @if (abierto(); as rol) {
+    <section class="editor">
+      <div class="cabecera-editor">
+        <div>
+          <div class="ceja">Permisos del rol</div>
+          <h2>{{ rol.nombre }}</h2>
+        </div>
+        <span class="contador">{{ elegidos().size }} de {{ totalPermisos() }} seleccionados</span>
+        @if (rol.editable) {
+          <button type="button" class="btn linea" [disabled]="!hayCambios()" (click)="descartar()">
+            Descartar
+          </button>
+          <button type="button" class="btn rosa" [disabled]="!hayCambios() || guardando()" (click)="guardar()">
+            {{ guardando() ? 'Guardando…' : 'Guardar permisos' }}
+          </button>
+        }
+        <button type="button" class="cerrar" aria-label="Cerrar" (click)="cerrarEditor()">✕</button>
+      </div>
+
+      @if (!rol.editable) {
+        <p class="aviso-fijo">
+          El rol <b>administrador</b> siempre tiene acceso total y no se puede modificar. Si se le pudieran quitar
+          permisos, nadie podria volver a entrar a esta pantalla.
+        </p>
+      }
+
+      <div class="modulos">
+        @for (modulo of modulos(); track modulo.modulo) {
+          <div class="modulo">
+            <div class="cabecera-modulo">
+              <div>
+                <b>{{ modulo.etiqueta }}</b>
+                <span class="conteo" [class.completo]="moduloCompleto(modulo)">
+                  {{ marcadosEn(modulo) }} / {{ modulo.permisos.length }}
+                </span>
+                <div class="ceja">{{ modulo.descripcion }}</div>
+              </div>
+              @if (rol.editable) {
+                <button type="button" class="enlace" (click)="alternarModulo(modulo)">
+                  {{ moduloCompleto(modulo) ? 'Quitar todo' : 'Seleccionar todo' }}
+                </button>
+              }
+            </div>
+
+            <div class="acciones-modulo">
+              @for (permiso of modulo.permisos; track permiso.codigo) {
+                <label class="permiso" [class.marcado]="marcado(permiso.codigo)" [class.fijo]="!rol.editable">
+                  <input
+                    type="checkbox"
+                    [checked]="marcado(permiso.codigo)"
+                    [disabled]="!rol.editable"
+                    (change)="alternar(permiso.codigo)"
+                  />
+                  <span>
+                    <b>{{ permiso.accion | lowercase }}</b>
+                    <span class="codigo mono">{{ permiso.codigo }}</span>
+                  </span>
+                </label>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </section>
+  }
+}
+
+<!-- ---------------------------------------------------- modal nuevo rol -->
+@if (modalNuevo()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Nuevo rol</div>
+      <h2>Rol</h2>
+
+      <form [formGroup]="formNuevo" (ngSubmit)="crear()" novalidate>
+        <div class="rejilla">
+          <div class="grupo completo">
+            <label class="etiqueta" for="r-nombre">Nombre<b class="req">*</b></label>
+            <input
+              id="r-nombre"
+              type="text"
+              class="campo"
+              [class.invalido]="invalidoNuevo('nombre')"
+              formControlName="nombre"
+              placeholder="supervisor"
+            />
+            @if (invalidoNuevo('nombre')) {
+              <p class="ayuda-error">Al menos 3 caracteres.</p>
+            } @else {
+              <p class="ayuda">Se guarda en minusculas.</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="r-descripcion">Descripcion</label>
+            <input
+              id="r-descripcion"
+              type="text"
+              class="campo"
+              formControlName="descripcion"
+              placeholder="Supervisa inventario de varias sucursales"
+            />
+          </div>
+        </div>
+
+        <p class="ayuda">El rol se crea sin permisos: al guardarlo se abre el editor para asignarlos.</p>
+
+        @if (errorNuevo()) {
+          <p class="error-servidor">{{ errorNuevo() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="creando()">
+            {{ creando() ? 'Creando…' : 'Crear rol' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------ confirmar eliminacion -->
+@if (aEliminar(); as rol) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Eliminar el rol «{{ rol.nombre }}»?</h2>
+      @if (rol.usuarios > 0) {
+        <p class="advertencia">
+          Lo usan <b>{{ rol.usuarios }}</b>
+          {{ rol.usuarios === 1 ? 'usuario' : 'usuarios' }}, asi que se desactivara en lugar de borrarse. Los
+          usuarios dejaran de recibir sus permisos.
+        </p>
+      } @else {
+        <p class="advertencia">No lo usa ningun usuario: se borrara junto con sus permisos.</p>
+      }
+
+      @if (errorEliminar()) {
+        <p class="error-servidor">{{ errorEliminar() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn peligro" [disabled]="eliminando()" (click)="confirmarBaja()">
+          {{ eliminando() ? 'Eliminando…' : 'Si, eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

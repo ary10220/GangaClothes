@@ -53,6 +53,18 @@ export const routes: Routes = [
         data: SOLO_ADMIN,
         loadComponent: () => import('./features/admin/usuarios/usuarios').then((m) => m.Usuarios),
       },
+      {
+        path: 'roles',
+        canActivate: [rolGuard],
+        data: SOLO_ADMIN,
+        loadComponent: () => import('./features/admin/roles/roles').then((m) => m.Roles),
+      },
+      {
+        path: 'bitacora',
+        canActivate: [rolGuard],
+        data: SOLO_ADMIN,
+        loadComponent: () => import('./features/admin/bitacora/bitacora').then((m) => m.Bitacora),
+      },
       rutaCrud('categorias', CATEGORIAS),
       rutaCrud('tallas', TALLAS),
       rutaCrud('colores', COLORES),
