@@ -47,6 +47,10 @@
                 {
                   "replace": "src/environments/cuentas-demo.ts",
                   "with": "src/environments/cuentas-demo.prod.ts"
+                },
+                {
+                  "replace": "src/environments/api-url.ts",
+                  "with": "src/environments/api-url.prod.ts"
                 }
               ]
             },

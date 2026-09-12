@@ -1,2 +1,5 @@
-/** URL base de la API. En Vercel apuntar a la URL publica de Render. */
-export const API_URL = 'http://localhost:8000/api';
+/**
+ * URL base de la API. El valor sale de `environments/api-url.ts`, que la
+ * compilacion de produccion reemplaza por `api-url.prod.ts` (URL de Render).
+ */
+export { API_URL } from '../../environments/api-url';

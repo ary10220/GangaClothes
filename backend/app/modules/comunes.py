@@ -9,7 +9,7 @@ cliente lo consume sin sesion.
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import create_model
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 
 from app.core.auditoria import registrar
 from app.core.database import to_dict
@@ -53,6 +53,10 @@ def crud_router(model, nombre: str, campos: dict, modulo: str = "CATALOGOS") -> 
         except IntegrityError:
             db.rollback()
             raise HTTPException(400, "Registro duplicado o referencia inexistente")
+        except DataError:
+            # PostgreSQL rechaza textos mas largos que la columna (SQLite no lo valida).
+            db.rollback()
+            raise HTTPException(400, "Algun campo excede el largo permitido")
         db.refresh(fila)
         registrar(db, modulo=modulo, accion="CREAR", usuario=usuario, peticion=peticion,
                   entidad=nombre, entidad_id=fila.id,
@@ -69,7 +73,7 @@ def crud_router(model, nombre: str, campos: dict, modulo: str = "CATALOGOS") -> 
             setattr(fila, k, v)
         try:
             db.commit()
-        except IntegrityError:
+        except (IntegrityError, DataError):
             db.rollback()
             raise HTTPException(400, "Datos invalidos")
         db.refresh(fila)

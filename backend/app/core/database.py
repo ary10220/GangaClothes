@@ -3,8 +3,13 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.core.config import settings
 
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
-engine = create_engine(settings.database_url, connect_args=connect_args)
+if settings.database_url.startswith("sqlite"):
+    engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
+else:
+    # Neon suspende la base cuando no hay trafico y corta las conexiones abiertas.
+    # pool_pre_ping descarta la conexion muerta antes de usarla (si no, la primera
+    # peticion despues de la pausa responde 500) y pool_recycle la renueva antes.
+    engine = create_engine(settings.database_url, pool_pre_ping=True, pool_recycle=280)
 
 if settings.database_url.startswith("sqlite"):
     # SQLite ignora las claves foraneas salvo que se pidan en cada conexion.
