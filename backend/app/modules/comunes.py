@@ -17,7 +17,7 @@ from app.core.deps import get_db, require_permiso
 
 
 def _nombre_legible(fila, nombre: str) -> str:
-    return str(getattr(fila, "nombre", None) or f"{nombre} #{getattr(fila, 'id', '?')}")
+    return str(getattr(fila, "nombre", None) or f"{nombre} #{getattr(fila, 'id', '?')}") 
 
 
 def crud_router(model, nombre: str, campos: dict, modulo: str = "CATALOGOS") -> APIRouter:
