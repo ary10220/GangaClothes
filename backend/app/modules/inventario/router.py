@@ -35,11 +35,12 @@ def alertas(sucursal_id: int | None = None, db=Depends(get_db), _=Depends(ver)):
 
 @router.post("", status_code=201, summary="CU11: abrir el stock de una variante en una sucursal")
 def crear_registro(datos: InventarioIn, peticion: Request, db=Depends(get_db), usuario=Depends(crear)):
-    fila = service.crear_registro(db, datos)
+    fila = service.crear_registro(db, datos, usuario.id)
     registrar(db, modulo="INVENTARIO", accion="CREAR", usuario=usuario, peticion=peticion,
               entidad="inventario", entidad_id=fila["id"],
               detalle=f"Alta de stock de {fila['sku']} en {fila['sucursal']} "
-                      f"con {fila['cantidad']} unidades")
+                      f"con {fila['cantidad']} unidades"
+                      + (f" (movimiento de ingreso '{service.MOTIVO_STOCK_INICIAL}')" if fila["cantidad"] else ""))
     return fila
 
 

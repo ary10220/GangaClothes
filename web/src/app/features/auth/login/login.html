@@ -56,7 +56,11 @@
         </button>
       </form>
 
-      <p class="nuevo">¿Cliente nuevo? <b>Crear cuenta</b></p>
+      <p class="nuevo">
+        ¿Cliente nuevo?
+        <a routerLink="/registro" [queryParams]="volverA ? { volverA } : {}">Crear cuenta</a>
+        · <a routerLink="/catalogo">Ver el catalogo</a>
+      </p>
 
       <!-- atajo de demostracion: cuentas de backend/seed.py, solo en local -->
       @if (mostrarCuentasDemo) {

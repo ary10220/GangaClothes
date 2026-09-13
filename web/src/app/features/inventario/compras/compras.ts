@@ -54,7 +54,10 @@ interface Proveedor {
   activo: boolean | null;
 }
 
-/** Lo que se usa de GET /api/catalogo: prendas activas con sus variantes y stock por sucursal. */
+/**
+ * Lo que se usa de GET /api/prendas/catalogo-interno: prendas activas (publicadas
+ * o no) con sus variantes y stock por sucursal. Se compra antes de publicar.
+ */
 interface PrendaCatalogo {
   id: number;
   nombre: string;
@@ -256,7 +259,7 @@ export class Compras {
     this.errorCatalogo.set(null);
     forkJoin({
       proveedores: this.http.get<Proveedor[]>(`${API_URL}/admin/proveedores`),
-      catalogo: this.http.get<PrendaCatalogo[]>(`${API_URL}/catalogo`),
+      catalogo: this.http.get<PrendaCatalogo[]>(`${API_URL}/prendas/catalogo-interno`),
       // El costo solo sirve para sugerir el precio: si no hay permiso, se sigue sin el.
       prendas: this.http
         .get<{ id: number; costo: number | string }[]>(`${API_URL}/prendas`)

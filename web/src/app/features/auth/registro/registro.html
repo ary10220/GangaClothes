@@ -1,0 +1,136 @@
+<div class="pantalla">
+  <div class="tarjeta">
+    <!-- panel de marca -->
+    <aside class="marca">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#E8175D" stroke-width="1.6">
+        <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z" />
+      </svg>
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <p>Con tu cuenta puedes reservar prendas para probartelas en la sucursal que elijas y comprar en linea.</p>
+      <div class="ceja roles">cuenta de cliente</div>
+    </aside>
+
+    <!-- formulario -->
+    <section class="formulario">
+      <h1>Crear cuenta</h1>
+
+      <form [formGroup]="formulario" (ngSubmit)="enviar()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="r-nombre">Nombre<b class="req">*</b></label>
+            <input
+              id="r-nombre"
+              type="text"
+              class="campo"
+              [class.invalido]="invalido('nombre')"
+              formControlName="nombre"
+              autocomplete="given-name"
+            />
+            @if (invalido('nombre')) {
+              <p class="ayuda-error">Ingresa tu nombre.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="r-apellido">Apellido</label>
+            <input
+              id="r-apellido"
+              type="text"
+              class="campo"
+              [class.invalido]="invalido('apellido')"
+              formControlName="apellido"
+              autocomplete="family-name"
+            />
+          </div>
+        </div>
+
+        <div class="grupo">
+          <label class="etiqueta" for="r-email">Correo electronico<b class="req">*</b></label>
+          <input
+            id="r-email"
+            type="email"
+            class="campo"
+            [class.invalido]="invalido('email') || correoRepetido()"
+            formControlName="email"
+            placeholder="tu@correo.com"
+            autocomplete="email"
+          />
+          @if (invalido('email')) {
+            <p class="ayuda-error">Ingresa un correo valido.</p>
+          }
+        </div>
+
+        <div class="grupo">
+          <label class="etiqueta" for="r-telefono">Telefono</label>
+          <input
+            id="r-telefono"
+            type="tel"
+            class="campo"
+            [class.invalido]="invalido('telefono')"
+            formControlName="telefono"
+            placeholder="70012345"
+            autocomplete="tel"
+          />
+          @if (invalido('telefono')) {
+            <p class="ayuda-error">Solo numeros, espacios, + o -, entre 6 y 20 caracteres.</p>
+          } @else {
+            <p class="ayuda">La sucursal te avisa por este numero cuando tu reserva esta lista.</p>
+          }
+        </div>
+
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="r-password">Contrasena<b class="req">*</b></label>
+            <input
+              id="r-password"
+              type="password"
+              class="campo"
+              [class.invalido]="invalido('password')"
+              formControlName="password"
+              autocomplete="new-password"
+            />
+            @if (invalido('password')) {
+              <p class="ayuda-error">Minimo 6 caracteres.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="r-confirmar">Repetir contrasena<b class="req">*</b></label>
+            <input
+              id="r-confirmar"
+              type="password"
+              class="campo"
+              [class.invalido]="invalido('confirmar') || distintas()"
+              formControlName="confirmar"
+              autocomplete="new-password"
+            />
+            @if (distintas()) {
+              <p class="ayuda-error">Las contrasenas no coinciden.</p>
+            } @else if (invalido('confirmar')) {
+              <p class="ayuda-error">Repite la contrasena.</p>
+            }
+          </div>
+        </div>
+
+        @if (error()) {
+          <p class="error-servidor">
+            {{ error() }}
+            @if (correoRepetido()) {
+              <a routerLink="/login" [queryParams]="volverA ? { volverA } : {}">Iniciar sesion →</a>
+            }
+          </p>
+        }
+
+        <button type="submit" class="btn rosa bloque" [disabled]="enviando()">
+          {{ enviando() ? 'Creando cuenta…' : 'Crear cuenta' }}
+        </button>
+      </form>
+
+      <p class="nuevo">
+        ¿Ya tienes cuenta?
+        <a routerLink="/login" [queryParams]="volverA ? { volverA } : {}">Iniciar sesion</a>
+        · <a routerLink="/catalogo">Ver el catalogo</a>
+      </p>
+    </section>
+  </div>
+</div>

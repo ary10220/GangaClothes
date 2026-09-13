@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 
 import { API_URL } from '../../../core/api';
@@ -8,18 +9,54 @@ import { mensajeDeError } from '../../../core/errores.interceptor';
 import { Notificaciones } from '../../../core/notificaciones';
 import { RecursoService, Registro } from '../../../core/recurso.service';
 import { esInactivo, filtrarPorEstado, FiltroEstado, textoPie, textoVacio } from '../../../shared/estado/estado';
-import { SelectorEstado } from '../../../shared/estado/selector-estado';
+import { OpcionFiltro, SelectorEstado } from '../../../shared/estado/selector-estado';
+import { moneda } from '../../../shared/formato';
+import { erroresStock, FilaStock, filasStock, lineasStock, StockInicial } from './stock-inicial';
 
 const GENEROS = ['unisex', 'mujer', 'hombre', 'nino'];
 
+type FiltroPublicacion = 'todas' | 'publicadas' | 'sin-publicar';
+
+const OPCIONES_PUBLICACION: OpcionFiltro<FiltroPublicacion>[] = [
+  { valor: 'todas', etiqueta: 'Todas' },
+  { valor: 'publicadas', etiqueta: 'Publicadas' },
+  { valor: 'sin-publicar', etiqueta: 'Sin publicar' },
+];
+
+/** Stock de una variante en una sucursal (backend: prendas/service.py `variante_salida`). */
+interface StockSucursal {
+  inventario_id: number;
+  sucursal_id: number;
+  sucursal: string;
+  sucursal_activa: boolean;
+  cantidad: number;
+  cantidad_reservada: number;
+  disponible: number;
+  stock_minimo: number;
+  stock_maximo: number;
+}
+
+interface Variante extends Registro {
+  sku: string;
+  talla_id: number;
+  color_id: number;
+  talla: string;
+  color: string;
+  color_hex: string | null;
+  tiene_asset_ar: boolean;
+  stock: StockSucursal[];
+  stock_total: number;
+  disponible_total: number;
+}
+
 /**
- * CU7: administracion de prendas y sus variantes talla-color.
- * No usa la fabrica generica: el backend tiene su propio router con SKU
- * autogenerado, sub-recurso de variantes y registro de recursos del probador.
+ * CU7: prendas y sus variantes talla-color, con el ciclo completo para vender:
+ * crear la prenda (nace sin publicar) → generar variantes con su stock inicial
+ * por sucursal → publicar. Publicar sin stock pide confirmacion.
  */
 @Component({
   selector: 'app-prendas',
-  imports: [ReactiveFormsModule, SelectorEstado],
+  imports: [ReactiveFormsModule, RouterLink, SelectorEstado, StockInicial],
   templateUrl: './prendas.html',
   styleUrl: './prendas.css',
   host: { '(document:keydown.escape)': 'cerrarModales()' },
@@ -31,6 +68,8 @@ export class Prendas {
   private avisos = inject(Notificaciones);
 
   readonly generos = GENEROS;
+  readonly opcionesPublicacion = OPCIONES_PUBLICACION;
+  readonly moneda = moneda;
 
   // ---- listado de prendas ----
   readonly prendas = signal<Registro[]>([]);
@@ -38,16 +77,18 @@ export class Prendas {
   readonly errorCarga = signal<string | null>(null);
   readonly busqueda = signal('');
   readonly estado = signal<FiltroEstado>('activos');
+  readonly publicacion = signal<FiltroPublicacion>('todas');
 
   // ---- catalogos para los selects y las etiquetas ----
   readonly categorias = signal<Registro[]>([]);
   readonly colecciones = signal<Registro[]>([]);
   readonly tallas = signal<Registro[]>([]);
   readonly colores = signal<Registro[]>([]);
+  readonly sucursales = signal<Registro[]>([]);
 
   // ---- prenda abierta y sus variantes ----
   readonly abierta = signal<Registro | null>(null);
-  readonly variantes = signal<Registro[]>([]);
+  readonly variantes = signal<Variante[]>([]);
   readonly cargandoVariantes = signal(false);
 
   // ---- formulario de prenda ----
@@ -57,22 +98,40 @@ export class Prendas {
   readonly errorPrenda = signal<string | null>(null);
   formPrenda: FormGroup = this.fb.group({});
 
-  // ---- formulario de variante ----
-  readonly modalVariante = signal(false);
-  readonly guardandoVariante = signal(false);
-  readonly errorVariante = signal<string | null>(null);
-  formVariante: FormGroup = this.fb.group({});
+  // ---- generador de variantes ----
+  readonly generador = signal(false);
+  readonly tallasSel = signal<number[]>([]);
+  readonly coloresSel = signal<number[]>([]);
+  readonly imagenVariantes = signal('');
+  readonly filasGenerador = signal<FilaStock[]>([]);
+  readonly intentoGenerador = signal(false);
+  readonly guardandoVariantes = signal(false);
+  readonly errorVariantes = signal<string | null>(null);
 
-  // ---- formulario de recurso AR ----
+  // ---- stock inicial de una variante existente ----
+  readonly varianteStock = signal<Variante | null>(null);
+  readonly filasCarga = signal<FilaStock[]>([]);
+  readonly intentoCarga = signal(false);
+  readonly guardandoStock = signal(false);
+  readonly errorStock = signal<string | null>(null);
+
+  // ---- recurso AR ----
   readonly varianteAsset = signal<Registro | null>(null);
   readonly guardandoAsset = signal(false);
   readonly errorAsset = signal<string | null>(null);
   formAsset: FormGroup = this.fb.group({});
 
-  // ---- archivar / reactivar ----
+  // ---- archivar / publicar ----
   readonly cambiandoEstado = signal<number | null>(null);
+  /** Prenda que se quiso publicar sin unidades disponibles: espera confirmacion. */
+  readonly sinStock = signal<Registro | null>(null);
 
-  readonly enEstado = computed(() => filtrarPorEstado(this.prendas(), this.estado()));
+  readonly enEstado = computed(() => {
+    const filas = filtrarPorEstado(this.prendas(), this.estado());
+    const filtro = this.publicacion();
+    if (filtro === 'todas') return filas;
+    return filas.filter((p) => this.publicada(p) === (filtro === 'publicadas'));
+  });
 
   readonly visibles = computed(() => {
     const texto = this.busqueda().trim().toLowerCase();
@@ -88,9 +147,36 @@ export class Prendas {
   readonly archivados = computed(() => this.prendas().filter((p) => esInactivo(p)).length);
   readonly muestraEstado = computed(() => this.estado() === 'todos');
   readonly pie = computed(() => textoPie(this.visibles().length, this.enEstado().length, this.estado(), true));
-  readonly mensajeVacio = computed(() =>
-    textoVacio(this.prendas().length, this.archivados(), this.estado(), 'prendas'),
-  );
+  readonly mensajeVacio = computed(() => {
+    const enEstado = filtrarPorEstado(this.prendas(), this.estado()).length;
+    if (enEstado > 0 && this.publicacion() !== 'todas') {
+      return this.publicacion() === 'publicadas'
+        ? 'Ninguna prenda esta publicada todavia.'
+        : 'Todas las prendas estan publicadas.';
+    }
+    return textoVacio(this.prendas().length, this.archivados(), this.estado(), 'prendas');
+  });
+
+  // ---- generador: combinaciones que se van a crear ----
+  readonly combinaciones = computed(() => {
+    const tallas = this.tallas().filter((t) => this.tallasSel().includes(t.id));
+    const colores = this.colores().filter((c) => this.coloresSel().includes(c.id));
+    return tallas.flatMap((t) =>
+      colores.map((c) => ({
+        clave: `${t.id}-${c.id}`,
+        texto: `${t['nombre']} · ${c['nombre']}`,
+        existe: this.variantes().some((v) => v.talla_id === t.id && v.color_id === c.id),
+      })),
+    );
+  });
+  readonly nuevas = computed(() => this.combinaciones().filter((c) => !c.existe).length);
+
+  readonly resumenAbierta = computed(() => {
+    const variantes = this.variantes();
+    const disponibles = variantes.reduce((s, v) => s + v.disponible_total, 0);
+    const sucursales = new Set(variantes.flatMap((v) => v.stock.filter((x) => x.cantidad > 0).map((x) => x.sucursal_id)));
+    return { variantes: variantes.length, disponibles, sucursales: sucursales.size };
+  });
 
   constructor() {
     this.cargarCatalogos();
@@ -104,12 +190,14 @@ export class Prendas {
       colecciones: this.recursos.listar('admin/colecciones'),
       tallas: this.recursos.listar('admin/tallas'),
       colores: this.recursos.listar('admin/colores'),
+      sucursales: this.recursos.listar('admin/sucursales'),
     }).subscribe({
       next: (r) => {
         this.categorias.set(r.categorias);
         this.colecciones.set(r.colecciones);
-        this.tallas.set(r.tallas);
+        this.tallas.set([...r.tallas].sort((a, b) => Number(a['orden'] ?? 99) - Number(b['orden'] ?? 99)));
         this.colores.set(r.colores);
+        this.sucursales.set(r.sucursales.filter((s) => s['activo'] !== false));
       },
       error: () => this.avisos.error('No se pudieron cargar los catalogos base.'),
     });
@@ -122,7 +210,7 @@ export class Prendas {
       next: (filas) => {
         this.prendas.set(filas);
         this.cargando.set(false);
-        // Si la prenda abierta cambio de estado, se refresca su copia.
+        // La prenda abierta cambio de estado o de stock: se refresca su copia.
         const abierta = this.abierta();
         if (abierta) this.abierta.set(filas.find((p) => p.id === abierta.id) ?? null);
       },
@@ -137,6 +225,7 @@ export class Prendas {
   abrir(prenda: Registro): void {
     this.abierta.set(prenda);
     this.cargarVariantes();
+    setTimeout(() => document.getElementById('detalle-variantes')?.scrollIntoView({ behavior: 'smooth' }));
   }
 
   cerrarDetalle(): void {
@@ -148,7 +237,7 @@ export class Prendas {
     const prenda = this.abierta();
     if (!prenda) return;
     this.cargandoVariantes.set(true);
-    this.http.get<Registro[]>(`${API_URL}/prendas/${prenda.id}/variantes`).subscribe({
+    this.http.get<Variante[]>(`${API_URL}/prendas/${prenda.id}/variantes`).subscribe({
       next: (filas) => {
         this.variantes.set(filas);
         this.cargandoVariantes.set(false);
@@ -224,11 +313,18 @@ export class Prendas {
       : this.http.post<Registro>(`${API_URL}/prendas`, datos);
 
     peticion.subscribe({
-      next: () => {
+      next: (prenda) => {
         this.guardando.set(false);
         this.modalPrenda.set(false);
-        this.avisos.ok(editando ? 'Se actualizo la prenda.' : 'Se creo la prenda.');
         this.cargar();
+        if (editando) {
+          this.avisos.ok('Se actualizo la prenda.');
+          return;
+        }
+        // Siguiente paso natural: sus variantes con el stock de cada sucursal.
+        this.avisos.ok(`Se creo «${prenda['nombre']}» sin publicar. Ahora genera sus variantes y carga su stock.`);
+        this.abrir(prenda);
+        this.abrirGenerador();
       },
       error: (err) => {
         this.guardando.set(false);
@@ -243,7 +339,13 @@ export class Prendas {
     this.http.put<Registro>(`${API_URL}/prendas/${prenda.id}`, { activo }).subscribe({
       next: () => {
         this.cambiandoEstado.set(null);
-        this.avisos.ok(activo ? 'Se reactivo la prenda.' : 'Se archivo la prenda.');
+        this.avisos.ok(
+          activo
+            ? 'Se reactivo la prenda. Sigue sin publicar hasta que la publiques.'
+            : this.publicada(prenda)
+              ? 'Se archivo la prenda y se retiro de la tienda en linea.'
+              : 'Se archivo la prenda.',
+        );
         this.cargar();
       },
       error: (err) => {
@@ -253,57 +355,164 @@ export class Prendas {
     });
   }
 
-  // ----------------------------------------------------- formulario variante
-  abrirNuevaVariante(): void {
-    this.errorVariante.set(null);
-    this.formVariante = this.fb.group({
-      talla_id: ['', Validators.required],
-      color_id: ['', Validators.required],
-      imagen_url: [''],
-    });
-    this.modalVariante.set(true);
-  }
-
-  invalidoVariante(campo: string): boolean {
-    const control = this.formVariante.get(campo);
-    return !!control && control.invalid && (control.dirty || control.touched);
-  }
-
-  guardarVariante(): void {
-    const prenda = this.abierta();
-    if (!prenda) return;
-    if (this.formVariante.invalid) {
-      this.formVariante.markAllAsTouched();
+  // ------------------------------------------------------------ publicacion
+  publicar(prenda: Registro, confirmarSinStock = false): void {
+    if (!confirmarSinStock && Number(prenda['disponible_total'] ?? 0) <= 0) {
+      this.sinStock.set(prenda);
       return;
     }
-    this.errorVariante.set(null);
-    this.guardandoVariante.set(true);
+    this.cambiandoEstado.set(prenda.id);
+    this.http
+      .post<Registro>(`${API_URL}/prendas/${prenda.id}/publicar`, { confirmar_sin_stock: confirmarSinStock })
+      .subscribe({
+        next: (actualizada) => {
+          this.cambiandoEstado.set(null);
+          this.sinStock.set(null);
+          this.avisos.ok(
+            confirmarSinStock
+              ? `«${actualizada['nombre']}» esta publicada, pero se vera agotada hasta que tenga stock.`
+              : `«${actualizada['nombre']}» ya se ve en la tienda con ${actualizada['disponible_total']} unidades disponibles.`,
+          );
+          this.cargar();
+        },
+        error: (err) => {
+          this.cambiandoEstado.set(null);
+          // 409: el stock se acabo entre la carga de la tabla y el clic.
+          if (err.status === 409) this.sinStock.set(prenda);
+          else this.avisos.error(mensajeDeError(err, 'No se pudo publicar la prenda.'));
+        },
+      });
+  }
 
-    const crudo = this.formVariante.getRawValue();
-    const datos = {
-      talla_id: Number(crudo.talla_id),
-      color_id: Number(crudo.color_id),
-      imagen_url: crudo.imagen_url || null,
-    };
-
-    this.http.post<Registro>(`${API_URL}/prendas/${prenda.id}/variantes`, datos).subscribe({
-      next: (v) => {
-        this.guardandoVariante.set(false);
-        this.modalVariante.set(false);
-        this.avisos.ok(`Se creo la variante ${v['sku']}.`);
-        this.cargarVariantes();
+  despublicar(prenda: Registro): void {
+    this.cambiandoEstado.set(prenda.id);
+    this.http.post<Registro>(`${API_URL}/prendas/${prenda.id}/despublicar`, {}).subscribe({
+      next: () => {
+        this.cambiandoEstado.set(null);
+        this.avisos.ok(`«${prenda['nombre']}» se retiro de la tienda en linea. Sigue disponible en caja.`);
+        this.cargar();
       },
       error: (err) => {
-        this.guardandoVariante.set(false);
-        // El backend devuelve 400 si la combinacion talla-color ya existe.
-        this.errorVariante.set(
-          err.status === 400
-            ? `Ya existe una variante de esta prenda con talla ${this.nombreDe(this.tallas(), datos.talla_id)} y ` +
-                `color ${this.nombreDe(this.colores(), datos.color_id)}. Elegi otra combinacion.`
-            : mensajeDeError(err, 'No se pudo crear la variante.'),
-        );
+        this.cambiandoEstado.set(null);
+        this.avisos.error(mensajeDeError(err, 'No se pudo despublicar la prenda.'));
       },
     });
+  }
+
+  /** Desde el aviso de "sin stock": lleva a donde se carga. */
+  irACargarStock(): void {
+    const prenda = this.sinStock();
+    if (!prenda) return;
+    this.sinStock.set(null);
+    this.abrir(prenda);
+    if (Number(prenda['variantes'] ?? 0) === 0) this.abrirGenerador();
+  }
+
+  // --------------------------------------------------- generador de variantes
+  abrirGenerador(): void {
+    this.tallasSel.set([]);
+    this.coloresSel.set([]);
+    this.imagenVariantes.set('');
+    this.filasGenerador.set(filasStock(this.opcionesSucursal()));
+    this.intentoGenerador.set(false);
+    this.errorVariantes.set(null);
+    this.generador.set(true);
+  }
+
+  alternarTalla(id: number): void {
+    this.tallasSel.update((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  alternarColor(id: number): void {
+    this.coloresSel.update((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  sucursalesMarcadas(filas: FilaStock[]): string {
+    return filas.filter((f) => f.cargar).map((f) => f.sucursal).join(' y ');
+  }
+
+  generarVariantes(): void {
+    const prenda = this.abierta();
+    if (!prenda) return;
+    this.intentoGenerador.set(true);
+    if (this.nuevas() === 0 || Object.keys(erroresStock(this.filasGenerador())).length > 0) return;
+
+    this.errorVariantes.set(null);
+    this.guardandoVariantes.set(true);
+    const stock = lineasStock(this.filasGenerador());
+    const datos = {
+      talla_ids: this.tallasSel(),
+      color_ids: this.coloresSel(),
+      imagen_url: this.imagenVariantes().trim() || null,
+      stock_inicial: stock,
+    };
+
+    this.http
+      .post<{ creadas: Variante[]; omitidas: string[] }>(`${API_URL}/prendas/${prenda.id}/variantes/lote`, datos)
+      .subscribe({
+        next: (r) => {
+          this.guardandoVariantes.set(false);
+          this.generador.set(false);
+          const cuantas = r.creadas.length === 1 ? '1 variante' : `${r.creadas.length} variantes`;
+          this.avisos.ok(
+            stock.length
+              ? `Se crearon ${cuantas} con stock en ${this.sucursalesMarcadas(this.filasGenerador())}.`
+              : `Se crearon ${cuantas} sin stock. Cargalo con «Cargar stock» antes de publicar.`,
+          );
+          this.cargarVariantes();
+          this.cargar();
+        },
+        error: (err) => {
+          this.guardandoVariantes.set(false);
+          this.errorVariantes.set(mensajeDeError(err, 'No se pudieron crear las variantes.'));
+        },
+      });
+  }
+
+  // ------------------------------------------------ stock de variante existente
+  /** Sucursales activas donde la variante todavia no tiene stock registrado. */
+  sucursalesSinRegistro(variante: Variante): { id: number; nombre: string }[] {
+    return this.opcionesSucursal().filter((s) => !variante.stock.some((x) => x.sucursal_id === s.id));
+  }
+
+  abrirCargaStock(variante: Variante): void {
+    this.filasCarga.set(filasStock(this.sucursalesSinRegistro(variante)).map((f, i) => ({ ...f, cargar: i === 0 })));
+    this.intentoCarga.set(false);
+    this.errorStock.set(null);
+    this.varianteStock.set(variante);
+  }
+
+  guardarStock(): void {
+    const variante = this.varianteStock();
+    if (!variante) return;
+    this.intentoCarga.set(true);
+    const lineas = lineasStock(this.filasCarga());
+    if (lineas.length === 0) {
+      this.errorStock.set('Marca al menos una sucursal.');
+      return;
+    }
+    if (Object.keys(erroresStock(this.filasCarga())).length > 0) return;
+
+    this.errorStock.set(null);
+    this.guardandoStock.set(true);
+    this.http
+      .post<Variante>(`${API_URL}/prendas/variantes/${variante.id}/stock-inicial`, { sucursales: lineas })
+      .subscribe({
+        next: (v) => {
+          this.guardandoStock.set(false);
+          this.varianteStock.set(null);
+          this.avisos.ok(
+            `Stock inicial de ${v.sku} cargado en ${this.sucursalesMarcadas(this.filasCarga())}. ` +
+              'Quedo registrado en Movimientos.',
+          );
+          this.cargarVariantes();
+          this.cargar();
+        },
+        error: (err) => {
+          this.guardandoStock.set(false);
+          this.errorStock.set(mensajeDeError(err, 'No se pudo cargar el stock.'));
+        },
+      });
   }
 
   // -------------------------------------------------------- recurso AR (CU24)
@@ -351,8 +560,10 @@ export class Prendas {
 
   cerrarModales(): void {
     this.modalPrenda.set(false);
-    this.modalVariante.set(false);
+    this.generador.set(false);
+    this.varianteStock.set(null);
     this.varianteAsset.set(null);
+    this.sinStock.set(null);
   }
 
   // ------------------------------------------------------------ presentacion
@@ -361,16 +572,13 @@ export class Prendas {
     return String(lista.find((f) => f.id === Number(id))?.['nombre'] ?? `#${id}`);
   }
 
-  hexDeColor(id: unknown): string {
-    const color = this.colores().find((c) => c.id === Number(id));
-    const hex = String(color?.['codigo_hex'] ?? '');
-    return /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#CCCCCC';
+  opcionesSucursal(): { id: number; nombre: string }[] {
+    return this.sucursales().map((s) => ({ id: s.id, nombre: String(s['nombre']) }));
   }
 
-  /** Formato boliviano: coma decimal, como en el mockup. */
-  moneda(valor: unknown): string {
-    const n = Number(valor ?? 0);
-    return n.toFixed(2).replace('.', ',');
+  hex(valor: unknown): string {
+    const hex = String(valor ?? '');
+    return /^#[0-9a-f]{6}$/i.test(hex) ? hex : '#CCCCCC';
   }
 
   margen(prenda: Registro): number {
@@ -381,7 +589,11 @@ export class Prendas {
     return esInactivo(prenda);
   }
 
-  tieneAsset(variante: Registro): boolean {
-    return variante['tiene_asset_ar'] === true;
+  publicada(prenda: Registro): boolean {
+    return prenda['publicado'] === true;
+  }
+
+  numero(valor: unknown): number {
+    return Number(valor ?? 0);
   }
 }

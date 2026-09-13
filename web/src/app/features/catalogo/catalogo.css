@@ -4,65 +4,31 @@
   background: var(--papel);
 }
 
-/* ------------------------------------------------------------ barra superior */
-.topnav {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 12px 26px;
-  background: #fff;
-  border-bottom: 1.5px solid var(--linea);
-}
-.topnav .logo {
-  font-size: 17px;
-}
-.seccion {
-  font-size: 12.5px;
-  font-weight: 700;
-  border-bottom: 2px solid var(--ganga);
-  padding-bottom: 2px;
-}
-.yo {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  background: var(--suave);
-  border: 1px solid var(--linea);
-  border-radius: 99px;
-  padding: 5px 13px;
-  color: var(--gris);
-}
-.acceso {
-  padding: 6px 13px;
-  font-size: 11.5px;
-}
-.yo + .acceso,
-.topnav > .acceso {
-  margin-left: auto;
-}
-.yo + .acceso {
-  margin-left: 0;
-}
-
 /* ------------------------------------------------------------------- layout */
 .cuerpo {
   display: grid;
   grid-template-columns: 232px 1fr;
   align-items: start;
 }
-
 .filtros {
   border-right: 1.5px solid var(--linea);
   padding: 20px 18px 30px;
   min-height: calc(100vh - 54px);
 }
-.filtros .campo {
-  margin-bottom: 6px;
-}
 .filtros .ceja {
   margin: 16px 0 8px;
 }
-.filtros .chip {
+.filtros .ceja.primera {
+  margin-top: 0;
+  color: var(--tinta);
+}
+.ayuda-filtro {
+  font-size: 11px;
+  color: var(--gris);
+  line-height: 1.4;
+  margin: 6px 0 14px;
+}
+.chip {
   font-family: inherit;
 }
 .swatches {
@@ -110,10 +76,22 @@ h1 {
   gap: 14px;
 }
 .tarjeta {
+  /* Es un boton: sin flex centraria el contenido y las fotos quedarian desalineadas. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
   border: 1.5px solid var(--linea);
   border-radius: 13px;
   overflow: hidden;
   background: #fff;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+.tarjeta:hover {
+  border-color: var(--tinta);
 }
 .foto {
   height: 140px;
@@ -138,7 +116,6 @@ h1 {
 .marca {
   font-size: 11px;
   color: var(--gris);
-  margin-top: 1px;
 }
 .precio {
   font-family: var(--mono);
@@ -152,15 +129,132 @@ h1 {
   color: var(--ok);
   margin-top: 3px;
 }
-.disponibilidad.sin-stock {
+.sin-stock {
   color: var(--alerta);
 }
 .tallas {
   margin-top: 6px;
 }
 
+/* ------------------------------------------------------------------ detalle */
+.modal.detalle {
+  max-width: 760px;
+  position: relative;
+}
+.cerrar {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+.columnas {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 22px;
+}
+.foto.grande {
+  height: 290px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.precio.grande {
+  font-size: 17px;
+  margin: -8px 0 8px;
+}
+.descripcion {
+  font-size: 12.5px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+.info .etiqueta {
+  margin: 14px 0 7px;
+}
+.chip.agotada:not(.on) {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.stock {
+  list-style: none;
+  font-size: 12px;
+  border: 1.5px solid var(--linea);
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+.stock li {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 11px;
+  color: var(--ok);
+}
+.stock li + li {
+  border-top: 1px solid var(--linea);
+}
+.stock li span {
+  color: var(--tinta);
+}
+.stock li.sin-stock {
+  color: var(--alerta);
+}
+
+.accion {
+  border-top: 1.5px solid var(--linea);
+  margin-top: 18px;
+  padding-top: 14px;
+}
+.fila-accion {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fila-accion .grupo {
+  flex: 1;
+  min-width: 190px;
+}
+.fila-accion .cantidad {
+  flex: 0 0 110px;
+  min-width: 110px;
+}
+.reserva {
+  margin-top: 14px;
+  background: var(--suave);
+  border: 1.5px dashed var(--linea);
+  border-radius: 12px;
+  padding: 12px;
+}
+.reserva .ceja {
+  margin-bottom: 8px;
+}
+.nota,
+.aviso-cambio,
+.exito {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 10px;
+  color: var(--gris);
+}
+.nota a,
+.exito a {
+  color: var(--ganga);
+  font-weight: 700;
+}
+.aviso-cambio {
+  color: var(--alerta);
+}
+.exito {
+  background: #e4f2ec;
+  color: var(--ok);
+  border-radius: 8px;
+  padding: 9px 11px;
+}
+
 @media (max-width: 780px) {
-  .cuerpo {
+  .cuerpo,
+  .columnas {
     grid-template-columns: 1fr;
   }
   .filtros {

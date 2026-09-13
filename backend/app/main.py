@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import models  # noqa: F401  (registra las 28 tablas)
+from app.core import migraciones
 from app.core.config import settings
 from app.core.database import Base, engine
 from app.modules.auth.router import router as auth_router
@@ -19,6 +20,8 @@ from app.modules.ia.router import router as ia_router
 
 # En el curso usamos create_all; en un proyecto real se usarian migraciones (Alembic).
 Base.metadata.create_all(bind=engine)
+# create_all no agrega columnas nuevas a tablas existentes: eso lo hace migraciones.py.
+migraciones.aplicar(engine)
 
 app = FastAPI(
     title="GangaClothes API",

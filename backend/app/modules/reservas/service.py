@@ -129,7 +129,8 @@ def crear(db: Session, usuario: Usuario, datos) -> dict:
             continue
         variante, prenda, talla, color = fila
         nombre = f"{variante.sku} ({prenda.nombre}, {talla.nombre}/{color.nombre})"
-        if variante.activo is False or prenda.activo is False:
+        # Reservar es parte de la tienda en linea: solo prendas publicadas.
+        if variante.activo is False or prenda.activo is False or not prenda.publicado:
             faltantes.append(f"{nombre}: ya no esta a la venta")
             continue
 

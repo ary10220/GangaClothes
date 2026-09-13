@@ -13,7 +13,10 @@ import { SelectorSucursal } from '../../shared/sucursal/selector-sucursal';
 
 type Metodo = 'efectivo' | 'tarjeta' | 'qr';
 
-/** Lo que se usa de GET /api/catalogo. */
+/**
+ * Lo que se usa de GET /api/prendas/catalogo-interno: toda prenda activa, este
+ * publicada en la tienda en linea o no (en caja se vende lo que hay en la sucursal).
+ */
 interface PrendaCatalogo {
   id: number;
   nombre: string;
@@ -206,7 +209,7 @@ export class Caja {
   cargarCatalogo(): void {
     this.cargandoCatalogo.set(true);
     this.errorCatalogo.set(null);
-    this.http.get<PrendaCatalogo[]>(`${API_URL}/catalogo`).subscribe({
+    this.http.get<PrendaCatalogo[]>(`${API_URL}/prendas/catalogo-interno`).subscribe({
       next: (prendas) => {
         const variantes = prendas.flatMap((p) =>
           p.variantes.map((v) => ({

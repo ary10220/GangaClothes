@@ -2,10 +2,8 @@
 <div class="encabezado">
   <div class="titulo">
     <h1>Prendas y variantes</h1>
-    <span class="ceja">el margen alimenta el reporte de ganancia promedio</span>
+    <span class="ceja">crear prenda → generar variantes con su stock → publicar en la tienda</span>
   </div>
-
-  <app-selector-estado [(valor)]="estado" />
 
   <input
     type="search"
@@ -17,8 +15,19 @@
   <button type="button" class="btn rosa" (click)="abrirNuevaPrenda()">+ Nueva prenda</button>
 </div>
 
+<div class="filtros">
+  <div class="filtro">
+    <span class="ceja">Estado</span>
+    <app-selector-estado [(valor)]="estado" />
+  </div>
+  <div class="filtro">
+    <span class="ceja">Tienda en linea</span>
+    <app-selector-estado [(valor)]="publicacion" [opciones]="opcionesPublicacion" />
+  </div>
+</div>
+
 <!-- ------------------------------------------------------ tabla de prendas -->
-@if (cargando()) {
+@if (cargando() && prendas().length === 0) {
   <p class="mensaje">Cargando…</p>
 } @else if (errorCarga()) {
   <div class="mensaje error">
@@ -30,6 +39,8 @@
     <p>{{ mensajeVacio() }}</p>
     @if (prendas().length === 0) {
       <button type="button" class="btn rosa" (click)="abrirNuevaPrenda()">Crear la primera</button>
+    } @else if (publicacion() !== 'todas') {
+      <button type="button" class="btn linea" (click)="publicacion.set('todas')">Ver todas</button>
     } @else if (estado() !== 'inactivos' && archivados() > 0) {
       <button type="button" class="btn linea" (click)="estado.set('inactivos')">Ver inactivas</button>
     }
@@ -43,11 +54,11 @@
         <tr>
           <th class="col-indice">#</th>
           <th>Prenda</th>
-          <th>Categoria</th>
-          <th>Coleccion</th>
           <th class="num">Precio</th>
-          <th class="num">Costo</th>
           <th class="num">Margen</th>
+          <th class="num">Variantes</th>
+          <th class="num">Stock disponible</th>
+          <th>Tienda en linea</th>
           @if (muestraEstado()) {
             <th>Estado</th>
           }
@@ -60,26 +71,62 @@
             <td class="mono col-indice">{{ i + 1 }}</td>
             <td>
               <b>{{ prenda['nombre'] }}</b>
-              @if (prenda['marca']) {
-                <span class="marca">{{ prenda['marca'] }}</span>
+              <span class="sub">
+                {{ nombreDe(categorias(), prenda['categoria_id']) }} · {{ nombreDe(colecciones(), prenda['coleccion_id']) }}
+                @if (prenda['marca']) {
+                  · {{ prenda['marca'] }}
+                }
+              </span>
+            </td>
+            <td class="mono num">{{ moneda(prenda['precio_venta']) }}</td>
+            <td class="mono num margen">+{{ moneda(margen(prenda)) }}</td>
+            <td class="mono num">{{ prenda['variantes'] }}</td>
+            <td class="num">
+              @if (numero(prenda['disponible_total']) > 0) {
+                <b class="mono">{{ prenda['disponible_total'] }}</b>
+                <span class="sub">
+                  en {{ prenda['sucursales_con_stock'] }}
+                  {{ numero(prenda['sucursales_con_stock']) === 1 ? 'sucursal' : 'sucursales' }}
+                </span>
+              } @else {
+                <span class="estado bajo">Sin stock</span>
               }
             </td>
-            <td>{{ nombreDe(categorias(), prenda['categoria_id']) }}</td>
-            <td>{{ nombreDe(colecciones(), prenda['coleccion_id']) }}</td>
-            <td class="mono num">{{ moneda(prenda['precio_venta']) }}</td>
-            <td class="mono num">{{ moneda(prenda['costo']) }}</td>
-            <td class="mono num margen">+{{ moneda(margen(prenda)) }}</td>
+            <td>
+              @if (publicada(prenda)) {
+                <span class="estado ok">● Publicada</span>
+              } @else {
+                <span class="estado borrador">Sin publicar</span>
+              }
+            </td>
             @if (muestraEstado()) {
               <td>
                 <span class="estado" [class.ok]="!esInactiva(prenda)" [class.bajo]="esInactiva(prenda)">
-                  {{ esInactiva(prenda) ? 'Inactiva' : 'Activa' }}
+                  {{ esInactiva(prenda) ? 'Archivada' : 'Activa' }}
                 </span>
               </td>
             }
             <td class="col-acciones">
               <button type="button" class="enlace" (click)="abrirEdicionPrenda(prenda)">Editar</button>
               <span class="separador">·</span>
-              <button type="button" class="enlace" (click)="abrir(prenda)">Variantes</button>
+              <button type="button" class="enlace" (click)="abrir(prenda)">Variantes y stock</button>
+              @if (!esInactiva(prenda)) {
+                <span class="separador">·</span>
+                @if (publicada(prenda)) {
+                  <button type="button" class="enlace" [disabled]="cambiandoEstado() === prenda.id" (click)="despublicar(prenda)">
+                    Despublicar
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="enlace publicar"
+                    [disabled]="cambiandoEstado() === prenda.id"
+                    (click)="publicar(prenda)"
+                  >
+                    Publicar
+                  </button>
+                }
+              }
               <span class="separador">·</span>
               @if (esInactiva(prenda)) {
                 <button
@@ -106,61 +153,107 @@
       </tbody>
     </table>
   </div>
-  <p class="ceja pie">{{ pie() }}</p>
+  <p class="ceja pie">{{ pie() }} · solo las prendas publicadas se ven en el catalogo web y movil</p>
 }
 
-<!-- --------------------------------------------- detalle: sub-tabla variantes -->
+<!-- --------------------------------------------- detalle: variantes y stock -->
 @if (abierta(); as prenda) {
-  <section class="detalle">
+  <section class="detalle" id="detalle-variantes">
     <div class="cabecera-detalle">
       <div>
-        <div class="ceja">Variantes talla-color</div>
-        <h2>{{ prenda['nombre'] }}</h2>
+        <div class="ceja">Variantes talla-color y su stock</div>
+        <h2>
+          {{ prenda['nombre'] }}
+          @if (publicada(prenda)) {
+            <span class="estado ok">● Publicada</span>
+          } @else {
+            <span class="estado borrador">Sin publicar</span>
+          }
+        </h2>
+        <p class="resumen">
+          {{ resumenAbierta().variantes }} {{ resumenAbierta().variantes === 1 ? 'variante' : 'variantes' }} ·
+          {{ resumenAbierta().disponibles }} unidades disponibles en {{ resumenAbierta().sucursales }}
+          {{ resumenAbierta().sucursales === 1 ? 'sucursal' : 'sucursales' }}
+        </p>
       </div>
-      <button type="button" class="btn linea" (click)="abrirNuevaVariante()">+ Nueva variante</button>
+      @if (!esInactiva(prenda)) {
+        <button type="button" class="btn linea" (click)="abrirGenerador()">+ Generar variantes</button>
+        @if (publicada(prenda)) {
+          <button type="button" class="btn linea" [disabled]="cambiandoEstado() === prenda.id" (click)="despublicar(prenda)">
+            Despublicar
+          </button>
+        } @else {
+          <button type="button" class="btn rosa" [disabled]="cambiandoEstado() === prenda.id" (click)="publicar(prenda)">
+            Publicar en la tienda
+          </button>
+        }
+      }
       <button type="button" class="cerrar" aria-label="Cerrar detalle" (click)="cerrarDetalle()">✕</button>
     </div>
 
-    @if (cargandoVariantes()) {
+    @if (cargandoVariantes() && variantes().length === 0) {
       <p class="mensaje">Cargando variantes…</p>
     } @else if (variantes().length === 0) {
       <div class="mensaje vacio">
-        <p>Esta prenda no tiene variantes todavia.</p>
-        <button type="button" class="btn rosa" (click)="abrirNuevaVariante()">Crear la primera</button>
+        <p>Esta prenda no tiene variantes. Sin variantes con stock no se puede vender ni reservar.</p>
+        @if (!esInactiva(prenda)) {
+          <button type="button" class="btn rosa" (click)="abrirGenerador()">Generar variantes</button>
+        }
       </div>
     } @else {
       <div class="marco-tabla">
         <table>
           <thead>
             <tr>
-              <th class="col-indice">#</th>
+              <th>Variante</th>
               <th>SKU</th>
-              <th>Talla</th>
-              <th>Color</th>
+              <th>Stock por sucursal <span class="ayuda-th">(disponible)</span></th>
+              <th class="num">Total disp.</th>
               <th>Recurso AR</th>
               <th class="col-acciones">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            @for (v of variantes(); track v.id; let i = $index) {
+            @for (v of variantes(); track v.id) {
               <tr>
-                <td class="mono col-indice">{{ i + 1 }}</td>
-                <td class="mono">{{ v['sku'] }}</td>
-                <td>{{ nombreDe(tallas(), v['talla_id']) }}</td>
                 <td>
-                  <span class="swatch" [style.background]="hexDeColor(v['color_id'])"></span>
-                  {{ nombreDe(colores(), v['color_id']) }}
+                  <b class="talla">{{ v.talla }}</b>
+                  <span class="swatch" [style.background]="hex(v.color_hex)"></span>{{ v.color }}
                 </td>
+                <td class="mono">{{ v.sku }}</td>
                 <td>
-                  @if (tieneAsset(v)) {
+                  @for (s of v.stock; track s.sucursal_id) {
+                    <span
+                      class="en-sucursal"
+                      [class.agotado]="s.disponible <= 0"
+                      [title]="
+                        s.cantidad + ' en stock, ' + s.cantidad_reservada + ' reservadas · minimo ' + s.stock_minimo +
+                        ', maximo ' + s.stock_maximo
+                      "
+                      >{{ s.sucursal }} <b>{{ s.disponible }}</b></span
+                    >
+                  } @empty {
+                    <span class="estado bajo">Sin stock en ninguna sucursal</span>
+                  }
+                </td>
+                <td class="mono num"><b>{{ v.disponible_total }}</b></td>
+                <td>
+                  @if (v.tiene_asset_ar) {
                     <span class="estado ok">PNG ✓</span>
                   } @else {
-                    <span class="estado bajo">Falta PNG</span>
+                    <span class="estado borrador">Falta PNG</span>
                   }
                 </td>
                 <td class="col-acciones">
+                  @if (!esInactiva(prenda) && sucursalesSinRegistro(v).length > 0) {
+                    <button type="button" class="enlace publicar" (click)="abrirCargaStock(v)">Cargar stock</button>
+                    <span class="separador">·</span>
+                  } @else if (v.stock.length > 0) {
+                    <a class="enlace" routerLink="/admin/movimientos" [queryParams]="{ registrar: 1 }">Movimiento</a>
+                    <span class="separador">·</span>
+                  }
                   <button type="button" class="enlace" (click)="abrirAsset(v)">
-                    {{ tieneAsset(v) ? 'Agregar recurso' : 'Registrar recurso' }}
+                    {{ v.tiene_asset_ar ? 'Agregar recurso' : 'Registrar recurso' }}
                   </button>
                 </td>
               </tr>
@@ -169,8 +262,7 @@
         </table>
       </div>
       <p class="ceja pie">
-        {{ variantes().length }} {{ variantes().length === 1 ? 'variante' : 'variantes' }} · el sku lo genera el
-        backend
+        disponible = en stock − reservado · para cambiar una cantidad ya cargada se registra un movimiento
       </p>
     }
   </section>
@@ -180,7 +272,7 @@
 @if (modalPrenda()) {
   <div class="fondo" (click)="cerrarModales()">
     <div class="modal ancho" (click)="$event.stopPropagation()">
-      <div class="ceja">{{ editando() ? 'Editar' : 'Nueva prenda' }}</div>
+      <div class="ceja">{{ editando() ? 'Editar' : 'Nueva prenda · nace sin publicar' }}</div>
       <h2>Prenda</h2>
 
       <form [formGroup]="formPrenda" (ngSubmit)="guardarPrenda()" novalidate>
@@ -279,13 +371,7 @@
 
           <div class="grupo completo">
             <label class="etiqueta" for="p-imagen">URL de imagen</label>
-            <input
-              id="p-imagen"
-              type="text"
-              class="campo"
-              formControlName="imagen_url"
-              placeholder="https://…/polera.jpg"
-            />
+            <input id="p-imagen" type="text" class="campo" formControlName="imagen_url" placeholder="https://…/polera.jpg" />
           </div>
 
           <div class="grupo completo">
@@ -294,6 +380,13 @@
           </div>
         </div>
 
+        @if (!editando()) {
+          <p class="advertencia">
+            Al guardar se abre el paso siguiente: generar sus variantes (talla y color) y cargar el stock de cada
+            sucursal. La prenda no se ve en la tienda hasta que la publiques.
+          </p>
+        }
+
         @if (errorPrenda()) {
           <p class="error-servidor">{{ errorPrenda() }}</p>
         }
@@ -301,7 +394,7 @@
         <div class="acciones">
           <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
           <button type="submit" class="btn rosa" [disabled]="guardando()">
-            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+            {{ guardando() ? 'Guardando…' : editando() ? 'Guardar' : 'Guardar y seguir' }}
           </button>
         </div>
       </form>
@@ -309,63 +402,134 @@
   </div>
 }
 
-<!-- ---------------------------------------------------- modal nueva variante -->
-@if (modalVariante()) {
+<!-- ------------------------------------------------- modal generar variantes -->
+@if (generador()) {
   <div class="fondo" (click)="cerrarModales()">
-    <div class="modal angosto" (click)="$event.stopPropagation()">
-      <div class="ceja">Nueva variante</div>
-      <h2>{{ abierta()?.['nombre'] }}</h2>
+    <div class="modal ancho" (click)="$event.stopPropagation()">
+      <div class="ceja">Generar variantes · {{ abierta()?.['nombre'] }}</div>
+      <h2>¿En que tallas y colores viene?</h2>
 
-      <form [formGroup]="formVariante" (ngSubmit)="guardarVariante()" novalidate>
-        <div class="rejilla">
-          <div class="grupo">
-            <label class="etiqueta" for="v-talla">Talla<b class="req">*</b></label>
-            <select id="v-talla" class="campo" [class.invalido]="invalidoVariante('talla_id')" formControlName="talla_id">
-              <option value="">— elegir —</option>
-              @for (t of tallas(); track t.id) {
-                <option [value]="t.id">{{ t['nombre'] }}</option>
-              }
-            </select>
-            @if (invalidoVariante('talla_id')) {
-              <p class="ayuda-error">Elegi una talla.</p>
-            }
-          </div>
-
-          <div class="grupo">
-            <label class="etiqueta" for="v-color">Color<b class="req">*</b></label>
-            <select id="v-color" class="campo" [class.invalido]="invalidoVariante('color_id')" formControlName="color_id">
-              <option value="">— elegir —</option>
-              @for (c of colores(); track c.id) {
-                <option [value]="c.id">{{ c['nombre'] }}</option>
-              }
-            </select>
-            @if (invalidoVariante('color_id')) {
-              <p class="ayuda-error">Elegi un color.</p>
-            }
-          </div>
-
-          <div class="grupo completo">
-            <label class="etiqueta" for="v-imagen">URL de imagen</label>
-            <input id="v-imagen" type="text" class="campo" formControlName="imagen_url" placeholder="opcional" />
-          </div>
-        </div>
-
-        <p class="advertencia">
-          El SKU lo genera el backend combinando prenda, talla y color; para esta prenda saldra como
-          <span class="mono">P{{ abierta()?.id }}-T…-C…</span>
-        </p>
-
-        @if (errorVariante()) {
-          <p class="error-servidor">{{ errorVariante() }}</p>
-        }
-
-        <div class="acciones">
-          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
-          <button type="submit" class="btn rosa" [disabled]="guardandoVariante()">
-            {{ guardandoVariante() ? 'Creando…' : 'Crear variante' }}
+      <div class="etiqueta">Tallas<b class="req">*</b></div>
+      <div>
+        @for (t of tallas(); track t.id) {
+          <button type="button" class="chip" [class.on]="tallasSel().includes(t.id)" (click)="alternarTalla(t.id)">
+            {{ t['nombre'] }}
           </button>
-        </div>
-      </form>
+        }
+      </div>
+
+      <div class="etiqueta separada">Colores<b class="req">*</b></div>
+      <div>
+        @for (c of colores(); track c.id) {
+          <button type="button" class="chip" [class.on]="coloresSel().includes(c.id)" (click)="alternarColor(c.id)">
+            <span class="swatch" [style.background]="hex(c['codigo_hex'])"></span>{{ c['nombre'] }}
+          </button>
+        }
+      </div>
+
+      @if (combinaciones().length > 0) {
+        <p class="combinaciones">
+          Se {{ nuevas() === 1 ? 'crea 1 variante' : 'crean ' + nuevas() + ' variantes' }}:
+          @for (c of combinaciones(); track c.clave; let ultimo = $last) {
+            <span [class.existe]="c.existe" [title]="c.existe ? 'Ya existe' : ''">{{ c.texto }}</span>{{ ultimo ? '' : ', ' }}
+          }
+        </p>
+      } @else if (intentoGenerador()) {
+        <p class="ayuda-error">Elige al menos una talla y un color.</p>
+      }
+      @if (intentoGenerador() && combinaciones().length > 0 && nuevas() === 0) {
+        <p class="ayuda-error">Todas esas combinaciones ya existen.</p>
+      }
+
+      <div class="etiqueta separada">Stock inicial de cada variante nueva</div>
+      <app-stock-inicial [(filas)]="filasGenerador" [mostrarErrores]="intentoGenerador()" />
+      <p class="advertencia">
+        Marca las sucursales donde llega esta prenda. Cada variante nueva arranca con esa cantidad y queda registrado un
+        ingreso «Stock inicial» en Movimientos. Si no marcas ninguna, las variantes se crean sin stock y la prenda no se
+        podra vender ni reservar hasta cargarlo.
+      </p>
+
+      <div class="grupo separada">
+        <label class="etiqueta" for="g-imagen">URL de imagen de las variantes</label>
+        <input
+          id="g-imagen"
+          type="text"
+          class="campo"
+          placeholder="opcional"
+          [value]="imagenVariantes()"
+          (input)="imagenVariantes.set($any($event.target).value)"
+        />
+      </div>
+
+      @if (errorVariantes()) {
+        <p class="error-servidor">{{ errorVariantes() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn rosa" [disabled]="guardandoVariantes()" (click)="generarVariantes()">
+          {{ guardandoVariantes() ? 'Creando…' : nuevas() > 0 ? 'Crear ' + nuevas() + (nuevas() === 1 ? ' variante' : ' variantes') : 'Crear variantes' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------- modal stock de variante existente -->
+@if (varianteStock(); as v) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal ancho" (click)="$event.stopPropagation()">
+      <div class="ceja">Cargar stock inicial</div>
+      <h2>{{ abierta()?.['nombre'] }} · {{ v.talla }} · {{ v.color }}</h2>
+      <p class="mono sku">{{ v.sku }}</p>
+
+      <app-stock-inicial [(filas)]="filasCarga" [mostrarErrores]="intentoCarga()" />
+      <p class="advertencia">
+        Solo aparecen las sucursales donde esta variante todavia no tiene stock. Se registra un ingreso «Stock inicial»
+        en Movimientos. Para cambiar una cantidad ya cargada, registra un movimiento.
+      </p>
+
+      @if (errorStock()) {
+        <p class="error-servidor">{{ errorStock() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn rosa" [disabled]="guardandoStock()" (click)="guardarStock()">
+          {{ guardandoStock() ? 'Guardando…' : 'Cargar stock' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------- aviso: publicar sin stock -->
+@if (sinStock(); as prenda) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" role="alertdialog" (click)="$event.stopPropagation()">
+      <div class="ceja aviso-ceja">⚠ Prenda sin stock</div>
+      <h2>«{{ prenda['nombre'] }}» no tiene unidades disponibles</h2>
+      <p class="advertencia">
+        @if (numero(prenda['variantes']) === 0) {
+          Todavia no tiene variantes (talla y color).
+        } @else {
+          Sus {{ prenda['variantes'] }} variantes no tienen stock en ninguna sucursal.
+        }
+        Si la publicas ahora, los clientes la veran <b>agotada</b> y no podran reservarla ni comprarla.
+      </p>
+
+      <div class="acciones columna">
+        <button type="button" class="btn rosa bloque" (click)="irACargarStock()">Ir a cargar su stock</button>
+        <button
+          type="button"
+          class="btn linea bloque"
+          [disabled]="cambiandoEstado() === prenda.id"
+          (click)="publicar(prenda, true)"
+        >
+          Publicar igual
+        </button>
+        <button type="button" class="enlace" (click)="cerrarModales()">Cancelar</button>
+      </div>
     </div>
   </div>
 }

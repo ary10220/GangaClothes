@@ -24,7 +24,11 @@ export interface FilaInventario {
   id: number;
   variante_id: number;
   sku: string;
+  /** Cada fila es una variante; estos datos son de su prenda, para agrupar. */
+  prenda_id: number;
   prenda: string;
+  prenda_publicada: boolean;
+  precio_venta: number | null;
   talla: string;
   color: string;
   color_hex: string | null;
@@ -39,6 +43,16 @@ export interface FilaInventario {
 }
 
 type FiltroStock = 'todas' | 'bajo';
+
+/** Las variantes de una misma prenda, bajo un encabezado con su nombre. */
+interface GrupoPrenda {
+  prenda_id: number;
+  prenda: string;
+  publicada: boolean;
+  disponible: number;
+  alertas: number;
+  filas: FilaInventario[];
+}
 
 const FILTROS: OpcionFiltro<FiltroStock>[] = [
   { valor: 'todas', etiqueta: 'Todas' },
@@ -105,11 +119,38 @@ export class Inventario {
     );
   });
 
+  /** El backend ya las manda ordenadas por prenda, talla y color. */
+  readonly grupos = computed<GrupoPrenda[]>(() => {
+    const porPrenda = new Map<number, GrupoPrenda>();
+    for (const fila of this.visibles()) {
+      let grupo = porPrenda.get(fila.prenda_id);
+      if (!grupo) {
+        grupo = {
+          prenda_id: fila.prenda_id,
+          prenda: fila.prenda,
+          publicada: fila.prenda_publicada,
+          disponible: 0,
+          alertas: 0,
+          filas: [],
+        };
+        porPrenda.set(fila.prenda_id, grupo);
+      }
+      grupo.filas.push(fila);
+      grupo.disponible += Math.max(fila.disponible, 0);
+      if (fila.bajo_minimo) grupo.alertas++;
+    }
+    return [...porPrenda.values()];
+  });
+
+  readonly columnas = computed(() => (this.puedeEditar() ? 8 : 7));
+
   readonly pie = computed(() => {
     const total = this.enFiltro().length;
     const mostradas = this.visibles().length;
     const nombre = total === 1 ? 'variante' : 'variantes';
-    return mostradas === total ? `${total} ${nombre}` : `${mostradas} de ${total} ${nombre}`;
+    const prendas = this.grupos().length;
+    const variantes = mostradas === total ? `${total} ${nombre}` : `${mostradas} de ${total} ${nombre}`;
+    return `${variantes} de ${prendas} ${prendas === 1 ? 'prenda' : 'prendas'}`;
   });
 
   constructor() {

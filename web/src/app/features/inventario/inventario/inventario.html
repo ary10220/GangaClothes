@@ -63,7 +63,10 @@
   </div>
 } @else if (filas().length === 0) {
   <div class="mensaje vacio">
-    <p>Esta sucursal todavia no tiene stock registrado. Se abre al recibir su primera compra a proveedor.</p>
+    <p>
+      Esta sucursal todavia no tiene stock registrado. Se abre al cargar el stock inicial de una variante en
+      «Prendas y variantes» o al recibir la primera compra a proveedor.
+    </p>
   </div>
 } @else if (enFiltro().length === 0) {
   <div class="mensaje vacio">
@@ -73,14 +76,16 @@
 } @else if (visibles().length === 0) {
   <p class="mensaje">Ninguna variante coincide con «{{ busqueda() }}».</p>
 } @else {
+  <p class="leyenda">
+    <b>Cada fila es una variante</b>: una prenda en una talla y un color (por ejemplo, «Polera · M · Negro»). Una
+    misma prenda tiene varias variantes, por eso se agrupan bajo su nombre y cada una lleva su propio stock.
+  </p>
   <div class="marco-tabla">
     <table>
       <thead>
         <tr>
+          <th>Variante (talla · color)</th>
           <th>SKU</th>
-          <th>Prenda</th>
-          <th>Talla</th>
-          <th>Color</th>
           <th class="num">Disponible</th>
           <th class="num">Reservado</th>
           <th class="num">Min</th>
@@ -91,13 +96,32 @@
           }
         </tr>
       </thead>
-      <tbody>
-        @for (fila of visibles(); track fila.id) {
-          <tr [class.bajo-minimo]="fila.bajo_minimo">
+      @for (grupo of grupos(); track grupo.prenda_id) {
+      <tbody class="grupo-prenda">
+        <tr class="fila-prenda">
+          <td [attr.colspan]="columnas()">
+            <b>{{ grupo.prenda }}</b>
+            <span class="resumen-prenda">
+              {{ grupo.filas.length }} {{ grupo.filas.length === 1 ? 'variante' : 'variantes' }} ·
+              {{ grupo.disponible }} disponibles
+              @if (grupo.alertas > 0) {
+                · <span class="alerta-prenda">{{ grupo.alertas }} bajo el minimo</span>
+              }
+            </span>
+            @if (!grupo.publicada) {
+              <span class="estado rosa" title="Se vende en caja, pero no se muestra en la tienda en linea">
+                no publicada en la tienda
+              </span>
+            }
+          </td>
+        </tr>
+        @for (fila of grupo.filas; track fila.id) {
+          <tr class="fila-variante" [class.bajo-minimo]="fila.bajo_minimo">
+            <td class="variante">
+              <span class="talla">{{ fila.talla }}</span>
+              <span class="swatch" [style.background]="hex(fila.color_hex)"></span>{{ fila.color }}
+            </td>
             <td class="mono">{{ fila.sku }}</td>
-            <td>{{ fila.prenda }}</td>
-            <td>{{ fila.talla }}</td>
-            <td><span class="swatch" [style.background]="hex(fila.color_hex)"></span>{{ fila.color }}</td>
             <td class="mono num disponible">{{ fila.disponible }}</td>
             <td class="mono num">{{ fila.cantidad_reservada }}</td>
             <td class="mono num">{{ fila.stock_minimo }}</td>
@@ -124,6 +148,7 @@
           </tr>
         }
       </tbody>
+      }
     </table>
   </div>
   <p class="ceja pie">{{ pie() }} · disponible = cantidad − reservado · la alerta se dispara al llegar al minimo</p>

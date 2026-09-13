@@ -9,9 +9,10 @@ from app.models.sucursales import Ciudad, Sucursal
 from app.models.seguridad import Permiso, RolPermiso
 from app.models.usuarios import Rol, Usuario
 from app.modules.auth.service import asignar_rol
-from app.core import permisos as cat
+from app.core import migraciones, permisos as cat
 
 Base.metadata.create_all(bind=engine)
+migraciones.aplicar(engine)
 db = SessionLocal()
 
 
@@ -87,7 +88,8 @@ prendas = [
 for nombre, cat_id, precio, costo in prendas:
     p = get_or_create(Prenda, nombre=nombre, defaults={
         "categoria_id": cat_id, "coleccion_id": colec.id,
-        "precio_venta": precio, "costo": costo, "genero": "unisex"})
+        # Las del seed nacen con stock en Central, asi que ya se pueden publicar.
+        "precio_venta": precio, "costo": costo, "genero": "unisex", "publicado": True})
     for t in list(tallas.values())[:3]:
         for c in list(colores.values())[:2]:
             v = get_or_create(Variante, prenda_id=p.id, talla_id=t.id, color_id=c.id,

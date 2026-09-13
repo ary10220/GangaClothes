@@ -1,0 +1,14 @@
+/* El layout es el del login (login.css); aca solo lo propio del registro. */
+.rejilla {
+  gap: 0 12px;
+}
+.ayuda {
+  color: var(--gris);
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+.error-servidor a {
+  font-weight: 700;
+  margin-left: 4px;
+  text-decoration: underline;
+}

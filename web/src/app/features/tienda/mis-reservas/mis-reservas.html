@@ -1,0 +1,86 @@
+<app-barra-tienda />
+
+<main class="pagina">
+  <div class="encabezado">
+    <div class="titulo">
+      <h1>Mis reservas</h1>
+      <span class="ceja">prendas apartadas para probartelas en tienda</span>
+    </div>
+    <app-selector-estado [(valor)]="filtro" [opciones]="opciones()" />
+    <a class="btn rosa" routerLink="/catalogo">+ Reservar otra prenda</a>
+  </div>
+
+  @if (cargando() && reservas().length === 0) {
+    <p class="mensaje">Cargando…</p>
+  } @else if (error()) {
+    <div class="mensaje error">
+      <p>{{ error() }}</p>
+      <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+    </div>
+  } @else if (reservas().length === 0) {
+    <div class="mensaje vacio">
+      <p>Todavia no reservaste prendas. Elige una en el catalogo y toca «Reservar para probar en tienda».</p>
+      <a class="btn rosa" routerLink="/catalogo">Ir al catalogo</a>
+    </div>
+  } @else if (visibles().length === 0) {
+    <div class="mensaje vacio">
+      <p>No tienes reservas activas.</p>
+      <button type="button" class="btn linea" (click)="filtro.set('todas')">Ver todas</button>
+    </div>
+  } @else {
+    <div class="lista">
+      @for (r of visibles(); track r.id) {
+        <article class="reserva" [class.inactiva]="!activa(r)">
+          <header>
+            <span class="mono">#R-{{ r.id }}</span>
+            <span
+              class="estado"
+              [class.ok]="r.estado === 'preparada' || r.estado === 'atendida'"
+              [class.rosa]="r.estado === 'pendiente'"
+              [class.bajo]="r.estado === 'cancelada' || r.estado === 'expirada'"
+              >{{ r.estado }}</span
+            >
+          </header>
+
+          <div class="cita">{{ fechaCita(r.fecha_hora_prueba) }}</div>
+          <div class="sucursal">{{ r.sucursal }}</div>
+          <p class="explicacion">
+            {{ explicacion[r.estado] }}
+            @if (vencida(r)) {
+              <b>La hora de la cita ya paso.</b>
+            }
+          </p>
+
+          <ul>
+            @for (d of r.detalle; track d.id) {
+              <li>
+                <span>{{ d.prenda }} · {{ d.talla }} · {{ d.color }}</span>
+                <b>×{{ d.cantidad }}</b>
+              </li>
+            }
+          </ul>
+          @if (r.notas) {
+            <p class="notas">«{{ r.notas }}»</p>
+          }
+          <p class="ceja creada">reservada el {{ fechaCreada(r.fecha_creacion) }}</p>
+
+          @if (activa(r)) {
+            <footer>
+              @if (confirmando() === r.id) {
+                <span class="pregunta">¿Cancelar la reserva?</span>
+                <button type="button" class="btn linea" [disabled]="cancelando() === r.id" (click)="confirmando.set(null)">
+                  No
+                </button>
+                <button type="button" class="btn peligro" [disabled]="cancelando() === r.id" (click)="cancelar(r)">
+                  {{ cancelando() === r.id ? 'Cancelando…' : 'Si, cancelar' }}
+                </button>
+              } @else {
+                <button type="button" class="enlace peligro" (click)="confirmando.set(r.id)">Cancelar reserva</button>
+              }
+            </footer>
+          }
+        </article>
+      }
+    </div>
+  }
+</main>

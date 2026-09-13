@@ -74,9 +74,12 @@ h1 {
   text-align: center;
   margin-top: 12px;
 }
-.nuevo b {
+.nuevo a {
   color: var(--ganga);
-  cursor: pointer;
+  font-weight: 700;
+}
+.nuevo a:hover {
+  text-decoration: underline;
 }
 .demo {
   margin-top: 24px;

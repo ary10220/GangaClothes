@@ -1,5 +1,5 @@
 from sqlalchemy import (Boolean, Column, Date, ForeignKey, Integer, Numeric,
-                        String, Text, UniqueConstraint)
+                        String, Text, UniqueConstraint, false)
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -57,7 +57,10 @@ class Prenda(Base):
     precio_venta = Column(Numeric(10, 2), nullable=False)
     costo = Column(Numeric(10, 2), nullable=False)
     imagen_url = Column(String(255))
+    # activo = existe en el sistema (false: archivada, no se vende por ningun canal).
+    # publicado = se muestra en la tienda en linea (web y movil). Nace despublicada.
     activo = Column(Boolean, default=True)
+    publicado = Column(Boolean, nullable=False, default=False, server_default=false())
 
     variantes = relationship("Variante", back_populates="prenda")
 

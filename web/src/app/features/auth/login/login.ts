@@ -1,6 +1,6 @@
 import { Component, inject, isDevMode, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../core/auth.service';
 import { mensajeDeError } from '../../../core/errores.interceptor';
@@ -18,7 +18,7 @@ function enLocal(): boolean {
 
 @Component({
   selector: 'app-login',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, RouterLink],
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
@@ -27,6 +27,9 @@ export class Login {
   private auth = inject(AuthService);
   private router = inject(Router);
   private ruta = inject(ActivatedRoute);
+
+  /** Se pasa al registro para que el cliente nuevo vuelva a donde estaba. */
+  readonly volverA = this.ruta.snapshot.queryParamMap.get('volverA');
 
   readonly mostrarCuentasDemo = enLocal() && CUENTAS_DEMO.length > 0;
   readonly cuentasDemo = CUENTAS_DEMO;

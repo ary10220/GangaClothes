@@ -2,11 +2,13 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class RegisterIn(BaseModel):
-    nombre: str
-    apellido: str | None = None
-    email: EmailStr
-    password: str = Field(min_length=6)
-    telefono: str | None = None
+    # Los largos son los de las columnas de `usuario`.
+    nombre: str = Field(min_length=1, max_length=100)
+    apellido: str | None = Field(default=None, max_length=100)
+    email: EmailStr = Field(max_length=120)
+    # bcrypt solo usa los primeros 72 bytes: mas largo se rechaza en el servicio.
+    password: str = Field(min_length=6, max_length=72)
+    telefono: str | None = Field(default=None, max_length=20, pattern=r"^[0-9+\-\s]{6,20}$")
 
 
 class LoginIn(BaseModel):

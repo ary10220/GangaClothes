@@ -41,6 +41,15 @@ export function instanteSinZona(iso: string | null | undefined): Date | null {
   return Number.isNaN(fecha.getTime()) ? null : fecha;
 }
 
+/** Valor para un `<input type="datetime-local">` en hora local: "2026-09-14T15:00". */
+export function paraCampoFechaHora(fecha: Date): string {
+  const dos = (n: number) => String(n).padStart(2, '0');
+  return (
+    `${fecha.getFullYear()}-${dos(fecha.getMonth() + 1)}-${dos(fecha.getDate())}` +
+    `T${dos(fecha.getHours())}:${dos(fecha.getMinutes())}`
+  );
+}
+
 /** Importe en bolivianos con punto de miles y coma decimal, como en el mockup: 1.234,50. */
 export function moneda(valor: unknown): string {
   const numero = Number(valor ?? 0);

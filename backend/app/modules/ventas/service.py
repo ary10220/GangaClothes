@@ -76,13 +76,17 @@ def _sucursal_por_defecto(db: Session) -> Sucursal:
     return sucursal
 
 
-def _variante_vendible(db: Session, variante_id: int):
+def _variante_vendible(db: Session, variante_id: int, en_linea: bool = False):
+    """En caja basta con que la prenda este activa; en la tienda en linea ademas
+    tiene que estar publicada."""
     fila = _variante(db, variante_id)
     if fila is None:
         raise HTTPException(404, f"La variante {variante_id} no existe")
     variante, prenda, _talla, _color = fila
     if variante.activo is False or prenda.activo is False:
         raise HTTPException(400, f"{nombre_variante(*fila)} ya no esta a la venta")
+    if en_linea and not prenda.publicado:
+        raise HTTPException(400, f"{nombre_variante(*fila)} no esta a la venta en la tienda en linea")
     return fila
 
 
@@ -230,7 +234,7 @@ def agregar_item(db: Session, usuario: Usuario, datos) -> dict:
         db.add(venta)
         db.flush()
 
-    fila = _variante_vendible(db, datos.variante_id)
+    fila = _variante_vendible(db, datos.variante_id, en_linea=True)
     variante, prenda, _t, _c = fila
     linea = (
         db.query(DetalleVenta)
@@ -293,6 +297,12 @@ def confirmar(db: Session, usuario: Usuario) -> dict:
 
     faltantes = []
     for d in lineas:
+        fila = _variante(db, d.variante_id)
+        variante, prenda, _t, _c = fila
+        # Pudo archivarse o despublicarse despues de agregarla al carrito.
+        if variante.activo is False or prenda.activo is False or not prenda.publicado:
+            faltantes.append(f"{nombre_variante(*fila)}: ya no esta a la venta en la tienda en linea")
+            continue
         disp = disponible(db, d.variante_id, venta.sucursal_id)
         if d.cantidad > disp:
             faltantes.append(f"{nombre_variante(*_variante(db, d.variante_id))}: "

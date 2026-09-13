@@ -6,6 +6,7 @@ que la validacion y la escritura queden en la misma transaccion.
 from decimal import Decimal
 
 from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.catalogo import Color, Prenda, Talla, Variante
@@ -22,6 +23,9 @@ TIPOS = SUMAN | RESTAN | FIJAN
 
 ESTADOS_COMPRA = {"pendiente", "recibida", "anulada"}
 
+# Motivo del ingreso que da origen al stock de una variante en una sucursal.
+MOTIVO_STOCK_INICIAL = "Stock inicial"
+
 
 # --------------------------------------------------------------- consultas
 def _fila_inventario(inv: Inventario, variante, prenda, talla, color, sucursal) -> dict:
@@ -31,7 +35,11 @@ def _fila_inventario(inv: Inventario, variante, prenda, talla, color, sucursal) 
         "id": inv.id,
         "variante_id": inv.variante_id,
         "sku": variante.sku if variante else None,
+        # Cada fila es una variante; la prenda viaja aparte para poder agruparlas.
+        "prenda_id": prenda.id if prenda else None,
         "prenda": prenda.nombre if prenda else None,
+        "prenda_publicada": bool(prenda.publicado) if prenda else False,
+        "precio_venta": float(prenda.precio_venta) if prenda else None,
         "talla": talla.nombre if talla else None,
         "color": color.nombre if color else None,
         "color_hex": color.codigo_hex if color else None,
@@ -59,38 +67,78 @@ def listar(db: Session, sucursal_id: int | None = None, solo_alertas: bool = Fal
     if sucursal_id:
         consulta = consulta.filter(Inventario.sucursal_id == sucursal_id)
 
-    filas = [_fila_inventario(*t) for t in consulta.order_by(Variante.sku).all()]
+    # Agrupado por prenda y, dentro de cada una, por talla y color.
+    orden = (Prenda.nombre, Prenda.id, Talla.orden, Talla.nombre, Color.nombre)
+    filas = [_fila_inventario(*t) for t in consulta.order_by(*orden).all()]
     return [f for f in filas if f["bajo_minimo"]] if solo_alertas else filas
 
 
 # ------------------------------------------------------------ alta de stock
-def crear_registro(db: Session, datos) -> dict:
-    if db.get(Variante, datos.variante_id) is None:
-        raise HTTPException(404, "La variante no existe")
-    if db.get(Sucursal, datos.sucursal_id) is None:
-        raise HTTPException(404, "La sucursal no existe")
+def abrir_stock(db: Session, variante: Variante, sucursal_id: int, cantidad: int,
+                stock_minimo: int, stock_maximo: int, usuario_id: int | None) -> Inventario:
+    """Crea el stock de una variante en una sucursal. No hace commit.
+
+    Si entra con unidades, registra el ingreso "Stock inicial": ninguna unidad
+    aparece en el inventario sin un movimiento que diga de donde salio.
+    """
+    sucursal = db.get(Sucursal, sucursal_id)
+    if sucursal is None:
+        raise HTTPException(404, f"La sucursal {sucursal_id} no existe")
+    if sucursal.activo is False:
+        raise HTTPException(400, f"La {sucursal.nombre} esta inactiva: no se le puede cargar stock")
+    if cantidad < 0:
+        raise HTTPException(400, "La cantidad inicial no puede ser negativa")
 
     existe = (
         db.query(Inventario)
-        .filter(Inventario.variante_id == datos.variante_id,
-                Inventario.sucursal_id == datos.sucursal_id)
+        .filter(Inventario.variante_id == variante.id, Inventario.sucursal_id == sucursal_id)
         .first()
     )
     if existe:
-        raise HTTPException(400, "Esa variante ya tiene stock registrado en esa sucursal")
+        raise HTTPException(
+            400,
+            f"{variante.sku} ya tiene stock en {sucursal.nombre} ({existe.cantidad} unidades). "
+            "Para cambiar la cantidad registra un movimiento",
+        )
 
-    _validar_limites(datos.stock_minimo, datos.stock_maximo)
-    inv = Inventario(
-        variante_id=datos.variante_id,
-        sucursal_id=datos.sucursal_id,
-        cantidad=datos.cantidad,
-        cantidad_reservada=0,
-        stock_minimo=datos.stock_minimo,
-        stock_maximo=datos.stock_maximo,
-    )
+    _validar_limites(stock_minimo, stock_maximo)
+    inv = Inventario(variante_id=variante.id, sucursal_id=sucursal_id, cantidad=cantidad,
+                     cantidad_reservada=0, stock_minimo=stock_minimo, stock_maximo=stock_maximo)
     db.add(inv)
-    db.commit()
-    db.refresh(inv)
+    if cantidad > 0:
+        db.add(MovimientoInventario(variante_id=variante.id, sucursal_id=sucursal_id,
+                                    usuario_id=usuario_id, tipo="ingreso", cantidad=cantidad,
+                                    motivo=MOTIVO_STOCK_INICIAL))
+    db.flush()
+    return inv
+
+
+def abrir_stock_en_sucursales(db: Session, variante: Variante, lineas, usuario_id: int | None) -> list[Inventario]:
+    """El stock inicial de una variante en varias sucursales. Todo o nada; no hace commit."""
+    ids = [linea.sucursal_id for linea in lineas]
+    repetidas = sorted({i for i in ids if ids.count(i) > 1})
+    if repetidas:
+        nombres = [db.get(Sucursal, i).nombre if db.get(Sucursal, i) else str(i) for i in repetidas]
+        raise HTTPException(400, f"Sucursal repetida en el stock inicial: {', '.join(nombres)}")
+    return [
+        abrir_stock(db, variante, l.sucursal_id, l.cantidad, l.stock_minimo, l.stock_maximo, usuario_id)
+        for l in lineas
+    ]
+
+
+def crear_registro(db: Session, datos, usuario_id: int | None = None) -> dict:
+    variante = db.get(Variante, datos.variante_id)
+    if variante is None:
+        raise HTTPException(404, "La variante no existe")
+
+    inv = abrir_stock(db, variante, datos.sucursal_id, datos.cantidad,
+                      datos.stock_minimo, datos.stock_maximo, usuario_id)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dos altas simultaneas de la misma variante y sucursal: gana una.
+        db.rollback()
+        raise HTTPException(400, "Esa variante ya tiene stock registrado en esa sucursal")
     return detalle(db, inv.id)
 
 
