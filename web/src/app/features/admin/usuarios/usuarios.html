@@ -167,12 +167,12 @@
                 class="campo"
                 [class.invalido]="invalido('password')"
                 formControlName="password"
-                placeholder="minimo 6 caracteres"
                 autocomplete="new-password"
               />
               @if (invalido('password')) {
-                <p class="ayuda-error">Debe tener al menos 6 caracteres.</p>
+                <p class="ayuda-error">La contrasena no cumple los requisitos.</p>
               }
+              <app-reglas-contrasena [valor]="formulario.get('password')?.value ?? ''" />
             </div>
           }
 

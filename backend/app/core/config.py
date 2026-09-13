@@ -14,6 +14,22 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24
     cors_origins: str = "*"
 
+    # Correo saliente para recuperar la contrasena. Con Gmail, SMTP_PASSWORD es
+    # una contrasena de aplicacion (myaccount.google.com/apppasswords).
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 465
+    smtp_usuario: str = ""
+    smtp_password: str = ""
+    smtp_nombre_remitente: str = "GangaClothes"
+    # Solo para pruebas locales: escribe el codigo en la consola del servidor.
+    codigo_recuperacion_en_log: bool = False
+
+    @field_validator("smtp_password")
+    @classmethod
+    def _sin_espacios(cls, clave: str) -> str:
+        # Google la muestra en grupos de 4 ("abcd efgh ..."); los espacios no son parte.
+        return clave.replace(" ", "")
+
     @field_validator("database_url")
     @classmethod
     def _esquema_postgresql(cls, url: str) -> str:

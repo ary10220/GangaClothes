@@ -1,0 +1,124 @@
+<div class="pantalla">
+  <div class="tarjeta">
+    <!-- panel de marca -->
+    <aside class="marca">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#E8175D" stroke-width="1.6">
+        <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z" />
+      </svg>
+      <div class="logo">Ganga<b>Clothes</b></div>
+      <p>Te enviamos un codigo a tu correo para que crees una contrasena nueva. Tu cuenta, reservas y compras siguen igual.</p>
+      <div class="ceja roles">recuperar acceso · paso {{ paso() === 'correo' ? '1' : '2' }} de 2</div>
+    </aside>
+
+    <section class="formulario">
+      @if (paso() === 'correo') {
+        <!-- ---------------------------------------------------- paso 1 -->
+        <h1>Recuperar contrasena</h1>
+        <p class="explicacion">Escribe el correo con el que te registraste y te enviaremos un codigo de 6 digitos.</p>
+
+        <form [formGroup]="formCorreo" (ngSubmit)="pedirCodigo()" novalidate>
+          <div class="grupo">
+            <label class="etiqueta" for="rc-email">Correo electronico</label>
+            <input
+              id="rc-email"
+              type="email"
+              class="campo"
+              [class.invalido]="invalidoCorreo()"
+              formControlName="email"
+              placeholder="tu@correo.com"
+              autocomplete="email"
+            />
+            @if (invalidoCorreo()) {
+              <p class="ayuda-error">Ingresa un correo valido.</p>
+            }
+          </div>
+
+          @if (error()) {
+            <p class="error-servidor">{{ error() }}</p>
+          }
+
+          <button type="submit" class="btn rosa bloque" [disabled]="enviando()">
+            {{ enviando() ? 'Enviando…' : 'Enviar codigo' }}
+          </button>
+        </form>
+      } @else {
+        <!-- ---------------------------------------------------- paso 2 -->
+        <h1>Revisa tu correo</h1>
+        <p class="explicacion">
+          {{ aviso() }} Vence en {{ minutos() }} minutos. Si no lo ves, revisa la carpeta de spam.
+        </p>
+
+        <form [formGroup]="formCodigo" (ngSubmit)="restablecer()" novalidate>
+          <div class="grupo">
+            <label class="etiqueta" for="rc-codigo">Codigo de 6 digitos</label>
+            <input
+              id="rc-codigo"
+              type="text"
+              class="campo codigo"
+              [class.invalido]="invalido('codigo')"
+              formControlName="codigo"
+              inputmode="numeric"
+              maxlength="6"
+              autocomplete="one-time-code"
+              placeholder="000000"
+            />
+            @if (invalido('codigo')) {
+              <p class="ayuda-error">El codigo son 6 numeros.</p>
+            }
+          </div>
+
+          <div class="rejilla">
+            <div class="grupo">
+              <label class="etiqueta" for="rc-password">Contrasena nueva</label>
+              <input
+                id="rc-password"
+                type="password"
+                class="campo"
+                [class.invalido]="invalido('password')"
+                formControlName="password"
+                autocomplete="new-password"
+              />
+            </div>
+            <div class="grupo">
+              <label class="etiqueta" for="rc-confirmar">Repetir contrasena</label>
+              <input
+                id="rc-confirmar"
+                type="password"
+                class="campo"
+                [class.invalido]="invalido('confirmar') || distintas()"
+                formControlName="confirmar"
+                autocomplete="new-password"
+              />
+              @if (distintas()) {
+                <p class="ayuda-error">Las contrasenas no coinciden.</p>
+              }
+            </div>
+          </div>
+          <app-reglas-contrasena [valor]="formCodigo.controls.password.value" />
+
+          @if (error()) {
+            <p class="error-servidor">{{ error() }}</p>
+          }
+
+          <button type="submit" class="btn rosa bloque" [disabled]="enviando()">
+            {{ enviando() ? 'Guardando…' : 'Cambiar contrasena' }}
+          </button>
+        </form>
+
+        <p class="reenvio">
+          ¿No llego?
+          @if (espera() > 0) {
+            <span>Puedes pedir otro en {{ espera() }} s</span>
+          } @else {
+            <button type="button" class="enlace-rosa" [disabled]="enviando()" (click)="pedirCodigo(true)">Reenviar codigo</button>
+          }
+          · <button type="button" class="enlace-rosa" (click)="usarOtroCorreo()">Usar otro correo</button>
+        </p>
+      }
+
+      <p class="nuevo">
+        <a routerLink="/login" [queryParams]="correo ? { email: correo } : {}">← Volver a iniciar sesion</a>
+      </p>
+    </section>
+  </div>
+</div>

@@ -4,7 +4,7 @@ Un permiso es la combinacion de un modulo del sistema con una accion sobre el
 (por ejemplo PRENDAS + CREAR). Los roles agrupan permisos, y los usuarios
 reciben roles: asi el acceso se administra por rol y no usuario por usuario.
 """
-from sqlalchemy import (Column, DateTime, ForeignKey, Integer, String,
+from sqlalchemy import (Boolean, Column, DateTime, ForeignKey, Integer, String,
                         UniqueConstraint, func)
 
 from app.core.database import Base
@@ -45,3 +45,20 @@ class Bitacora(Base):
     entidad_id = Column(Integer)
     detalle = Column(String(400))
     ip = Column(String(45))
+
+
+class RecuperacionContrasena(Base):
+    """Codigo de un solo uso enviado al correo para restablecer la contrasena.
+
+    Se guarda el hash del codigo, nunca el codigo. Las fechas son UTC y las
+    pone el backend (no la base) para compararlas sin problemas de zona.
+    """
+
+    __tablename__ = "recuperacion_contrasena"
+    id = Column(Integer, primary_key=True)
+    usuario_id = Column(Integer, ForeignKey("usuario.id"), nullable=False, index=True)
+    codigo_hash = Column(String(64), nullable=False)
+    fecha = Column(DateTime, nullable=False)
+    expira = Column(DateTime, nullable=False)
+    intentos = Column(Integer, nullable=False, default=0)
+    usado = Column(Boolean, nullable=False, default=False)

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 
 from app.core.auditoria import registrar
+from app.core.contrasenas import exigir_segura
 from app.core.deps import get_db, require_permiso
 from app.core.security import hash_password
 from app.models.usuarios import Usuario, UsuarioRol
@@ -45,6 +46,7 @@ def listar(db=Depends(get_db), _=Depends(ver)):
 def crear(datos: UsuarioCrear, peticion: Request, db=Depends(get_db), usuario=Depends(crear_u)):
     if db.query(Usuario).filter(Usuario.email == datos.email).first():
         raise HTTPException(400, "Ya existe un usuario con ese correo")
+    exigir_segura(datos.password)
     u = Usuario(nombre=datos.nombre, apellido=datos.apellido, email=datos.email,
                 password_hash=hash_password(datos.password), telefono=datos.telefono)
     db.add(u)

@@ -60,6 +60,17 @@ h1 {
 .grupo {
   margin-bottom: 14px;
 }
+.olvide {
+  display: block;
+  width: fit-content;
+  margin: -6px 0 14px auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ganga);
+}
+.olvide:hover {
+  text-decoration: underline;
+}
 .error-servidor {
   background: #fce9e2;
   color: var(--alerta);

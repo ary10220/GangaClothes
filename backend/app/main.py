@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -17,6 +19,16 @@ from app.modules.pagos.router import router as pagos_router
 from app.modules.promociones.router import router as promociones_router
 from app.modules.reportes.router import router as reportes_router
 from app.modules.ia.router import router as ia_router
+
+# Mensajes propios (por ejemplo, si un correo no se pudo enviar) en la consola,
+# junto a los de uvicorn. En Render se ven en la pestana Logs.
+_log = logging.getLogger("gangaclothes")
+if not _log.handlers:
+    _manejador = logging.StreamHandler()
+    _manejador.setFormatter(logging.Formatter("%(levelname)s:     %(name)s - %(message)s"))
+    _log.addHandler(_manejador)
+    _log.setLevel(logging.INFO)
+    _log.propagate = False
 
 # En el curso usamos create_all; en un proyecto real se usarian migraciones (Alembic).
 Base.metadata.create_all(bind=engine)

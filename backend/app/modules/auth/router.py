@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.core.auditoria import registrar
 from app.core.deps import get_current_user, get_db, permisos_de
 from app.core.security import create_token
 from app.modules.auth import service
-from app.modules.auth.schemas import LoginIn, RegisterIn, TokenOut, UsuarioOut
+from app.modules.auth.schemas import (LoginIn, RecuperarIn, RegisterIn, RestablecerIn,
+                                      TokenOut, UsuarioOut)
 
 router = APIRouter()
 
@@ -35,6 +36,33 @@ def login(datos: LoginIn, peticion: Request, db=Depends(get_db)):
               entidad="usuario", entidad_id=usuario.id,
               detalle=f"Inicio de sesion como {', '.join(salida.usuario.roles) or 'sin rol'}")
     return salida
+
+
+@router.post("/recuperar", summary="Recuperar contrasena: envia un codigo de 6 digitos al correo")
+def recuperar(datos: RecuperarIn, tareas: BackgroundTasks, peticion: Request, db=Depends(get_db)):
+    """Responde lo mismo exista o no la cuenta. El correo sale despues de
+    responder, asi el tiempo de respuesta tampoco delata si el correo existe."""
+    resultado = service.solicitar_recuperacion(db, datos.email)
+    if resultado:
+        usuario, codigo = resultado
+        tareas.add_task(service.enviar_codigo, usuario.email, usuario.nombre, codigo)
+        registrar(db, modulo="SESION", accion="RECUPERAR", usuario=usuario, peticion=peticion,
+                  entidad="usuario", entidad_id=usuario.id,
+                  detalle="Pidio un codigo para restablecer la contrasena")
+    return {
+        "detail": "Si el correo tiene una cuenta, te enviamos un codigo de 6 digitos",
+        "minutos": service.MINUTOS_CODIGO,
+        "reenvio_en": service.SEGUNDOS_ENTRE_ENVIOS,
+    }
+
+
+@router.post("/restablecer", summary="Crear una contrasena nueva con el codigo recibido")
+def restablecer(datos: RestablecerIn, peticion: Request, db=Depends(get_db)):
+    usuario = service.restablecer_contrasena(db, datos.email, datos.codigo, datos.password)
+    registrar(db, modulo="SESION", accion="RESTABLECER", usuario=usuario, peticion=peticion,
+              entidad="usuario", entidad_id=usuario.id, nivel="ALERTA",
+              detalle="Contrasena restablecida con el codigo enviado al correo")
+    return {"detail": "Tu contrasena se actualizo. Ya puedes iniciar sesion"}
 
 
 @router.post("/logout", summary="CU2: cerrar sesion")

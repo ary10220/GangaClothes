@@ -44,6 +44,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/registro/registro').then((m) => m.Registro),
   },
   {
+    path: 'recuperar',
+    canActivate: [invitadoGuard],
+    loadComponent: () => import('./features/auth/recuperar/recuperar').then((m) => m.Recuperar),
+  },
+  {
     path: 'catalogo',
     loadComponent: () => import('./features/catalogo/catalogo').then((m) => m.Catalogo),
   },

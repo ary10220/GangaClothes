@@ -9,6 +9,7 @@ import { Registro } from '../../../core/recurso.service';
 import { SesionStore } from '../../../core/sesion';
 import { esInactivo, filtrarPorEstado, FiltroEstado, textoPie, textoVacio } from '../../../shared/estado/estado';
 import { SelectorEstado } from '../../../shared/estado/selector-estado';
+import { contrasenaSegura, ReglasContrasena } from '../../../shared/contrasena/reglas-contrasena';
 
 /**
  * Administrar usuarios y roles. No usa la fabrica generica porque los roles
@@ -17,7 +18,7 @@ import { SelectorEstado } from '../../../shared/estado/selector-estado';
  */
 @Component({
   selector: 'app-usuarios',
-  imports: [ReactiveFormsModule, SelectorEstado],
+  imports: [ReactiveFormsModule, SelectorEstado, ReglasContrasena],
   templateUrl: './usuarios.html',
   styleUrl: './usuarios.css',
   host: { '(document:keydown.escape)': 'cerrarModal()' },
@@ -107,7 +108,7 @@ export class Usuarios {
       nombre: ['', Validators.required],
       apellido: [''],
       email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]],
+      password: ['', [Validators.required, Validators.maxLength(72), contrasenaSegura]],
       telefono: [''],
     });
     this.modalAbierto.set(true);

@@ -46,6 +46,7 @@
             <p class="ayuda-error">La contrasena debe tener al menos 6 caracteres.</p>
           }
         </div>
+        <a class="olvide" routerLink="/recuperar" [queryParams]="correoEscrito()">¿Olvidaste tu contrasena?</a>
 
         @if (error()) {
           <p class="error-servidor">{{ error() }}</p>

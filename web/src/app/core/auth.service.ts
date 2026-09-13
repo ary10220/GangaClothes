@@ -26,6 +26,17 @@ export class AuthService {
       .pipe(tap((respuesta) => this.sesion.guardar(respuesta)));
   }
 
+  /** Pide el codigo de recuperacion. La API responde igual exista o no la cuenta. */
+  recuperar(email: string): Observable<{ detail: string; minutos: number; reenvio_en: number }> {
+    return this.http.post<{ detail: string; minutos: number; reenvio_en: number }>(`${API_URL}/auth/recuperar`, {
+      email,
+    });
+  }
+
+  restablecer(datos: { email: string; codigo: string; password: string }): Observable<{ detail: string }> {
+    return this.http.post<{ detail: string }>(`${API_URL}/auth/restablecer`, datos);
+  }
+
   /** Revalida el token contra la API; util al recargar la pagina. */
   yo(): Observable<Usuario> {
     return this.http.get<Usuario>(`${API_URL}/auth/me`);

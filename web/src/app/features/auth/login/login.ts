@@ -37,12 +37,19 @@ export class Login {
   readonly error = signal<string | null>(null);
 
   readonly formulario = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email]],
+    // Viene rellenado al volver de "recuperar contrasena".
+    email: [this.ruta.snapshot.queryParamMap.get('email') ?? '', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
   });
 
   usar(cuenta: CuentaDemo): void {
     this.formulario.setValue({ email: cuenta.email, password: cuenta.password });
+  }
+
+  /** Lleva el correo ya escrito a la pantalla de recuperacion. */
+  correoEscrito(): Record<string, string> {
+    const email = this.formulario.controls.email;
+    return email.valid ? { email: email.value.trim() } : {};
   }
 
   invalido(campo: 'email' | 'password'): boolean {
