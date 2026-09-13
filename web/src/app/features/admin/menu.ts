@@ -52,8 +52,12 @@ export const MENU: GrupoMenu[] = [
   {
     titulo: 'Operacion',
     items: [
-      { etiqueta: 'Inventario', ruta: '/admin/inventario', roles: ['administrador', 'encargado'], disponible: false },
-      { etiqueta: 'Caja', ruta: '/caja', roles: ['administrador', 'cajero'], disponible: false },
+      { etiqueta: 'Inventario', ruta: '/admin/inventario', roles: ['administrador', 'encargado'], disponible: true },
+      { etiqueta: 'Movimientos', ruta: '/admin/movimientos', roles: ['administrador', 'encargado'], disponible: true },
+      { etiqueta: 'Compras', ruta: '/admin/compras', roles: ['administrador', 'encargado'], disponible: true },
+      { etiqueta: 'Proveedores', ruta: '/admin/proveedores', roles: ['administrador', 'encargado'], disponible: true },
+      { etiqueta: 'Reservas', ruta: '/admin/reservas', roles: ['administrador', 'encargado'], disponible: true },
+      { etiqueta: 'Caja', ruta: '/admin/caja', roles: ['administrador', 'cajero'], disponible: true },
     ],
   },
 ];

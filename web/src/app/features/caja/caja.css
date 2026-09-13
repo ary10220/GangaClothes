@@ -1,0 +1,297 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Dos columnas como el mockup: la venta a la izquierda, el cobro a la derecha. */
+.caja {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  background: #fff;
+}
+.panel-venta {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px 22px;
+  border-right: 1.5px solid var(--linea);
+}
+.panel-cobro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 22px;
+  background: var(--suave);
+  border-radius: 0 12px 12px 0;
+}
+
+/* ------------------------------------------------------------- buscador */
+.buscador-caja {
+  position: relative;
+  margin-top: -8px;
+}
+.resultados {
+  list-style: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 320px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1.5px solid var(--tinta);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(20, 22, 26, 0.18);
+}
+.resultado {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--linea);
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--tinta);
+  text-align: left;
+  cursor: pointer;
+}
+.resultados li:last-child .resultado {
+  border-bottom: none;
+}
+.resultado:hover:not(:disabled) {
+  background: #fdf1f5;
+}
+.resultado:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.precio {
+  color: var(--ganga);
+  font-weight: 700;
+}
+.stock {
+  font-size: 11px;
+  color: var(--ok);
+}
+.stock.agotado {
+  color: var(--alerta);
+}
+.sin-resultados,
+.nota {
+  font-size: 11.5px;
+  color: var(--gris);
+}
+.sin-resultados {
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------- reservas */
+.cabecera-seccion {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.tarjeta-reserva {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--linea);
+  border-radius: 12px;
+  font-size: 12.5px;
+}
+.tarjeta-reserva.cargada {
+  border-color: var(--ganga);
+  background: #fdf1f5;
+}
+.secundario {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+}
+.btn.chico {
+  padding: 6px 12px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- lineas */
+.vacia {
+  padding: 26px 16px;
+  border: 1.5px dashed var(--linea);
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: var(--gris);
+  text-align: center;
+}
+.origen {
+  font-size: 12px;
+  color: var(--gris);
+}
+.num {
+  text-align: right;
+}
+.sku {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+}
+.aviso-stock {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--alerta);
+}
+tr.excede,
+tr.excede:hover {
+  background: #fff6f2;
+}
+.cantidad {
+  display: inline-block;
+  width: 64px;
+  padding: 6px 8px;
+  text-align: right;
+}
+.quitar {
+  width: 26px;
+  height: 26px;
+  background: none;
+  border: 1.5px solid var(--linea);
+  border-radius: 50%;
+  color: var(--gris);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+.quitar:hover:not(:disabled) {
+  border-color: var(--alerta);
+  color: var(--alerta);
+}
+.quitar:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* ---------------------------------------------------- ticket (del mockup) */
+.ticket {
+  padding: 14px 16px;
+  background: #fffdf6;
+  border: 1.5px dashed var(--tinta);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.9;
+}
+.ticket .fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ticket .tot {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1.5px dashed var(--tinta);
+  font-weight: 700;
+}
+.centro {
+  text-align: center;
+}
+.espaciado {
+  letter-spacing: 0.2em;
+}
+.pequeno {
+  font-size: 10.5px;
+}
+.gris {
+  color: var(--gris);
+}
+.nro {
+  font-weight: 700;
+  color: var(--tinta);
+}
+
+/* ------------------------------------------------------------------ cobro */
+.metodo-titulo {
+  margin-top: 6px;
+}
+.cambio {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ok);
+}
+.exacto {
+  font-size: 12.5px;
+  color: var(--gris);
+}
+.error-cobro,
+.exito {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.error-cobro {
+  background: #fce9e2;
+  color: var(--alerta);
+}
+.exito {
+  background: #e4f2ec;
+  color: var(--ok);
+}
+.error-cobro b,
+.exito b {
+  font-size: 13px;
+}
+.cobrar {
+  margin-top: 4px;
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .caja {
+    grid-template-columns: 1fr;
+  }
+  .panel-venta {
+    border-right: none;
+    border-bottom: 1.5px solid var(--linea);
+  }
+  .panel-cobro {
+    border-radius: 0 0 12px 12px;
+  }
+}

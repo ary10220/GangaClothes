@@ -1,0 +1,278 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Caja
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">venta presencial y cobro · {{ sesion.nombreCompleto() }}</span>
+  </div>
+  <app-selector-sucursal />
+</div>
+
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.id() === null && !sucursal.cargando()) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else {
+  <div class="caja">
+    <!-- ---------------------------------------------------------- la venta -->
+    <section class="panel-venta" aria-label="Venta">
+      <div class="ceja">Venta en caja</div>
+
+      <div class="buscador-caja">
+        <input
+          type="search"
+          class="campo"
+          placeholder="⌕ Escanear o buscar SKU o prenda…"
+          aria-label="Buscar variante por SKU o nombre"
+          [value]="busqueda()"
+          (input)="busqueda.set($any($event.target).value)"
+          (keydown.enter)="agregarDesdeBuscador()"
+        />
+        @if (resultados().length > 0) {
+          <ul class="resultados">
+            @for (v of resultados(); track v.id) {
+              <li>
+                <button type="button" class="resultado" [disabled]="limite(v) === 0" (click)="agregar(v)">
+                  <span class="mono">{{ v.sku }}</span>
+                  <span>{{ v.prenda }} · {{ v.talla }} · {{ v.color }}</span>
+                  <span class="mono precio">Bs {{ moneda(v.precio) }}</span>
+                  <span class="stock" [class.agotado]="limite(v) === 0">
+                    {{ limite(v) === 0 ? 'sin stock' : limite(v) + ' disp.' }}
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+        } @else if (busqueda().trim() && !cargandoCatalogo()) {
+          <p class="sin-resultados">Ninguna prenda coincide con «{{ busqueda() }}».</p>
+        }
+      </div>
+      @if (errorCatalogo()) {
+        <p class="error-servidor">
+          {{ errorCatalogo() }}
+          <button type="button" class="enlace" (click)="cargarCatalogo()">Reintentar</button>
+        </p>
+      }
+
+      <div class="seccion-reservas">
+        <div class="cabecera-seccion">
+          <span class="ceja">Desde reserva preparada</span>
+          <button type="button" class="enlace" [disabled]="cargandoReservas()" (click)="cargarReservas()">
+            Actualizar
+          </button>
+        </div>
+        @if (cargandoReservas() && reservas().length === 0) {
+          <p class="nota">Buscando reservas…</p>
+        } @else {
+          @for (r of reservas(); track r.id) {
+            <div class="tarjeta-reserva" [class.cargada]="reservaCargada()?.id === r.id">
+              <div>
+                <b>#R-{{ r.id }} · {{ r.cliente.nombre || 'Cliente' }}</b>
+                <span class="secundario">
+                  {{ r.unidades }} {{ r.unidades === 1 ? 'prenda' : 'prendas' }} · cita {{ fechaCita(r.fecha_hora_prueba) }}
+                </span>
+              </div>
+              @if (reservaCargada()?.id === r.id) {
+                <button type="button" class="btn linea chico" (click)="quitarReserva()">Quitar</button>
+              } @else {
+                <button type="button" class="btn linea chico" (click)="cargarReserva(r)">Cargar a la venta</button>
+              }
+            </div>
+          } @empty {
+            <p class="nota">No hay reservas preparadas en esta sucursal.</p>
+          }
+        }
+      </div>
+
+      @if (lineas().length === 0) {
+        <div class="vacia">
+          <p>Escanea o busca un SKU para empezar la venta, o carga una reserva preparada.</p>
+        </div>
+      } @else {
+        @if (reservaCargada(); as r) {
+          <p class="origen">
+            Venta desde la reserva <b>#R-{{ r.id }}</b> de {{ r.cliente.nombre || 'el cliente' }}: al cobrar queda atendida.
+          </p>
+        }
+        <div class="marco-tabla">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th class="num">Cant.</th>
+                <th class="num">P. unit</th>
+                <th class="num">Subtotal</th>
+                <th><span class="oculto">Quitar</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (linea of lineas(); track linea.variante.id; let i = $index) {
+                <tr [class.excede]="excede(linea)">
+                  <td>
+                    <span class="mono sku">{{ linea.variante.sku }}</span>
+                    {{ linea.variante.prenda }} · {{ linea.variante.talla }} · {{ linea.variante.color }}
+                    @if (excede(linea)) {
+                      <span class="aviso-stock">solo hay {{ limite(linea.variante) }} en la sucursal</span>
+                    }
+                  </td>
+                  <td class="num">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      class="campo cantidad"
+                      [disabled]="!!cobro()"
+                      [value]="linea.cantidad"
+                      [attr.aria-label]="'Cantidad de ' + linea.variante.sku"
+                      (change)="cambiarCantidad(i, $event)"
+                    />
+                  </td>
+                  <td class="mono num">{{ moneda(linea.variante.precio) }}</td>
+                  <td class="mono num">{{ moneda(subtotal(linea)) }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="quitar"
+                      [disabled]="!!cobro()"
+                      [attr.aria-label]="'Quitar ' + linea.variante.sku"
+                      (click)="quitar(i)"
+                    >
+                      ✕
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+
+    <!-- ----------------------------------------------------------- el cobro -->
+    <section class="panel-cobro" aria-label="Cobro">
+      @if (cobro(); as c) {
+        <div class="ticket" aria-label="Comprobante">
+          <div class="centro espaciado">GANGACLOTHES</div>
+          <div class="centro pequeno">{{ c.comprobante.sucursal?.nombre }} · {{ c.comprobante.cajero?.nombre }}</div>
+          <div class="centro pequeno">{{ fechaCobro(c.comprobante.fecha) }}</div>
+          @for (item of c.comprobante.items; track item.sku) {
+            <div class="fila">
+              <span>{{ item.cantidad }} × {{ item.descripcion }}</span>
+              <span>{{ moneda(item.subtotal) }}</span>
+            </div>
+          }
+          <div class="fila tot">
+            <span>TOTAL Bs</span>
+            <span>{{ moneda(c.comprobante.total) }}</span>
+          </div>
+          <div class="fila pequeno">
+            <span>{{ etiquetaMetodo(c.comprobante.pago.metodo) }}</span>
+            <span>{{ moneda(c.comprobante.pago.recibido) }}</span>
+          </div>
+          @if (c.comprobante.pago.cambio > 0) {
+            <div class="fila pequeno">
+              <span>cambio</span>
+              <span>{{ moneda(c.comprobante.pago.cambio) }}</span>
+            </div>
+          }
+          <div class="fila pequeno gris">
+            <span>comprobante</span>
+            <span class="nro">{{ c.comprobante.nro_comprobante }}</span>
+          </div>
+        </div>
+
+        <div class="exito" role="status">
+          <b>Venta cobrada · {{ c.comprobante.nro_comprobante }}</b>
+          <span>
+            El inventario de {{ c.comprobante.sucursal?.nombre }} ya se desconto: {{ c.unidades }}
+            {{ c.unidades === 1 ? 'unidad' : 'unidades' }}.
+          </span>
+          @if (c.reservaAtendida) {
+            <span>La reserva #R-{{ c.reservaAtendida }} quedo atendida.</span>
+          }
+        </div>
+        <button type="button" class="btn rosa bloque" (click)="nuevaVenta()">Nueva venta</button>
+      } @else {
+        <div class="ticket">
+          <div class="centro espaciado">GANGACLOTHES</div>
+          <div class="centro pequeno">{{ sucursal.actual()?.nombre }} · caja · {{ sesion.nombreCompleto() }}</div>
+          @for (linea of lineas(); track linea.variante.id) {
+            <div class="fila">
+              <span>
+                {{ linea.cantidad }} × {{ linea.variante.prenda }} {{ linea.variante.talla }}/{{ linea.variante.color }}
+              </span>
+              <span>{{ moneda(subtotal(linea)) }}</span>
+            </div>
+          } @empty {
+            <div class="centro pequeno gris">sin prendas todavia</div>
+          }
+          <div class="fila tot">
+            <span>TOTAL Bs</span>
+            <span>{{ moneda(total()) }}</span>
+          </div>
+          <div class="fila pequeno gris">
+            <span>comprobante</span>
+            <span>al cobrar</span>
+          </div>
+        </div>
+
+        <div class="ceja metodo-titulo">Metodo de pago</div>
+        <app-selector-estado [(valor)]="metodo" [opciones]="metodos" />
+
+        @if (metodo() === 'efectivo') {
+          <div>
+            <label class="etiqueta" for="caja-recibido">Monto recibido (Bs)</label>
+            <input
+              id="caja-recibido"
+              type="text"
+              inputmode="decimal"
+              class="campo"
+              placeholder="0,00"
+              [class.invalido]="errorMonto()"
+              [value]="recibido()"
+              (input)="recibido.set($any($event.target).value)"
+              (keydown.enter)="cobrar()"
+            />
+            @if (errorMonto()) {
+              <p class="ayuda-error">{{ errorMonto() }}</p>
+            } @else if (cambio() !== null) {
+              <p class="cambio">
+                Cambio: <b class="mono">Bs {{ moneda(cambio()) }}</b>
+              </p>
+            }
+          </div>
+        } @else {
+          <p class="exacto">
+            Con {{ metodo() === 'qr' ? 'QR' : 'tarjeta' }} se cobra el total exacto:
+            <b class="mono">Bs {{ moneda(total()) }}</b>
+          </p>
+        }
+
+        @if (errorCobro(); as error) {
+          <div class="error-cobro" role="alert">
+            <b>{{ error.titulo }}</b>
+            <span>{{ error.detalle }}</span>
+          </div>
+        }
+
+        <button type="button" class="btn rosa bloque cobrar" [disabled]="!!bloqueo() || cobrando()" (click)="cobrar()">
+          {{ cobrando() ? 'Cobrando…' : 'Cobrar Bs ' + moneda(total()) }}
+        </button>
+        @if (bloqueo() && !errorMonto()) {
+          <p class="nota centro">{{ bloqueo() }}</p>
+        }
+        <p class="nota">
+          Al cobrar, la venta pasa a pagada, se emite el comprobante y el stock de la sucursal se descuenta.
+        </p>
+      }
+    </section>
+  </div>
+}

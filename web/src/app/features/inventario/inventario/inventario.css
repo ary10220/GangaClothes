@@ -1,0 +1,78 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.contador {
+  font-size: 10.5px;
+  padding: 5px 11px;
+}
+button.contador {
+  border: none;
+  cursor: pointer;
+}
+
+.filtros {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.buscador {
+  width: 260px;
+  margin-left: auto;
+}
+.pie {
+  margin-top: 10px;
+}
+
+/* ----------------------------------------------------------------- tabla */
+.num {
+  text-align: right;
+}
+tr.bajo-minimo,
+tr.bajo-minimo:hover {
+  background: #fff6f2;
+}
+.reponer {
+  color: var(--ganga);
+  font-weight: 700;
+}
+tr.bajo-minimo .disponible {
+  color: var(--alerta);
+  font-weight: 700;
+}
+
+/* ----------------------------------------------------------------- modal */
+.detalle-variante {
+  color: var(--gris);
+  font-size: 11px;
+  margin: -10px 0 16px;
+}
+.advertencia {
+  font-size: 12px;
+  color: var(--gris);
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+@media (max-width: 620px) {
+  .buscador {
+    width: 100%;
+    margin-left: 0;
+  }
+}

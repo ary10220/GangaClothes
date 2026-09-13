@@ -1,0 +1,222 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Movimientos
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">ingresos, salidas, ajustes y devoluciones de stock</span>
+  </div>
+
+  <app-selector-sucursal />
+  @if (puedeRegistrar()) {
+    <button
+      type="button"
+      class="btn rosa"
+      [disabled]="variantes().length === 0"
+      (click)="abrirRegistro()"
+    >
+      + Registrar movimiento
+    </button>
+  }
+</div>
+
+<div class="filtros">
+  <label class="filtro-variante">
+    <span class="ceja">Variante</span>
+    <select
+      class="campo"
+      [disabled]="variantes().length === 0"
+      (change)="filtrarVariante($any($event.target).value)"
+    >
+      <option value="" [selected]="varianteFiltro() === null">Todas las variantes</option>
+      @for (v of variantes(); track v.variante_id) {
+        <option [value]="v.variante_id" [selected]="v.variante_id === varianteFiltro()">
+          {{ etiquetaVariante(v) }}
+        </option>
+      }
+    </select>
+  </label>
+  <app-selector-estado [(valor)]="tipoFiltro" [opciones]="filtros" />
+</div>
+
+<!-- ------------------------------------------------------------ historial -->
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.cargando() || cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sucursal.id() === null) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (variantes().length === 0) {
+  <div class="mensaje vacio">
+    <p>Esta sucursal todavia no tiene stock registrado: no hay variantes sobre las que registrar movimientos.</p>
+  </div>
+} @else if (cargandoHistorial()) {
+  <p class="mensaje">Filtrando…</p>
+} @else if (movimientos().length === 0) {
+  <div class="mensaje vacio">
+    <p>
+      {{ varianteFiltro() === null ? 'Todavia no hay movimientos en esta sucursal.' : 'Esta variante no tiene movimientos.' }}
+    </p>
+    @if (puedeRegistrar()) {
+      <button type="button" class="btn rosa" (click)="abrirRegistro()">Registrar el primero</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <div class="mensaje vacio">
+    <p>No hay movimientos de ese tipo en el historial.</p>
+    <button type="button" class="btn linea" (click)="tipoFiltro.set('todos')">Ver todos</button>
+  </div>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Variante</th>
+          <th class="num">Cantidad</th>
+          <th>Motivo</th>
+          <th>Usuario</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (m of visibles(); track m.id) {
+          <tr>
+            <td class="mono fecha">{{ fecha(m.fecha) }}</td>
+            <td>
+              <span class="estado" [class]="claseTipo(m.tipo)">{{ etiquetaTipo(m.tipo) }}</span>
+            </td>
+            <td>
+              <span class="mono">{{ m.sku }}</span>
+              <span class="secundario">{{ detalleVariante(m) }}</span>
+            </td>
+            <td class="mono num cantidad" [class]="m.tipo">{{ cantidadConSigno(m) }}</td>
+            <td class="motivo">{{ m.motivo || '—' }}</td>
+            <td>{{ m.usuario || '—' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }} · en un ajuste la cantidad es el total contado, no la diferencia</p>
+}
+
+<!-- ------------------------------------------------ modal registrar movimiento -->
+@if (modalAbierto()) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="ceja">Nuevo movimiento · {{ sucursal.actual()?.nombre }}</div>
+      <h2>Registrar movimiento</h2>
+
+      <form [formGroup]="formMov" (ngSubmit)="guardar()" novalidate>
+        <span class="etiqueta">Tipo<b class="req">*</b></span>
+        <div class="tipos" role="radiogroup" aria-label="Tipo de movimiento">
+          @for (t of tipos; track t.valor) {
+            <button
+              type="button"
+              class="chip"
+              role="radio"
+              [attr.aria-checked]="tipoElegido().valor === t.valor"
+              [class.on]="tipoElegido().valor === t.valor"
+              (click)="elegirTipo(t.valor)"
+            >
+              {{ t.etiqueta }}
+            </button>
+          }
+        </div>
+        <p class="ayuda-tipo">{{ tipoElegido().ayuda }}</p>
+
+        <div class="rejilla">
+          <div class="grupo completo">
+            <label class="etiqueta" for="m-variante">Variante<b class="req">*</b></label>
+            <select
+              id="m-variante"
+              class="campo"
+              [class.invalido]="varianteInvalida()"
+              formControlName="variante_id"
+            >
+              <option value="">— elegir —</option>
+              @for (v of variantes(); track v.variante_id) {
+                <option [value]="v.variante_id">{{ etiquetaVariante(v) }} (disponible {{ v.disponible }})</option>
+              }
+            </select>
+            @if (varianteInvalida()) {
+              <p class="ayuda-error">Elegi la variante.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="m-cantidad">
+              {{ tipoElegido().valor === 'ajuste' ? 'Total contado' : 'Cantidad' }}<b class="req">*</b>
+            </label>
+            <input
+              id="m-cantidad"
+              type="number"
+              step="1"
+              [min]="tipoElegido().valor === 'ajuste' ? 0 : 1"
+              class="campo"
+              [class.invalido]="errorCantidad()"
+              formControlName="cantidad"
+            />
+          </div>
+
+          <div class="grupo">
+            @if (varianteElegida(); as v) {
+              <span class="etiqueta">Stock actual</span>
+              <p class="stock-actual mono">
+                {{ v.cantidad }} en stock · {{ v.cantidad_reservada }} reservados ·
+                <b>{{ v.disponible }} disponibles</b>
+              </p>
+            }
+          </div>
+
+          @if (errorCantidadVisible(); as error) {
+            <p class="ayuda-error grupo completo error-cantidad">{{ error }}</p>
+          } @else if (vistaPrevia(); as p) {
+            <p class="vista-previa grupo completo" [class.alerta]="p.bajoMinimo">
+              El stock pasa de <b>{{ p.antes }}</b> a <b>{{ p.despues }}</b> ({{ p.disponible }} disponibles)
+              @if (p.bajoMinimo) {
+                · queda bajo el minimo
+              }
+            </p>
+          }
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="m-motivo">Motivo</label>
+            <textarea
+              id="m-motivo"
+              class="campo"
+              rows="2"
+              maxlength="200"
+              formControlName="motivo"
+              placeholder="Opcional, por ejemplo: conteo semanal, prenda danada, traspaso a otra sucursal"
+            ></textarea>
+          </div>
+        </div>
+
+        @if (errorServidor()) {
+          <p class="error-servidor" role="alert">{{ errorServidor() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Registrando…' : 'Registrar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

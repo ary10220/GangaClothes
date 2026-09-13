@@ -1,0 +1,180 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Reservas
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">citas para probarse prendas en tienda · la mas proxima primero</span>
+  </div>
+  <app-selector-sucursal />
+  <button type="button" class="btn linea" [disabled]="cargando()" (click)="recargar()">Actualizar</button>
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="opciones()" />
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.cargando() || (cargando() && reservas().length === 0)) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sucursal.id() === null) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (reservas().length === 0) {
+  <div class="mensaje vacio">
+    <p>Esta sucursal todavia no recibio reservas. Los clientes reservan desde el detalle de cada prenda.</p>
+  </div>
+} @else if (visibles().length === 0) {
+  <div class="mensaje vacio">
+    <p>{{ filtro() === 'activas' ? 'No hay reservas pendientes ni preparadas.' : 'No hay reservas en ese estado.' }}</p>
+    <button type="button" class="btn linea" (click)="filtro.set('todas')">Ver todas</button>
+  </div>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Reserva</th>
+          <th>Cita</th>
+          <th>Cliente</th>
+          <th>Prendas</th>
+          <th>Estado</th>
+          @if (puedeEditar()) {
+            <th class="col-acciones">Acciones</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (reserva of visibles(); track reserva.id) {
+          <tr [class.hora-pasada]="horaPasada(reserva)">
+            <td class="mono">#R-{{ reserva.id }}</td>
+            <td class="cita">
+              <b class="mono">{{ fecha(reserva.fecha_hora_prueba) }}</b>
+              @if (horaPasada(reserva)) {
+                <span class="aviso-hora">la hora ya paso</span>
+              }
+            </td>
+            <td>
+              <b>{{ reserva.cliente.nombre || 'Cliente #' + reserva.cliente.id }}</b>
+              <span class="secundario">{{ reserva.cliente.telefono || reserva.cliente.email }}</span>
+            </td>
+            <td>
+              <ul class="prendas">
+                @for (linea of reserva.detalle; track linea.id) {
+                  <li [class.liberada]="linea.estado === 'liberado'">
+                    <span class="mono">{{ linea.sku }}</span>
+                    {{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}
+                    <b class="mono">×{{ linea.cantidad }}</b>
+                  </li>
+                }
+              </ul>
+              @if (reserva.notas) {
+                <span class="notas">«{{ reserva.notas }}»</span>
+              }
+            </td>
+            <td>
+              <span class="estado" [class]="claseEstado(reserva.estado)">{{ etiquetaEstado(reserva.estado) }}</span>
+            </td>
+            @if (puedeEditar()) {
+              <td class="col-acciones">
+                @if (reserva.estado === 'pendiente') {
+                  <button
+                    type="button"
+                    class="enlace principal"
+                    [disabled]="enProceso() === reserva.id"
+                    (click)="preparar(reserva)"
+                  >
+                    Preparar
+                  </button>
+                } @else if (reserva.estado === 'preparada') {
+                  <button
+                    type="button"
+                    class="enlace principal"
+                    [disabled]="enProceso() === reserva.id"
+                    (click)="atender(reserva)"
+                  >
+                    Atender
+                  </button>
+                }
+                @if (esActiva(reserva)) {
+                  <span class="separador">·</span>
+                  <button
+                    type="button"
+                    class="enlace peligro"
+                    [disabled]="enProceso() === reserva.id"
+                    (click)="pedirExpirar(reserva)"
+                  >
+                    Expirar
+                  </button>
+                } @else {
+                  <span class="sin-acciones">—</span>
+                }
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- ---------------------------------------------------- confirmar expirar -->
+@if (aExpirar(); as reserva) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Expirar la reserva #R-{{ reserva.id }}?</h2>
+      <p class="advertencia">
+        {{ reserva.cliente.nombre || 'El cliente' }} no vino a su cita
+        (<b>{{ fecha(reserva.fecha_hora_prueba) }}</b>).
+        @if (apartadas(reserva) === 1) {
+          Se libera <b>1 unidad apartada</b> y vuelve al disponible de {{ reserva.sucursal }}.
+        } @else {
+          Se liberan <b>{{ apartadas(reserva) }} unidades apartadas</b> y vuelven al disponible de {{ reserva.sucursal }}.
+        }
+        No se puede deshacer.
+      </p>
+      <ul class="resumen">
+        @for (linea of reserva.detalle; track linea.id) {
+          <li>
+            <span class="mono">{{ linea.sku }}</span>
+            <span>{{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}</span>
+            <b class="mono">×{{ linea.cantidad }}</b>
+          </li>
+        }
+      </ul>
+
+      @if (errorExpirar()) {
+        <p class="error-servidor" role="alert">{{ errorExpirar() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="enProceso() !== null" (click)="cerrarModal()">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn peligro"
+          [disabled]="enProceso() !== null || !!errorExpirar()"
+          (click)="confirmarExpirar()"
+        >
+          {{ enProceso() !== null ? 'Expirando…' : 'Si, expirar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

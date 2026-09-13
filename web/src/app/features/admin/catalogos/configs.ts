@@ -88,6 +88,22 @@ export const CIUDADES: ConfigCrud = {
   ],
 };
 
+export const PROVEEDORES: ConfigCrud = {
+  titulo: 'Proveedores',
+  singular: 'el proveedor',
+  ruta: 'admin/proveedores',
+  archivable: true,
+  nota: 'a quienes se les hacen las compras',
+  campos: [
+    { nombre: 'nombre', etiqueta: 'Nombre', tipo: 'texto', requerido: true, marcador: 'Textiles Andinos SRL' },
+    { nombre: 'nit', etiqueta: 'NIT', tipo: 'texto', marcador: '1020304025' },
+    { nombre: 'contacto', etiqueta: 'Contacto', tipo: 'texto', marcador: 'Rosa Mamani' },
+    { nombre: 'telefono', etiqueta: 'Telefono', tipo: 'texto', marcador: '70012345' },
+    { nombre: 'email', etiqueta: 'Correo', tipo: 'texto', marcador: 'ventas@proveedor.bo' },
+    { nombre: 'direccion', etiqueta: 'Direccion', tipo: 'texto', ancho: 'completo', enTabla: false },
+  ],
+};
+
 export const SUCURSALES: ConfigCrud = {
   titulo: 'Sucursales',
   singular: 'la sucursal',

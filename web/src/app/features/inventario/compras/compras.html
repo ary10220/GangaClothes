@@ -1,0 +1,335 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Compras a proveedor
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">al recibir una compra se suma su stock</span>
+  </div>
+
+  @if (!cargando() && pendientes() > 0) {
+    <span class="estado rosa contador">
+      {{ pendientes() }} {{ pendientes() === 1 ? 'pendiente de recibir' : 'pendientes de recibir' }}
+    </span>
+  }
+
+  <app-selector-sucursal />
+  @if (puedeCrear()) {
+    <button type="button" class="btn rosa" (click)="abrirNueva()">+ Nueva compra</button>
+  }
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="filtros" />
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.cargando() || cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sucursal.id() === null) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (compras().length === 0) {
+  <div class="mensaje vacio">
+    <p>Esta sucursal todavia no tiene compras a proveedor.</p>
+    @if (puedeCrear()) {
+      <button type="button" class="btn rosa" (click)="abrirNueva()">Registrar la primera</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <div class="mensaje vacio">
+    <p>{{ filtro() === 'pendiente' ? 'No hay compras pendientes de recibir.' : 'No hay compras recibidas todavia.' }}</p>
+    <button type="button" class="btn linea" (click)="filtro.set('todas')">Ver todas</button>
+  </div>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Compra</th>
+          <th>Fecha</th>
+          <th>Proveedor</th>
+          <th class="num">Lineas</th>
+          <th class="num">Total (Bs)</th>
+          <th>Estado</th>
+          <th class="col-acciones">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (compra of visibles(); track compra.id) {
+          <tr>
+            <td class="mono">#{{ compra.id }}</td>
+            <td class="mono fecha">{{ fecha(compra.fecha) }}</td>
+            <td>{{ compra.proveedor }}</td>
+            <td class="mono num">{{ compra.items }}</td>
+            <td class="mono num">{{ moneda(compra.total) }}</td>
+            <td>
+              <span class="estado" [class]="claseEstado(compra.estado)">{{ etiquetaEstado(compra.estado) }}</span>
+            </td>
+            <td class="col-acciones">
+              <button
+                type="button"
+                class="enlace"
+                [disabled]="cargandoDetalle() === compra.id"
+                (click)="verDetalle(compra)"
+              >
+                Ver detalle
+              </button>
+              @if (compra.estado === 'pendiente' && puedeRecibir()) {
+                <span class="separador">·</span>
+                <button
+                  type="button"
+                  class="enlace recibir"
+                  [disabled]="cargandoDetalle() === compra.id"
+                  (click)="pedirRecepcion(compra)"
+                >
+                  Recibir
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- ------------------------------------------------------ modal de detalle -->
+@if (abierta(); as compra) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal ancho" (click)="$event.stopPropagation()">
+      <div class="ceja">Compra #{{ compra.id }} · {{ fecha(compra.fecha) }}</div>
+      <h2>{{ compra.proveedor }}</h2>
+      <p class="subtitulo">
+        Para {{ compra.sucursal }} ·
+        <span class="estado" [class]="claseEstado(compra.estado)">{{ etiquetaEstado(compra.estado) }}</span>
+      </p>
+
+      <div class="marco-tabla">
+        <table>
+          <thead>
+            <tr>
+              <th>SKU</th>
+              <th>Variante</th>
+              <th class="num">Cant.</th>
+              <th class="num">P. unit.</th>
+              <th class="num">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (linea of compra.detalle ?? []; track linea.id) {
+              <tr>
+                <td class="mono">{{ linea.sku }}</td>
+                <td>{{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}</td>
+                <td class="mono num">{{ linea.cantidad }}</td>
+                <td class="mono num">{{ moneda(linea.precio_unitario) }}</td>
+                <td class="mono num">{{ moneda(linea.subtotal) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="total">
+        <span class="ceja">Total · {{ unidades(compra) }} {{ unidades(compra) === 1 ? 'unidad' : 'unidades' }}</span>
+        <span class="mono">Bs {{ moneda(compra.total) }}</span>
+      </div>
+
+      <div class="acciones">
+        <button type="button" class="btn linea" (click)="cerrarModales()">Cerrar</button>
+        @if (compra.estado === 'pendiente' && puedeRecibir()) {
+          <button type="button" class="btn rosa" (click)="pedirRecepcion(compra)">Recibir compra</button>
+        }
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------ confirmar recepcion -->
+@if (aRecibir(); as compra) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar recepcion</div>
+      <h2>¿Recibir la compra #{{ compra.id }}?</h2>
+      <p class="advertencia">
+        {{ unidades(compra) === 1 ? 'Se va a sumar' : 'Se van a sumar' }}
+        <b>{{ unidades(compra) }} {{ unidades(compra) === 1 ? 'unidad' : 'unidades' }}</b> al stock de
+        <b>{{ compra.sucursal }}</b>, con un ingreso por linea en el historial de movimientos. La recepcion no se puede
+        deshacer.
+      </p>
+      <ul class="resumen-lineas">
+        @for (linea of compra.detalle ?? []; track linea.id) {
+          <li>
+            <span class="mono">{{ linea.sku }}</span>
+            <span>{{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}</span>
+            <b class="mono">+{{ linea.cantidad }}</b>
+          </li>
+        }
+      </ul>
+
+      @if (errorRecibir()) {
+        <p class="error-servidor" role="alert">{{ errorRecibir() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="recibiendo()" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn rosa" [disabled]="recibiendo() || !!errorRecibir()" (click)="confirmarRecepcion()">
+          {{ recibiendo() ? 'Recibiendo…' : 'Si, recibir' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- --------------------------------------------------------- nueva compra -->
+@if (modalNueva()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal compra" (click)="$event.stopPropagation()">
+      <div class="ceja">Nueva compra · queda pendiente hasta recibirla</div>
+      <h2>Compra a proveedor</h2>
+
+      <form [formGroup]="formCompra" (ngSubmit)="guardar()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="c-proveedor">Proveedor<b class="req">*</b></label>
+            <select id="c-proveedor" class="campo" [class.invalido]="errorProveedor()" formControlName="proveedor_id">
+              <option value="">— elegir —</option>
+              @for (p of proveedores(); track p.id) {
+                <option [value]="p.id">{{ p.nombre }}</option>
+              }
+            </select>
+            @if (errorProveedor()) {
+              <p class="ayuda-error">{{ errorProveedor() }}</p>
+            } @else if (!cargandoCatalogo() && !errorCatalogo() && proveedores().length === 0) {
+              <p class="ayuda">No hay proveedores activos: crealos en «Proveedores».</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="c-sucursal">Sucursal que recibe<b class="req">*</b></label>
+            <select id="c-sucursal" class="campo" formControlName="sucursal_id">
+              @for (s of sucursal.sucursales(); track s.id) {
+                <option [value]="s.id">{{ s.nombre }}</option>
+              }
+            </select>
+          </div>
+        </div>
+
+        <div class="cabecera-lineas">
+          <span class="etiqueta">Lineas<b class="req">*</b></span>
+          <button type="button" class="btn linea chico" (click)="agregarLinea()">+ Agregar linea</button>
+        </div>
+
+        @if (cargandoCatalogo()) {
+          <p class="nota">Cargando proveedores y prendas…</p>
+        } @else if (errorCatalogo()) {
+          <p class="error-servidor">{{ errorCatalogo() }}</p>
+        }
+
+        <div class="lineas" formArrayName="lineas">
+          @if (lineas.length > 0) {
+            <div class="fila-linea titulos" aria-hidden="true">
+              <span class="ceja">Variante</span>
+              <span class="ceja">Cantidad</span>
+              <span class="ceja">P. unit. (Bs)</span>
+              <span class="ceja num">Subtotal</span>
+              <span></span>
+            </div>
+          }
+          @for (linea of lineas.controls; track linea; let i = $index) {
+            <div class="fila-linea" [formGroupName]="i">
+              <div>
+                <select
+                  class="campo"
+                  formControlName="variante_id"
+                  [class.invalido]="erroresLinea()[i]?.variante"
+                  [attr.aria-label]="'Variante de la linea ' + (i + 1)"
+                  (change)="alElegirVariante(i)"
+                >
+                  <option value="">— elegir variante —</option>
+                  @for (grupo of grupos(); track grupo.prenda) {
+                    <optgroup [label]="grupo.prenda">
+                      @for (v of grupo.variantes; track v.id) {
+                        <option [value]="v.id">{{ v.sku }} · {{ v.talla }} · {{ v.color }}</option>
+                      }
+                    </optgroup>
+                  }
+                </select>
+                @if (stockTexto(i); as stock) {
+                  <span class="ayuda">{{ stock }}</span>
+                }
+              </div>
+              <input
+                type="number"
+                min="1"
+                step="1"
+                class="campo"
+                formControlName="cantidad"
+                placeholder="0"
+                [class.invalido]="erroresLinea()[i]?.cantidad"
+                [attr.aria-label]="'Cantidad de la linea ' + (i + 1)"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                class="campo"
+                formControlName="precio_unitario"
+                placeholder="0,00"
+                [class.invalido]="erroresLinea()[i]?.precio"
+                [attr.aria-label]="'Precio unitario de la linea ' + (i + 1)"
+              />
+              <span class="mono num subtotal">{{ moneda(subtotalLinea(i)) }}</span>
+              <button
+                type="button"
+                class="quitar"
+                [attr.aria-label]="'Quitar la linea ' + (i + 1)"
+                (click)="quitarLinea(i)"
+              >
+                ✕
+              </button>
+              @if (mensajesLinea(i); as mensajes) {
+                <p class="ayuda-error errores-linea">{{ mensajes }}</p>
+              }
+            </div>
+          } @empty {
+            <p class="nota">Todavia no hay lineas en la compra.</p>
+          }
+        </div>
+
+        @if (errorSinLineas()) {
+          <p class="ayuda-error">{{ errorSinLineas() }}</p>
+        }
+
+        <div class="total">
+          <span class="ceja">Total de la compra</span>
+          <span class="mono">Bs {{ moneda(total()) }}</span>
+        </div>
+
+        @if (errorServidor()) {
+          <p class="error-servidor" role="alert">{{ errorServidor() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Registrando…' : 'Registrar compra' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

@@ -1,0 +1,108 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.filtros {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.filtro-variante {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filtro-variante select {
+  width: auto;
+  min-width: 260px;
+}
+.pie {
+  margin-top: 10px;
+}
+
+/* ----------------------------------------------------------------- tabla */
+.num {
+  text-align: right;
+}
+.fecha {
+  white-space: nowrap;
+}
+.secundario {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+}
+.cantidad {
+  font-weight: 700;
+}
+.cantidad.ingreso,
+.cantidad.devolucion {
+  color: var(--ok);
+}
+.cantidad.salida {
+  color: var(--alerta);
+}
+.motivo {
+  max-width: 260px;
+  color: var(--gris);
+}
+
+/* ----------------------------------------------------------------- modal */
+.tipos {
+  display: flex;
+  flex-wrap: wrap;
+}
+.tipos .chip {
+  font-family: inherit;
+}
+.ayuda-tipo {
+  font-size: 12px;
+  color: var(--gris);
+  margin: 0 0 14px;
+}
+.stock-actual {
+  font-size: 11.5px;
+  color: var(--gris);
+  padding-top: 11px;
+  line-height: 1.5;
+}
+.stock-actual b {
+  color: var(--tinta);
+}
+.error-cantidad {
+  margin-top: -4px;
+  font-weight: 600;
+}
+.vista-previa {
+  margin-top: -4px;
+  font-size: 12px;
+  color: var(--ok);
+}
+.vista-previa.alerta {
+  color: var(--alerta);
+}
+
+@media (max-width: 620px) {
+  .filtro-variante,
+  .filtro-variante select {
+    width: 100%;
+    min-width: 0;
+  }
+}

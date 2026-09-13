@@ -1,0 +1,197 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Inventario
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">stock por sucursal con minimos y maximos</span>
+  </div>
+
+  @if (!cargando() && !errorCarga() && filas().length > 0) {
+    @if (alertas() > 0) {
+      <button
+        type="button"
+        class="estado bajo contador"
+        title="Ver solo las variantes bajo el minimo"
+        (click)="filtro.set('bajo')"
+      >
+        ⚠ {{ alertas() }} {{ alertas() === 1 ? 'variante bajo el minimo' : 'variantes bajo el minimo' }}
+      </button>
+    } @else {
+      <span class="estado ok contador">✓ Sin alertas de stock</span>
+    }
+  }
+
+  <app-selector-sucursal />
+  @if (puedeEditar()) {
+    <a class="btn linea" routerLink="/admin/movimientos" [queryParams]="{ registrar: 1 }">Registrar movimiento</a>
+  }
+  @if (puedeCrear()) {
+    <a class="btn" routerLink="/admin/compras" [queryParams]="{ nueva: 1 }">+ Compra a proveedor</a>
+  }
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="filtros" />
+  <input
+    type="search"
+    class="campo buscador"
+    placeholder="⌕ Buscar por SKU, prenda o color…"
+    [value]="busqueda()"
+    (input)="busqueda.set($any($event.target).value)"
+  />
+</div>
+
+<!-- --------------------------------------------------------------- tabla -->
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.cargando() || cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sucursal.id() === null) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (filas().length === 0) {
+  <div class="mensaje vacio">
+    <p>Esta sucursal todavia no tiene stock registrado. Se abre al recibir su primera compra a proveedor.</p>
+  </div>
+} @else if (enFiltro().length === 0) {
+  <div class="mensaje vacio">
+    <p>Ninguna variante esta bajo el minimo en esta sucursal.</p>
+    <button type="button" class="btn linea" (click)="filtro.set('todas')">Ver todas</button>
+  </div>
+} @else if (visibles().length === 0) {
+  <p class="mensaje">Ninguna variante coincide con «{{ busqueda() }}».</p>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>SKU</th>
+          <th>Prenda</th>
+          <th>Talla</th>
+          <th>Color</th>
+          <th class="num">Disponible</th>
+          <th class="num">Reservado</th>
+          <th class="num">Min</th>
+          <th class="num">Max</th>
+          <th>Estado</th>
+          @if (puedeEditar()) {
+            <th class="col-acciones">Accion</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of visibles(); track fila.id) {
+          <tr [class.bajo-minimo]="fila.bajo_minimo">
+            <td class="mono">{{ fila.sku }}</td>
+            <td>{{ fila.prenda }}</td>
+            <td>{{ fila.talla }}</td>
+            <td><span class="swatch" [style.background]="hex(fila.color_hex)"></span>{{ fila.color }}</td>
+            <td class="mono num disponible">{{ fila.disponible }}</td>
+            <td class="mono num">{{ fila.cantidad_reservada }}</td>
+            <td class="mono num">{{ fila.stock_minimo }}</td>
+            <td class="mono num">{{ fila.stock_maximo }}</td>
+            <td>
+              <span class="estado" [class.ok]="!fila.bajo_minimo" [class.bajo]="fila.bajo_minimo">
+                {{ textoEstado(fila) }}
+              </span>
+            </td>
+            @if (puedeEditar()) {
+              <td class="col-acciones">
+                @if (fila.bajo_minimo && puedeCrear()) {
+                  <a
+                    class="enlace reponer"
+                    routerLink="/admin/compras"
+                    [queryParams]="{ nueva: 1, variante: fila.variante_id }"
+                    >Reponer →</a
+                  >
+                  <span class="separador">·</span>
+                }
+                <button type="button" class="enlace" (click)="abrirLimites(fila)">Editar min / max</button>
+              </td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ pie() }} · disponible = cantidad − reservado · la alerta se dispara al llegar al minimo</p>
+}
+
+<!-- ---------------------------------------------- modal minimo y maximo -->
+@if (editando(); as fila) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Limites de stock · {{ fila.sucursal }}</div>
+      <h2>{{ fila.prenda }} · {{ fila.talla }} · {{ fila.color }}</h2>
+      <p class="mono detalle-variante">{{ fila.sku }} · disponible {{ fila.disponible }}</p>
+
+      <form [formGroup]="formLimites" (ngSubmit)="guardarLimites()" novalidate>
+        <div class="rejilla">
+          <div class="grupo">
+            <label class="etiqueta" for="l-minimo">Stock minimo<b class="req">*</b></label>
+            <input
+              id="l-minimo"
+              type="number"
+              min="0"
+              step="1"
+              class="campo"
+              [class.invalido]="invalido('stock_minimo') || minimoMayor()"
+              formControlName="stock_minimo"
+            />
+            @if (invalido('stock_minimo')) {
+              <p class="ayuda-error">Ingresa un numero entero, desde 0.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="l-maximo">Stock maximo<b class="req">*</b></label>
+            <input
+              id="l-maximo"
+              type="number"
+              min="0"
+              step="1"
+              class="campo"
+              [class.invalido]="invalido('stock_maximo') || minimoMayor()"
+              formControlName="stock_maximo"
+            />
+            @if (invalido('stock_maximo')) {
+              <p class="ayuda-error">Ingresa un numero entero, desde 0.</p>
+            }
+          </div>
+
+          @if (minimoMayor()) {
+            <p class="ayuda-error grupo completo">El minimo no puede ser mayor que el maximo.</p>
+          }
+        </div>
+
+        <p class="advertencia">
+          La alerta se dispara cuando el disponible llega al minimo. La cantidad no se cambia aca: se mueve
+          registrando un movimiento o recibiendo una compra.
+        </p>
+
+        @if (errorLimites()) {
+          <p class="error-servidor">{{ errorLimites() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModal()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}

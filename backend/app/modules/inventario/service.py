@@ -12,6 +12,7 @@ from app.models.catalogo import Color, Prenda, Talla, Variante
 from app.models.inventario import (Compra, DetalleCompra, Inventario,
                                    MovimientoInventario, Proveedor)
 from app.models.sucursales import Sucursal
+from app.models.usuarios import Usuario
 
 # Como afecta cada tipo al stock. El ajuste no suma ni resta: fija el total.
 SUMAN = {"ingreso", "devolucion"}
@@ -208,6 +209,7 @@ def _fila_movimiento(db: Session, m: MovimientoInventario) -> dict:
     variante = db.get(Variante, m.variante_id)
     sucursal = db.get(Sucursal, m.sucursal_id)
     prenda = db.get(Prenda, variante.prenda_id) if variante else None
+    usuario = db.get(Usuario, m.usuario_id) if m.usuario_id else None
     return {
         "id": m.id,
         "fecha": m.fecha.isoformat() if m.fecha else None,
@@ -220,6 +222,8 @@ def _fila_movimiento(db: Session, m: MovimientoInventario) -> dict:
         "sucursal_id": m.sucursal_id,
         "sucursal": sucursal.nombre if sucursal else None,
         "usuario_id": m.usuario_id,
+        # El historial muestra quien lo hizo; el encargado no puede listar usuarios.
+        "usuario": " ".join(filter(None, [usuario.nombre, usuario.apellido])) if usuario else None,
     }
 
 

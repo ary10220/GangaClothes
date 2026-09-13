@@ -9,6 +9,11 @@ export interface Usuario {
   roles: string[];
   /** Permisos que le llegan por sus roles, en formato "modulo:accion". */
   permisos: string[];
+  /**
+   * Sucursal asignada al personal. El backend todavia no la envia; cuando lo
+   * haga, las pantallas de operacion la preseleccionan (ver SucursalActual).
+   */
+  sucursal_id?: number | null;
 }
 
 export interface SesionRespuesta {

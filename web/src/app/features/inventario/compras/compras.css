@@ -1,0 +1,166 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.contador {
+  font-size: 10.5px;
+  padding: 5px 11px;
+}
+.filtros {
+  margin-bottom: 14px;
+}
+.pie {
+  margin-top: 10px;
+}
+
+/* ----------------------------------------------------------------- tabla */
+.num {
+  text-align: right;
+}
+.fecha {
+  white-space: nowrap;
+}
+.enlace.recibir {
+  color: var(--ganga);
+}
+
+/* ------------------------------------------------------- detalle y resumen */
+.modal.ancho {
+  max-width: 640px;
+}
+.subtitulo {
+  font-size: 12.5px;
+  color: var(--gris);
+  margin: -10px 0 14px;
+}
+.total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1.5px dashed var(--tinta);
+  margin-top: 14px;
+  padding-top: 10px;
+}
+.total .mono {
+  font-size: 17px;
+  font-weight: 700;
+}
+.advertencia {
+  font-size: 12.5px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+.resumen-lineas {
+  list-style: none;
+  margin-top: 12px;
+  border: 1.5px solid var(--linea);
+  border-radius: 10px;
+}
+.resumen-lineas li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--linea);
+}
+.resumen-lineas li:last-child {
+  border-bottom: none;
+}
+.resumen-lineas b {
+  color: var(--ok);
+}
+
+/* ------------------------------------------------------------ nueva compra */
+.modal.compra {
+  max-width: 820px;
+}
+.cabecera-lineas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 18px 0 8px;
+}
+.cabecera-lineas .etiqueta {
+  margin: 0;
+}
+.btn.chico {
+  padding: 6px 12px;
+  font-size: 11.5px;
+}
+.lineas {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fila-linea {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px 120px 90px 28px;
+  gap: 8px;
+  align-items: start;
+}
+.fila-linea.titulos {
+  align-items: end;
+}
+.fila-linea .subtotal {
+  padding-top: 11px;
+}
+.fila-linea .ayuda {
+  display: block;
+  margin-top: 4px;
+}
+.errores-linea {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+}
+.ayuda,
+.nota {
+  font-size: 11.5px;
+  color: var(--gris);
+}
+.nota {
+  padding: 6px 0;
+}
+.quitar {
+  margin-top: 8px;
+  background: none;
+  border: 1.5px solid var(--linea);
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+  color: var(--gris);
+  font-size: 11px;
+  line-height: 1;
+}
+.quitar:hover {
+  border-color: var(--alerta);
+  color: var(--alerta);
+}
+
+@media (max-width: 620px) {
+  .fila-linea {
+    grid-template-columns: 1fr 1fr;
+  }
+  .fila-linea > div:first-child,
+  .fila-linea .subtotal {
+    grid-column: 1 / -1;
+  }
+  .fila-linea.titulos {
+    display: none;
+  }
+}

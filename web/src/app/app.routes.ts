@@ -6,6 +6,7 @@ import {
   CIUDADES,
   COLECCIONES,
   COLORES,
+  PROVEEDORES,
   SUCURSALES,
   TALLAS,
   TEMPORADAS,
@@ -13,16 +14,18 @@ import {
 import { ConfigCrud } from './shared/crud/config';
 
 const SOLO_ADMIN = { roles: ['administrador'] };
+/** Panel del encargado de sucursal: inventario, movimientos, compras y reservas. */
+const OPERACION_SUCURSAL = { roles: ['administrador', 'encargado'] };
 
 /**
  * Los 7 catalogos comparten el componente `Crud`: lo unico que cambia es el
  * `config`, que llega como input gracias a `withComponentInputBinding()`.
  */
-function rutaCrud(camino: string, config: ConfigCrud) {
+function rutaCrud(camino: string, config: ConfigCrud, acceso: { roles: string[] } = SOLO_ADMIN) {
   return {
     path: camino,
     canActivate: [rolGuard],
-    data: { ...SOLO_ADMIN, config },
+    data: { ...acceso, config },
     loadComponent: () => import('./shared/crud/crud').then((m) => m.Crud),
   };
 }
@@ -77,6 +80,38 @@ export const routes: Routes = [
         canActivate: [rolGuard],
         data: SOLO_ADMIN,
         loadComponent: () => import('./features/admin/prendas/prendas').then((m) => m.Prendas),
+      },
+      {
+        path: 'inventario',
+        canActivate: [rolGuard],
+        data: OPERACION_SUCURSAL,
+        loadComponent: () => import('./features/inventario/inventario/inventario').then((m) => m.Inventario),
+      },
+      {
+        path: 'movimientos',
+        canActivate: [rolGuard],
+        data: OPERACION_SUCURSAL,
+        loadComponent: () => import('./features/inventario/movimientos/movimientos').then((m) => m.Movimientos),
+      },
+      {
+        path: 'compras',
+        canActivate: [rolGuard],
+        data: OPERACION_SUCURSAL,
+        loadComponent: () => import('./features/inventario/compras/compras').then((m) => m.Compras),
+      },
+      rutaCrud('proveedores', PROVEEDORES, OPERACION_SUCURSAL),
+      {
+        path: 'reservas',
+        canActivate: [rolGuard],
+        data: OPERACION_SUCURSAL,
+        loadComponent: () =>
+          import('./features/reservas/sucursal/reservas-sucursal').then((m) => m.ReservasSucursal),
+      },
+      {
+        path: 'caja',
+        canActivate: [rolGuard],
+        data: { roles: ['administrador', 'cajero'] },
+        loadComponent: () => import('./features/caja/caja').then((m) => m.Caja),
       },
     ],
   },
