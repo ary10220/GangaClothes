@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     smtp_usuario: str = ""
     smtp_password: str = ""
     smtp_nombre_remitente: str = "GangaClothes"
+    # En Render (plan gratuito sin SMTP) el correo sale por la API HTTPS de Brevo.
+    brevo_api_key: str = ""
+    # Direccion que figura como remitente; por defecto SMTP_USUARIO. En Brevo
+    # tiene que estar verificada como remitente.
+    correo_remitente: str = ""
     # Solo para pruebas locales: escribe el codigo en la consola del servidor.
     codigo_recuperacion_en_log: bool = False
 

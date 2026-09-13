@@ -142,7 +142,7 @@ def enviar_codigo(email: str, nombre: str, codigo: str) -> None:
     if settings.codigo_recuperacion_en_log:
         log.warning("Codigo de recuperacion para %s: %s", email, codigo)
     if not correo.configurado():
-        log.error("SMTP sin configurar (SMTP_USUARIO / SMTP_PASSWORD): no se envio el codigo a %s", email)
+        log.error("Correo sin configurar (BREVO_API_KEY o SMTP_USUARIO/SMTP_PASSWORD): no se envio el codigo a %s", email)
         return
 
     texto = (
@@ -162,8 +162,8 @@ def enviar_codigo(email: str, nombre: str, codigo: str) -> None:
   Si no pediste cambiar tu contrasena, ignora este correo: tu cuenta sigue igual.</p>
 </div>"""
     try:
-        correo.enviar(email, f"Tu codigo de GangaClothes: {codigo}", texto, html)
-        log.info("Codigo de recuperacion enviado a %s", email)
+        via = correo.enviar(email, f"Tu codigo de GangaClothes: {codigo}", texto, html)
+        log.info("Codigo de recuperacion enviado a %s (via %s)", email, via)
     except Exception:
         log.exception("No se pudo enviar el codigo de recuperacion a %s", email)
 
