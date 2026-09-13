@@ -235,3 +235,11 @@ def catalogo(q: str | None = None, categoria_id: int | None = None,
         db, solo_publicadas=True, q=q, categoria_id=categoria_id, temporada_id=temporada_id,
         coleccion_id=coleccion_id, talla_id=talla_id, color_id=color_id, sucursal_id=sucursal_id,
     )
+
+
+@publico.get("/catalogo/variantes/{variante_id}/asset-ar",
+             summary="Probador virtual: PNG transparente y escala de una variante publicada")
+def recursos_ar(variante_id: int, db=Depends(get_db)):
+    """Tambien vienen dentro de GET /catalogo (variantes[].recursos_ar); esta ruta
+    sirve para abrir el probador directo desde una variante."""
+    return service.recursos_ar_publicos(db, variante_id)

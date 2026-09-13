@@ -273,6 +273,31 @@ def editar(db: Session, prenda_id: int, cambios: dict) -> dict:
 
 
 # ---------------------------------------------------------------- catalogo
+def _recurso_ar(a: AssetAR) -> dict:
+    return {"id": a.id, "tipo": a.tipo, "url_recurso": a.url_recurso, "escala": float(a.escala or 1)}
+
+
+def recursos_ar_publicos(db: Session, variante_id: int) -> dict:
+    """Recursos del probador de una variante que se vende en la tienda en linea."""
+    fila = (
+        db.query(Variante, Prenda)
+        .join(Prenda, Prenda.id == Variante.prenda_id)
+        .filter(Variante.id == variante_id)
+        .first()
+    )
+    if fila is None or fila[0].activo is False or fila[1].activo is False or not fila[1].publicado:
+        raise HTTPException(404, "La variante no existe o no esta a la venta en la tienda en linea")
+    variante, prenda = fila
+    recursos = db.query(AssetAR).filter(AssetAR.variante_id == variante.id).order_by(AssetAR.id).all()
+    return {
+        "variante_id": variante.id,
+        "sku": variante.sku,
+        "prenda": prenda.nombre,
+        "tiene_probador": bool(recursos),
+        "recursos_ar": [_recurso_ar(a) for a in recursos],
+    }
+
+
 def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
                    categoria_id: int | None = None, temporada_id: int | None = None,
                    coleccion_id: int | None = None, talla_id: int | None = None,
@@ -317,6 +342,14 @@ def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
         vq = vq.filter(Variante.color_id == color_id)
     variantes = vq.order_by(Talla.orden, Talla.nombre, Color.nombre).all()
 
+    # Recursos del probador virtual (PNG transparente) de cada variante: la app
+    # movil los necesita para superponer la prenda sobre la camara.
+    recursos = defaultdict(list)
+    for a in (db.query(AssetAR)
+              .filter(AssetAR.variante_id.in_([v.id for v, _t, _c in variantes] or [0]))
+              .order_by(AssetAR.id).all()):
+        recursos[a.variante_id].append(_recurso_ar(a))
+
     iq = (
         db.query(Inventario, Sucursal)
         .join(Sucursal, Sucursal.id == Inventario.sucursal_id)
@@ -340,6 +373,8 @@ def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
             "imagen_url": v.imagen_url,
             "disponible_total": sum(max(d["disponible"], 0) for d in disponibilidad),
             "disponibilidad": disponibilidad,
+            "tiene_probador": bool(recursos[v.id]),
+            "recursos_ar": recursos[v.id],
         })
 
     resultado = []

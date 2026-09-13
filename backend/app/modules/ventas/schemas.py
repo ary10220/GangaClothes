@@ -1,10 +1,14 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class CarritoIn(BaseModel):
-    """Sucursal desde la que se despacha la compra en linea (opcional)."""
+    """Sucursal desde la que se despacha la compra en linea y canal (ambos opcionales)."""
 
     sucursal_id: int | None = None
+    # La app movil manda "movil" para que sus compras se distingan en los reportes.
+    canal: Literal["web", "movil"] | None = None
 
 
 class ItemIn(BaseModel):

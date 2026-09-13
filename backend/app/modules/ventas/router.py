@@ -20,7 +20,8 @@ crear = require_permiso("ventas:crear")
 @router.post("/carrito", summary="CU17: abrir el carrito (o devolver el que ya existe)")
 def abrir_carrito(response: Response, datos: CarritoIn | None = None,
                   db=Depends(get_db), usuario=Depends(get_current_user)):
-    carrito, creado = service.abrir_carrito(db, usuario, datos.sucursal_id if datos else None)
+    carrito, creado = service.abrir_carrito(db, usuario, datos.sucursal_id if datos else None,
+                                            datos.canal if datos else None)
     response.status_code = 201 if creado else 200
     return carrito
 

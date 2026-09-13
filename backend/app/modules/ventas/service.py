@@ -199,22 +199,34 @@ def _carrito_existente(db: Session, cliente: Cliente) -> Venta:
     return venta
 
 
-def abrir_carrito(db: Session, usuario: Usuario, sucursal_id: int | None = None) -> tuple[dict, bool]:
+def abrir_carrito(db: Session, usuario: Usuario, sucursal_id: int | None = None,
+                  canal: str | None = None) -> tuple[dict, bool]:
+    """Un cliente tiene un solo carrito: si lo abre desde la app, pasa a canal
+    "movil"; si no manda canal, se conserva el que tenia (por defecto "web")."""
     cliente = cliente_de(db, usuario)
     if sucursal_id is not None:
         _sucursal_activa(db, sucursal_id)
+    if canal is not None and canal not in ("web", "movil"):
+        raise HTTPException(400, "Canal invalido para la tienda en linea: use web o movil")
 
     venta = _carrito_de(db, cliente)
     creado = venta is None
     if creado:
         sucursal = db.get(Sucursal, sucursal_id) if sucursal_id else _sucursal_por_defecto(db)
-        venta = Venta(cliente_id=cliente.id, sucursal_id=sucursal.id, canal="web",
+        venta = Venta(cliente_id=cliente.id, sucursal_id=sucursal.id, canal=canal or "web",
                       estado="carrito", subtotal=0, descuento=0, total=0)
         db.add(venta)
         db.commit()
-    elif sucursal_id is not None and sucursal_id != venta.sucursal_id:
-        venta.sucursal_id = sucursal_id
-        db.commit()
+    else:
+        cambio = False
+        if sucursal_id is not None and sucursal_id != venta.sucursal_id:
+            venta.sucursal_id = sucursal_id
+            cambio = True
+        if canal is not None and canal != venta.canal:
+            venta.canal = canal
+            cambio = True
+        if cambio:
+            db.commit()
     return salida(db, db.get(Venta, venta.id), con_stock=True), creado
 
 
