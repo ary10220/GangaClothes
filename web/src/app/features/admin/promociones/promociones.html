@@ -1,0 +1,296 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Promociones</h1>
+    <span class="ceja">el descuento rige en el catalogo, el carrito y la caja mientras este vigente</span>
+  </div>
+
+  @if (!cargando() && conCruces() > 0) {
+    <span class="estado bajo contador">{{ conCruces() }} con solapamiento</span>
+  }
+  @if (puedeCrear()) {
+    <button type="button" class="btn rosa" (click)="abrirNueva()">+ Nueva promocion</button>
+  }
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="filtros" />
+</div>
+
+<!-- --------------------------------------------------------------- lista -->
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else if (promociones().length === 0) {
+  <div class="mensaje vacio">
+    <p>Todavia no hay promociones. Crea una para que el catalogo muestre precios con descuento.</p>
+    @if (puedeCrear()) {
+      <button type="button" class="btn rosa" (click)="abrirNueva()">Crear la primera</button>
+    }
+  </div>
+} @else if (visibles().length === 0) {
+  <div class="mensaje vacio">
+    <p>No hay promociones en este estado.</p>
+    <button type="button" class="btn linea" (click)="filtro.set('todas')">Ver todas</button>
+  </div>
+} @else {
+  <div class="tarjetas">
+    @for (promo of visibles(); track promo.id) {
+      <article class="promo" [class.apagada]="promo.estado === 'vencida' || promo.estado === 'inactiva'">
+        <div class="cabecera">
+          <span class="sello">{{ promo.etiqueta }}</span>
+          <div class="quien">
+            <h2>{{ promo.nombre }}</h2>
+            <span class="ceja">{{ fecha(promo.fecha_inicio) }} → {{ fecha(promo.fecha_fin) }}</span>
+          </div>
+          <span class="estado" [class]="claseEstado(promo.estado)">{{ promo.estado }}</span>
+        </div>
+
+        @if (promo.descripcion) {
+          <p class="descripcion">{{ promo.descripcion }}</p>
+        }
+
+        @if (promo.advertencia) {
+          <div class="cruce" role="alert">
+            <b>Solapamiento</b>
+            @for (c of promo.solapamientos; track c.promocion_id) {
+              <span>
+                con «{{ c.promocion }}» en {{ c.prendas.join(', ') }} ({{ fecha(c.desde) }} → {{ fecha(c.hasta) }})
+              </span>
+            }
+            <span class="nota-cruce">Los descuentos no se acumulan: en esas prendas se cobra el mayor.</span>
+          </div>
+        }
+
+        <ul class="prendas">
+          @for (p of promo.prendas; track p.id) {
+            <li>
+              @if (p.imagen_url) {
+                <img [src]="p.imagen_url" [alt]="p.nombre" loading="lazy" />
+              } @else {
+                <span class="sin-foto"></span>
+              }
+              <span class="nombre-prenda">{{ p.nombre }}</span>
+              <span class="mono precios">
+                <s>{{ moneda(p.precio_venta) }}</s>
+                <b>Bs {{ moneda(p.precio_final) }}</b>
+              </span>
+              @if (p.bajo_costo) {
+                <span class="estado bajo" title="El precio con descuento queda por debajo del costo">bajo costo</span>
+              }
+            </li>
+          } @empty {
+            <li class="sin-prendas">Sin prendas asociadas: no descuenta nada.</li>
+          }
+        </ul>
+
+        <div class="pie-tarjeta">
+          @if (puedeEditar()) {
+            <button type="button" class="enlace" (click)="abrirEdicion(promo)">Editar</button>
+            <span class="separador">·</span>
+            @if (promo.activo) {
+              <button type="button" class="enlace peligro" [disabled]="cambiando() === promo.id" (click)="cambiarActivo(promo, false)">
+                Desactivar
+              </button>
+            } @else {
+              <button type="button" class="enlace reactivar" [disabled]="cambiando() === promo.id" (click)="cambiarActivo(promo, true)">
+                Reactivar
+              </button>
+            }
+          }
+          @if (puedeEliminar()) {
+            <span class="separador">·</span>
+            <button type="button" class="enlace peligro" (click)="aEliminar.set(promo)">Eliminar</button>
+          }
+        </div>
+      </article>
+    }
+  </div>
+  <p class="ceja pie">{{ pie() }}</p>
+}
+
+<!-- ---------------------------------------------------------- formulario -->
+@if (modal()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal promo-form" (click)="$event.stopPropagation()">
+      <div class="ceja">{{ editando() ? 'Editar promocion' : 'Nueva promocion' }}</div>
+      <h2>{{ editando()?.nombre || 'Promocion' }}</h2>
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()" novalidate>
+        <div class="rejilla">
+          <div class="grupo completo">
+            <label class="etiqueta" for="p-nombre">Nombre<b class="req">*</b></label>
+            <input
+              id="p-nombre"
+              type="text"
+              class="campo"
+              maxlength="100"
+              formControlName="nombre"
+              placeholder="Liquidacion de verano"
+              [class.invalido]="intento() && errores().nombre"
+            />
+            @if (intento() && errores().nombre) {
+              <p class="ayuda-error">{{ errores().nombre }}</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="p-descripcion">Descripcion</label>
+            <input id="p-descripcion" type="text" class="campo" maxlength="200" formControlName="descripcion" />
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-tipo">Tipo de descuento<b class="req">*</b></label>
+            <select id="p-tipo" class="campo" formControlName="tipo_descuento">
+              <option value="porcentaje">Porcentaje (%)</option>
+              <option value="monto">Monto fijo (Bs)</option>
+            </select>
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-valor">
+              {{ tipo() === 'porcentaje' ? 'Porcentaje' : 'Monto en Bs' }}<b class="req">*</b>
+            </label>
+            <input
+              id="p-valor"
+              type="text"
+              inputmode="decimal"
+              class="campo"
+              formControlName="valor"
+              [placeholder]="tipo() === 'porcentaje' ? '20' : '40,00'"
+              [class.invalido]="intento() && errores().valor"
+            />
+            @if (intento() && errores().valor) {
+              <p class="ayuda-error">{{ errores().valor }}</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-inicio">Vigente desde<b class="req">*</b></label>
+            <input id="p-inicio" type="date" class="campo" formControlName="fecha_inicio" [class.invalido]="intento() && errores().inicio" />
+            @if (intento() && errores().inicio) {
+              <p class="ayuda-error">{{ errores().inicio }}</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="p-fin">Hasta (inclusive)<b class="req">*</b></label>
+            <input id="p-fin" type="date" class="campo" formControlName="fecha_fin" [class.invalido]="errores().fin && (intento() || formulario.controls.fecha_fin.dirty)" />
+            @if (errores().fin && (intento() || formulario.controls.fecha_fin.dirty)) {
+              <p class="ayuda-error">{{ errores().fin }}</p>
+            }
+          </div>
+        </div>
+
+        <!-- ------------------------------------------------ prendas -->
+        <div class="cabecera-prendas">
+          <span class="etiqueta">Prendas en promocion<b class="req">*</b> · {{ elegidas().length }} elegidas</span>
+          <input
+            type="search"
+            class="campo buscador"
+            placeholder="⌕ Buscar prenda…"
+            aria-label="Buscar prenda"
+            [value]="busquedaPrenda()"
+            (input)="busquedaPrenda.set($any($event.target).value)"
+          />
+        </div>
+        <div class="atajos">
+          <span class="ceja">agregar categoria:</span>
+          @for (c of categoriasConPrendas(); track c.id) {
+            <button type="button" class="chip" (click)="elegirCategoria(c.id)">+ {{ c.nombre }}</button>
+          }
+          @if (elegidas().length > 0) {
+            <button type="button" class="enlace peligro" (click)="elegidas.set([])">Quitar todas</button>
+          }
+        </div>
+
+        <div class="selector-prendas" role="group" aria-label="Prendas en promocion">
+          @for (p of prendasFiltradas(); track p.id) {
+            <label class="opcion" [class.on]="elegidas().includes(p.id)">
+              <input type="checkbox" [checked]="elegidas().includes(p.id)" (change)="alternarPrenda(p.id)" />
+              <span class="nombre-prenda">{{ p.nombre }}</span>
+              @if (!p.publicado) {
+                <span class="ceja">sin publicar</span>
+              }
+              <span class="mono">Bs {{ moneda(p.precio_venta) }}</span>
+            </label>
+          } @empty {
+            <p class="nota">Ninguna prenda coincide con la busqueda.</p>
+          }
+        </div>
+        @if (intento() && errores().prendas) {
+          <p class="ayuda-error">{{ errores().prendas }}</p>
+        }
+
+        <!-- ------------------------------------------ vista previa -->
+        @if (vistaPrevia().length > 0 && valorNumero() !== null) {
+          <div class="previa">
+            <div class="ceja">asi quedan los precios</div>
+            @for (p of vistaPrevia(); track p.id) {
+              <div class="fila-previa" [class.mal]="p.invalido">
+                <span>{{ p.nombre }}</span>
+                <span class="mono">
+                  <s>{{ moneda(p.precio_venta) }}</s>
+                  <b>{{ p.invalido ? 'el descuento supera el precio' : 'Bs ' + moneda(p.final) }}</b>
+                </span>
+                @if (p.bajoCosto) {
+                  <span class="estado bajo">bajo el costo (Bs {{ moneda(p.costo) }})</span>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (crucesPrevistos().length > 0) {
+          <div class="cruce" role="alert">
+            <b>Atencion: se solapa con otra promocion</b>
+            @for (c of crucesPrevistos(); track c.promocion.id) {
+              <span>
+                «{{ c.promocion.nombre }}» ({{ c.promocion.etiqueta }}, {{ fecha(c.promocion.fecha_inicio) }} →
+                {{ fecha(c.promocion.fecha_fin) }}) ya incluye: {{ c.prendas.join(', ') }}
+              </span>
+            }
+            <span class="nota-cruce">
+              Se puede guardar igual. Los descuentos no se acumulan: en esas prendas se cobra el mayor de los dos.
+            </span>
+          </div>
+        }
+
+        @if (errorServidor()) {
+          <p class="error-servidor" role="alert">{{ errorServidor() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : crucesPrevistos().length > 0 ? 'Guardar igual' : 'Guardar' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- ------------------------------------------------------------ eliminar -->
+@if (aEliminar(); as promo) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Eliminar «{{ promo.nombre }}»?</h2>
+      <p class="advertencia">
+        Sus {{ promo.prendas.length }} prendas vuelven al precio de lista. Si la promocion ya dio descuentos en alguna
+        venta, no se borra: se desactiva, para que los comprobantes sigan mostrando de donde salio el descuento.
+      </p>
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="eliminando()" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn peligro" [disabled]="eliminando()" (click)="confirmarEliminar()">
+          {{ eliminando() ? 'Eliminando…' : 'Si, eliminar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

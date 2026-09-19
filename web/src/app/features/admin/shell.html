@@ -2,7 +2,7 @@
   <aside class="lateral">
     <div class="cabecera">
       <div class="logo">Ganga<b>Clothes</b></div>
-      <div class="ceja">panel interno</div>
+      <div class="ceja">{{ subtitulo() }}</div>
     </div>
 
     <nav>
@@ -14,7 +14,7 @@
               <a
                 [routerLink]="item.ruta"
                 routerLinkActive="on"
-                [routerLinkActiveOptions]="{ exact: item.ruta === '/admin' }"
+                [routerLinkActiveOptions]="{ exact: item.ruta === '/admin' || item.ruta === '/proveedor' }"
                 >{{ item.etiqueta }}</a
               >
             } @else {

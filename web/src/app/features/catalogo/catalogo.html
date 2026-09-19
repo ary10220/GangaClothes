@@ -119,8 +119,11 @@
         @for (prenda of prendas(); track prenda.id) {
           <button type="button" class="tarjeta" (click)="abrir(prenda)">
             <div class="foto">
+              @if (prenda.promocion; as promo) {
+                <span class="oferta">{{ promo.etiqueta }}</span>
+              }
               @if (prenda.imagen_url) {
-                <img [src]="prenda.imagen_url" [alt]="prenda.nombre" />
+                <img [src]="prenda.imagen_url" [alt]="prenda.nombre" loading="lazy" />
               } @else {
                 <svg width="58" height="58" viewBox="0 0 24 24" fill="none" stroke="#9AA0A6" stroke-width="1.4">
                   <path d="M12 4a2 2 0 1 1 2 2c-1 .4-2 .9-2 2m0 0L3 15.5a1 1 0 0 0 .6 1.8h16.8a1 1 0 0 0 .6-1.8L12 8z" />
@@ -132,7 +135,14 @@
               @if (prenda.marca) {
                 <div class="marca">{{ prenda.marca }}</div>
               }
-              <div class="precio">Bs {{ moneda(prenda.precio_venta) }}</div>
+              @if (prenda.promocion) {
+                <div class="precio">
+                  Bs {{ moneda(prenda.precio_final) }}
+                  <s class="antes">Bs {{ moneda(prenda.precio_venta) }}</s>
+                </div>
+              } @else {
+                <div class="precio">Bs {{ moneda(prenda.precio_venta) }}</div>
+              }
               <div class="disponibilidad" [class.sin-stock]="prenda.disponible_total <= 0">
                 ● {{ textoDisponibilidad(prenda) }}
               </div>
@@ -169,7 +179,18 @@
             <div class="ceja">{{ prenda.marca }}</div>
           }
           <h2>{{ prenda.nombre }}</h2>
-          <div class="precio grande">Bs {{ moneda(prenda.precio_venta) }}</div>
+          @if (prenda.promocion; as promo) {
+            <div class="precio grande">
+              Bs {{ moneda(prenda.precio_final) }}
+              <s class="antes">Bs {{ moneda(prenda.precio_venta) }}</s>
+            </div>
+            <p class="promo-detalle">
+              <span class="estado rosa">{{ promo.etiqueta }}</span>
+              {{ promo.nombre }} · ahorras Bs {{ moneda(prenda.descuento) }}
+            </p>
+          } @else {
+            <div class="precio grande">Bs {{ moneda(prenda.precio_venta) }}</div>
+          }
           @if (prenda.descripcion) {
             <p class="descripcion">{{ prenda.descripcion }}</p>
           }

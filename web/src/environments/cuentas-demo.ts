@@ -14,4 +14,6 @@ export const CUENTAS_DEMO: CuentaDemo[] = [
   { rol: 'administrador', email: 'admin@gangaclothes.com', password: 'Admin123' },
   { rol: 'encargado', email: 'encargado@gangaclothes.com', password: 'Encargado123' },
   { rol: 'cajero', email: 'cajero@gangaclothes.com', password: 'Cajero123' },
+  { rol: 'cliente', email: 'sofia@gangaclothes.com', password: 'Cliente#2026' },
+  { rol: 'proveedor', email: 'proveedor@gangaclothes.com', password: 'Proveedor123' },
 ];

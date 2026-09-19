@@ -117,3 +117,20 @@ main {
     padding-bottom: 16px;
   }
 }
+
+/* Al imprimir un reporte (CU19) solo sale el contenido, sin menu ni barra. */
+@media print {
+  .lateral,
+  .superior {
+    display: none !important;
+  }
+  .panel,
+  .contenido,
+  main {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}

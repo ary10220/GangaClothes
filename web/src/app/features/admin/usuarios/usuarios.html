@@ -68,6 +68,9 @@
               @for (rol of rolesDe(usuario); track rol) {
                 <span class="estado rosa rol">{{ rol }}</span>
               }
+              @if (proveedorDe(usuario); as proveedor) {
+                <span class="de-proveedor">de {{ proveedor }}</span>
+              }
             </td>
             @if (muestraEstado()) {
               <td>
@@ -202,6 +205,31 @@
               <p class="ayuda">Se puede asignar mas de uno.</p>
             }
           </div>
+
+          @if (tieneRol('proveedor')) {
+            <div class="grupo completo">
+              <label class="etiqueta" for="u-proveedor">Proveedor que representa<b class="req">*</b></label>
+              <select
+                id="u-proveedor"
+                class="campo"
+                [class.invalido]="errorProveedor()"
+                (change)="proveedorElegido.set(+$any($event.target).value || null); errorProveedor.set(false)"
+              >
+                <option value="" [selected]="proveedorElegido() === null">— elegir —</option>
+                @for (p of proveedoresLibres(); track p.id) {
+                  <option [value]="p.id" [selected]="p.id === proveedorElegido()">{{ p.nombre }}</option>
+                }
+              </select>
+              @if (errorProveedor()) {
+                <p class="ayuda-error">Elegi el proveedor cuya oferta va a cargar esta cuenta.</p>
+              } @else {
+                <p class="ayuda">
+                  Con esta cuenta el proveedor entra a su portal y carga su oferta. Solo aparecen proveedores sin cuenta:
+                  se crean en «Proveedores».
+                </p>
+              }
+            </div>
+          }
         </div>
 
         @if (errorFormulario()) {

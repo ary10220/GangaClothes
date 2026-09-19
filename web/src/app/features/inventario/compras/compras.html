@@ -134,7 +134,12 @@
             @for (linea of compra.detalle ?? []; track linea.id) {
               <tr>
                 <td class="mono">{{ linea.sku }}</td>
-                <td>{{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}</td>
+                <td>
+                  {{ linea.prenda }} · {{ linea.talla }} · {{ linea.color }}
+                  @if (linea.producto_proveedor) {
+                    <span class="origen">del proveedor: {{ linea.producto_proveedor }}</span>
+                  }
+                </td>
                 <td class="mono num">{{ linea.cantidad }}</td>
                 <td class="mono num">{{ moneda(linea.precio_unitario) }}</td>
                 <td class="mono num">{{ moneda(linea.subtotal) }}</td>
@@ -228,6 +233,36 @@
           </div>
         </div>
 
+        <!-- ------------- de donde parten las lineas: la oferta del proveedor (CU9) -->
+        @if (proveedorElegido(); as prov) {
+          @if (cargandoOferta()) {
+            <p class="aviso-oferta">Consultando la oferta de {{ prov.nombre }}…</p>
+          } @else if (errorOferta()) {
+            <p class="aviso-oferta alerta" role="alert">{{ errorOferta() }}</p>
+          } @else if (sinOferta()) {
+            <p class="aviso-oferta alerta" role="status">
+              <b>{{ prov.nombre }} no tiene oferta registrada.</b>
+              La compra se arma libremente, eligiendo las variantes del catalogo. Cuando el proveedor cargue sus
+              productos en su portal, las lineas partiran de ahi.
+            </p>
+          } @else {
+            <div class="aviso-oferta">
+              <span>
+                <b>{{ prov.nombre }} ofrece {{ oferta().length }} {{ oferta().length === 1 ? 'producto' : 'productos' }}.</b>
+                Cada linea parte de uno: producto del proveedor → variante destino → cantidad.
+              </span>
+              @if (temporadasOferta().length > 1) {
+                <select class="campo temporada-oferta" aria-label="Temporada de la oferta" (change)="elegirTemporadaOferta($any($event.target).value)">
+                  <option value="">Todas las temporadas</option>
+                  @for (t of temporadasOferta(); track t.id) {
+                    <option [value]="t.id" [selected]="t.id === temporadaOferta()">{{ t.nombre }}</option>
+                  }
+                </select>
+              }
+            </div>
+          }
+        }
+
         <div class="cabecera-lineas">
           <span class="etiqueta">Lineas<b class="req">*</b></span>
           <button type="button" class="btn linea chico" (click)="agregarLinea()">+ Agregar linea</button>
@@ -239,11 +274,14 @@
           <p class="error-servidor">{{ errorCatalogo() }}</p>
         }
 
-        <div class="lineas" formArrayName="lineas">
+        <div class="lineas" [class.con-oferta]="hayOferta()" formArrayName="lineas">
           @if (lineas.length > 0) {
             <div class="fila-linea titulos" aria-hidden="true">
-              <span class="ceja">Variante</span>
-              <span class="ceja">Cantidad</span>
+              @if (hayOferta()) {
+                <span class="ceja">1 · Producto del proveedor</span>
+              }
+              <span class="ceja">{{ hayOferta() ? '2 · Variante destino' : 'Variante' }}</span>
+              <span class="ceja">{{ hayOferta() ? '3 · Cant.' : 'Cantidad' }}</span>
               <span class="ceja">P. unit. (Bs)</span>
               <span class="ceja num">Subtotal</span>
               <span></span>
@@ -251,6 +289,22 @@
           }
           @for (linea of lineas.controls; track linea; let i = $index) {
             <div class="fila-linea" [formGroupName]="i">
+              @if (hayOferta()) {
+                <div>
+                  <select
+                    class="campo"
+                    formControlName="producto_id"
+                    [class.invalido]="erroresLinea()[i]?.producto"
+                    [attr.aria-label]="'Producto del proveedor de la linea ' + (i + 1)"
+                    (change)="alElegirProducto(i)"
+                  >
+                    <option value="">— elegir producto —</option>
+                    @for (p of productosPara(i); track p.id) {
+                      <option [value]="p.id">{{ p.nombre }} · Bs {{ moneda(p.precio_referencial) }}</option>
+                    }
+                  </select>
+                </div>
+              }
               <div>
                 <select
                   class="campo"
@@ -259,9 +313,9 @@
                   [attr.aria-label]="'Variante de la linea ' + (i + 1)"
                   (change)="alElegirVariante(i)"
                 >
-                  <option value="">— elegir variante —</option>
-                  @for (grupo of grupos(); track grupo.prenda) {
-                    <optgroup [label]="grupo.prenda">
+                  <option value="">{{ hayOferta() && !producto(i) ? '— primero el producto —' : '— elegir variante —' }}</option>
+                  @for (grupo of gruposPara(i); track grupo.prenda_id) {
+                    <optgroup [label]="(grupo.asociada ? '★ ' : '') + grupo.prenda + (grupo.asociada ? ' (corresponde al producto)' : '')">
                       @for (v of grupo.variantes; track v.id) {
                         <option [value]="v.id">{{ v.sku }} · {{ v.talla }} · {{ v.color }}</option>
                       }
@@ -301,8 +355,46 @@
               >
                 ✕
               </button>
+              <!-- Lo que el proveedor escribio de su producto: con eso se decide la variante destino. -->
+              @if (producto(i); as p) {
+                <div class="ficha-producto errores-linea">
+                  <span class="ceja">lo que ofrece el proveedor</span>
+                  <p class="detalle-producto">
+                    <b>{{ p.nombre }}</b>
+                    @if (p.descripcion) {
+                      — {{ p.descripcion }}
+                    } @else {
+                      — <span class="sin-detalle">el proveedor no escribio detalle de telas, colores ni tallas</span>
+                    }
+                  </p>
+                  <p class="datos-producto">
+                    @if (p.categoria) {
+                      <span>{{ p.categoria }}</span>
+                    }
+                    @for (t of p.temporadas; track t.id) {
+                      <span class="estado rosa">{{ t.nombre }}</span>
+                    }
+                    <span>ref. Bs {{ moneda(p.precio_referencial) }}</span>
+                    <span>pedido minimo {{ p.cantidad_minima }} u.</span>
+                    <span>actualizado {{ fecha(p.fecha_actualizacion) }}</span>
+                    <span [class.sin-correspondencia]="!p.prenda">
+                      {{ p.prenda ? 'corresponde a ' + p.prenda : 'sin correspondencia definida' }}
+                    </span>
+                  </p>
+                </div>
+              }
               @if (mensajesLinea(i); as mensajes) {
                 <p class="ayuda-error errores-linea">{{ mensajes }}</p>
+              }
+              @for (aviso of avisosLinea(i); track aviso) {
+                <p class="aviso-linea errores-linea" role="status">
+                  ⚠ {{ aviso }}
+                  @if ($first && prendaParaAsociar(i); as destino) {
+                    <button type="button" class="enlace" [disabled]="asociando() === destino.productoId" (click)="asociar(i)">
+                      Asociarlo a {{ destino.prenda }}
+                    </button>
+                  }
+                </p>
               }
             </div>
           } @empty {

@@ -8,6 +8,7 @@ from app.core.deps import get_db, require_permiso
 from app.core.security import hash_password
 from app.models.usuarios import Usuario, UsuarioRol
 from app.modules.auth.service import asignar_rol, obtener_roles
+from app.modules.proveedores import service as proveedores
 
 router = APIRouter()
 ver = require_permiso("usuarios:ver")
@@ -22,6 +23,8 @@ class UsuarioCrear(BaseModel):
     password: str
     telefono: str | None = None
     roles: list[str] = ["cliente"]
+    # CU9: proveedor cuya oferta administra esta cuenta (solo con el rol proveedor).
+    proveedor_id: int | None = None
 
 
 class UsuarioEditar(BaseModel):
@@ -30,11 +33,23 @@ class UsuarioEditar(BaseModel):
     telefono: str | None = None
     activo: bool | None = None
     roles: list[str] | None = None
+    proveedor_id: int | None = None
 
 
 def _salida(db, u: Usuario) -> dict:
     return {"id": u.id, "nombre": u.nombre, "apellido": u.apellido, "email": u.email,
-            "telefono": u.telefono, "activo": u.activo, "roles": obtener_roles(db, u.id)}
+            "telefono": u.telefono, "activo": u.activo, "roles": obtener_roles(db, u.id),
+            "proveedor": proveedores.proveedor_del_usuario(db, u.id)}
+
+
+def _enlazar_proveedor(db, u: Usuario, roles: list[str], proveedor_id: int | None) -> None:
+    """Sin el rol proveedor la cuenta no queda enlazada a ninguno."""
+    if "proveedor" not in roles:
+        proveedores.enlazar_usuario(db, u.id, None)
+        return
+    if proveedor_id is None:
+        raise HTTPException(400, "Una cuenta con rol proveedor necesita el proveedor al que pertenece")
+    proveedores.enlazar_usuario(db, u.id, proveedor_id)
 
 
 @router.get("", summary="Listar usuarios")
@@ -53,6 +68,11 @@ def crear(datos: UsuarioCrear, peticion: Request, db=Depends(get_db), usuario=De
     db.flush()
     for rol in datos.roles:
         asignar_rol(db, u.id, rol)
+    try:
+        _enlazar_proveedor(db, u, datos.roles, datos.proveedor_id)
+    except HTTPException:
+        db.rollback()
+        raise
     db.commit()
     registrar(db, modulo="USUARIOS", accion="CREAR", usuario=usuario, peticion=peticion,
               entidad="usuario", entidad_id=u.id,
@@ -68,12 +88,23 @@ def editar(id: int, datos: UsuarioEditar, peticion: Request, db=Depends(get_db),
         raise HTTPException(404, "Usuario no encontrado")
     cambios = datos.model_dump(exclude_unset=True)
     roles = cambios.pop("roles", None)
+    toca_proveedor = "proveedor_id" in cambios
+    proveedor_id = cambios.pop("proveedor_id", None)
     for k, v in cambios.items():
         setattr(u, k, v)
     if roles is not None:
         db.query(UsuarioRol).filter(UsuarioRol.usuario_id == u.id).delete()
         for rol in roles:
             asignar_rol(db, u.id, rol)
+    if roles is not None or toca_proveedor:
+        db.flush()
+        actual = proveedores.proveedor_del_usuario(db, u.id)
+        try:
+            _enlazar_proveedor(db, u, roles if roles is not None else obtener_roles(db, u.id),
+                               proveedor_id if toca_proveedor else (actual["id"] if actual else None))
+        except HTTPException:
+            db.rollback()
+            raise
     db.commit()
     if list(cambios) == ["activo"]:
         detalle = f"{'Reactivacion' if cambios['activo'] else 'Archivado'} de {u.email}"

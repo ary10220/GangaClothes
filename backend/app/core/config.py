@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     # Direccion que figura como remitente; por defecto SMTP_USUARIO. En Brevo
     # tiene que estar verificada como remitente.
     correo_remitente: str = ""
+    # Las fotos del seed viven en la web (web/public/img/prendas) y se guardan
+    # como ruta relativa ("/img/prendas/x.jpg"): la web las resuelve sola. La app
+    # movil necesita la URL completa: definir aqui el dominio de la web
+    # (https://ganga-clothes.vercel.app) y el catalogo las devuelve absolutas.
+    imagenes_base_url: str = ""
     # Solo para pruebas locales: escribe el codigo en la consola del servidor.
     codigo_recuperacion_en_log: bool = False
 

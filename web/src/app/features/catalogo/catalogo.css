@@ -94,7 +94,8 @@ h1 {
   border-color: var(--tinta);
 }
 .foto {
-  height: 140px;
+  position: relative;
+  height: 230px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,6 +105,31 @@ h1 {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center 20%;
+}
+/* etiqueta de la promocion vigente sobre la foto (CU18) */
+.oferta {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  background: var(--ganga);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 3px 9px;
+}
+.antes {
+  color: var(--gris);
+  font-weight: 400;
+  font-size: 0.85em;
+  margin-left: 5px;
+}
+.promo-detalle {
+  font-size: 12px;
+  color: var(--tinta);
+  margin: -2px 0 10px;
 }
 .datos {
   padding: 10px 12px 13px;
@@ -158,7 +184,7 @@ h1 {
   gap: 22px;
 }
 .foto.grande {
-  height: 290px;
+  height: 360px;
   border-radius: 12px;
   overflow: hidden;
 }

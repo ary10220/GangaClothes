@@ -29,7 +29,25 @@ def _prenda_publicado(conexion) -> None:
     """), {"si": True})
 
 
+def _columna_nueva(conexion, tabla: str, columna: str, definicion: str) -> None:
+    """Agrega una columna que admite nulos si todavia no existe."""
+    if not inspect(conexion).has_table(tabla):
+        return
+    if columna in {c["name"] for c in inspect(conexion).get_columns(tabla)}:
+        return
+    conexion.execute(text(f"ALTER TABLE {tabla} ADD COLUMN {columna} {definicion}"))
+
+
 def aplicar(engine) -> None:
     with engine.begin() as conexion:
         if inspect(conexion).has_table("prenda"):
             _prenda_publicado(conexion)
+        # Ciclo 3: promocion aplicada a cada linea de venta (CU18) y cuenta del
+        # proveedor para su portal (CU9).
+        _columna_nueva(conexion, "detalle_venta", "promocion_id", "INTEGER REFERENCES promocion(id)")
+        _columna_nueva(conexion, "proveedor", "usuario_id", "INTEGER REFERENCES usuario(id)")
+        # La compra parte de la oferta: a que prenda corresponde un producto
+        # ofrecido y de que producto salio cada linea de compra.
+        _columna_nueva(conexion, "producto_proveedor", "prenda_id", "INTEGER REFERENCES prenda(id)")
+        _columna_nueva(conexion, "detalle_compra", "producto_proveedor_id",
+                       "INTEGER REFERENCES producto_proveedor(id)")

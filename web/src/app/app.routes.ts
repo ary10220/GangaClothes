@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, invitadoGuard, rolGuard } from './core/auth.guard';
+import { authGuard, invitadoGuard, permisoGuard, rolGuard } from './core/auth.guard';
 import {
   CATEGORIAS,
   CIUDADES,
@@ -75,6 +75,24 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/inicio/inicio').then((m) => m.AdminInicio),
       },
       {
+        path: 'dashboard',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'reportes:ver' },
+        loadComponent: () => import('./features/reportes/dashboard/dashboard').then((m) => m.Dashboard),
+      },
+      {
+        path: 'reportes',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'reportes:ver' },
+        loadComponent: () => import('./features/reportes/reportes/reportes').then((m) => m.Reportes),
+      },
+      {
+        path: 'promociones',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...SOLO_ADMIN, permiso: 'promociones:ver' },
+        loadComponent: () => import('./features/admin/promociones/promociones').then((m) => m.Promociones),
+      },
+      {
         path: 'usuarios',
         canActivate: [rolGuard],
         data: SOLO_ADMIN,
@@ -125,6 +143,14 @@ export const routes: Routes = [
       },
       rutaCrud('proveedores', PROVEEDORES, OPERACION_SUCURSAL),
       {
+        // CU9/CU10: a que prenda del catalogo corresponde cada producto que ofrecen los proveedores.
+        path: 'oferta-proveedores',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'inventario:crear' },
+        loadComponent: () =>
+          import('./features/inventario/oferta-proveedores/oferta-proveedores').then((m) => m.OfertaProveedores),
+      },
+      {
         path: 'reservas',
         canActivate: [rolGuard],
         data: OPERACION_SUCURSAL,
@@ -136,6 +162,19 @@ export const routes: Routes = [
         canActivate: [rolGuard],
         data: { roles: ['administrador', 'cajero'] },
         loadComponent: () => import('./features/caja/caja').then((m) => m.Caja),
+      },
+    ],
+  },
+  {
+    // CU9: portal del proveedor. Reusa el marco del panel con su propio menu.
+    path: 'proveedor',
+    canActivate: [authGuard, rolGuard],
+    data: { roles: ['proveedor'] },
+    loadComponent: () => import('./features/admin/shell').then((m) => m.AdminShell),
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/proveedor/mi-oferta/mi-oferta').then((m) => m.MiOferta),
       },
     ],
   },

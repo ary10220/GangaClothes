@@ -1,0 +1,340 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Reportes · {{ titulo() }}</h1>
+    <span class="ceja">{{ nombreSucursal() }} · del {{ fecha(desde()) }} al {{ fecha(hasta()) }} · solo ventas pagadas</span>
+  </div>
+  <div class="sin-imprimir botones">
+    <button type="button" class="btn rosa" [disabled]="exportando() || cargando() || !!errorFechas()" (click)="exportar()">
+      {{ exportando() ? 'Exportando…' : 'Exportar a Excel (CSV)' }}
+    </button>
+    <button type="button" class="btn linea" (click)="imprimir()">Imprimir / PDF</button>
+  </div>
+</div>
+
+<div class="sin-imprimir">
+  <div class="pestanas">
+    <app-selector-estado [(valor)]="reporte" [opciones]="opcionesReporte" />
+  </div>
+
+  <div class="filtros">
+    <label>
+      <span class="etiqueta">Desde</span>
+      <input type="date" class="campo" [class.invalido]="errorFechas()" [value]="desde()" [max]="hasta()" (change)="desde.set($any($event.target).value)" />
+    </label>
+    <label>
+      <span class="etiqueta">Hasta</span>
+      <input type="date" class="campo" [class.invalido]="errorFechas()" [value]="hasta()" (change)="hasta.set($any($event.target).value)" />
+    </label>
+    <div class="atajos">
+      <button type="button" class="chip" (click)="ultimosDias(7)">7 dias</button>
+      <button type="button" class="chip" (click)="ultimosDias(30)">30 dias</button>
+      <button type="button" class="chip" (click)="ultimosDias(90)">90 dias</button>
+    </div>
+    <label>
+      <span class="etiqueta">Sucursal</span>
+      <select class="campo" (change)="elegirSucursal($any($event.target).value)">
+        <option value="">Todas</option>
+        @for (s of sucursales.sucursales(); track s.id) {
+          <option [value]="s.id" [selected]="s.id === sucursalId()">{{ s.nombre }}</option>
+        }
+      </select>
+    </label>
+    @if (reporte() === 'ventas') {
+      <label>
+        <span class="etiqueta">Canal</span>
+        <select class="campo" (change)="elegirCanal($any($event.target).value)">
+          <option value="">Todos</option>
+          @for (c of canales; track c.valor) {
+            <option [value]="c.valor" [selected]="c.valor === canal()">{{ c.etiqueta }}</option>
+          }
+        </select>
+      </label>
+      <div class="agrupar">
+        <span class="etiqueta">Periodo</span>
+        <app-selector-estado [(valor)]="agrupar" [opciones]="agrupaciones" />
+      </div>
+    }
+  </div>
+  @if (errorFechas()) {
+    <p class="ayuda-error">{{ errorFechas() }}</p>
+  }
+</div>
+
+@if (error()) {
+  <div class="mensaje error">
+    <p>{{ error() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else {
+  <div class="cuerpo" [class.refrescando]="cargando()">
+    <!-- ================================================================ VENTAS -->
+    @if (reporte() === 'ventas') {
+      @if (ventas(); as r) {
+        <div class="fichas">
+          <div class="ficha"><div class="ceja">Total vendido</div><div class="numero">Bs {{ moneda(r.totales.total) }}</div><div class="apoyo">{{ r.totales.ventas }} ventas · {{ r.totales.unidades }} unidades</div></div>
+          <div class="ficha"><div class="ceja">Ticket promedio</div><div class="numero">Bs {{ moneda(r.totales.ticket_promedio) }}</div><div class="apoyo">por venta cobrada</div></div>
+          <div class="ficha"><div class="ceja">Descuentos</div><div class="numero">Bs {{ moneda(r.totales.descuento) }}</div><div class="apoyo">sobre Bs {{ moneda(r.totales.subtotal) }} a precio de lista</div></div>
+          <div class="ficha"><div class="ceja">Ganancia bruta</div><div class="numero">Bs {{ moneda(r.totales.ganancia) }}</div><div class="apoyo">margen {{ pct(r.totales.margen_porcentaje) }} · costo Bs {{ moneda(r.totales.costo) }}</div></div>
+        </div>
+
+        @if (r.totales.ventas === 0) {
+          <div class="mensaje vacio"><p>No hay ventas pagadas con esos filtros.</p></div>
+        } @else {
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Ventas por periodo (Bs)</h2></div>
+            <app-serie-dias [puntos]="serieVentas()" titulo="Ventas por periodo en bolivianos" />
+          </section>
+
+          <div class="dos-columnas">
+            <section class="panel">
+              <div class="cabecera-panel"><h2>Por sucursal</h2></div>
+              <app-barras-h [filas]="barrasSucursal()" />
+            </section>
+            <section class="panel">
+              <div class="cabecera-panel"><h2>Por canal</h2></div>
+              <app-barras-h [filas]="barrasCanal()" />
+            </section>
+          </div>
+
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Sucursal y canal</h2></div>
+            <div class="marco-tabla">
+              <table>
+                <thead>
+                  <tr><th>Sucursal · canal</th><th class="num">Ventas</th><th class="num">Unidades</th><th class="num">Descuento</th><th class="num">Total (Bs)</th><th class="num">Ganancia</th><th class="num">Ticket prom.</th><th class="num">% del total</th></tr>
+                </thead>
+                <tbody>
+                  @for (g of r.por_sucursal_y_canal; track g.clave) {
+                    <tr>
+                      <td>{{ g.etiqueta }}</td>
+                      <td class="mono num">{{ g.ventas }}</td>
+                      <td class="mono num">{{ g.unidades }}</td>
+                      <td class="mono num">{{ moneda(g.descuento) }}</td>
+                      <td class="mono num"><b>{{ moneda(g.total) }}</b></td>
+                      <td class="mono num">{{ moneda(g.ganancia) }}</td>
+                      <td class="mono num">{{ moneda(g.ticket_promedio) }}</td>
+                      <td class="mono num">{{ pct(g.participacion) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Por periodo</h2></div>
+            <div class="marco-tabla">
+              <table>
+                <thead>
+                  <tr><th>Periodo</th><th class="num">Ventas</th><th class="num">Unidades</th><th class="num">Descuento</th><th class="num">Total (Bs)</th><th class="num">Ganancia</th><th class="num">Margen</th></tr>
+                </thead>
+                <tbody>
+                  @for (g of r.por_periodo; track g.clave) {
+                    <tr>
+                      <td class="mono">{{ g.etiqueta }}</td>
+                      <td class="mono num">{{ g.ventas }}</td>
+                      <td class="mono num">{{ g.unidades }}</td>
+                      <td class="mono num">{{ moneda(g.descuento) }}</td>
+                      <td class="mono num"><b>{{ moneda(g.total) }}</b></td>
+                      <td class="mono num">{{ moneda(g.ganancia) }}</td>
+                      <td class="mono num">{{ pct(g.margen_porcentaje) }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Detalle de ventas</h2><span class="ceja">{{ r.ventas.length }} ventas</span></div>
+            <div class="marco-tabla">
+              <table>
+                <thead>
+                  <tr><th>Venta</th><th>Fecha</th><th>Comprobante</th><th>Sucursal</th><th>Canal</th><th class="num">Unid.</th><th class="num">Subtotal</th><th class="num">Descuento</th><th class="num">Total (Bs)</th></tr>
+                </thead>
+                <tbody>
+                  @for (v of r.ventas; track v.id) {
+                    <tr>
+                      <td class="mono">#{{ v.id }}</td>
+                      <td class="mono">{{ fechaHora(v.fecha) }}</td>
+                      <td class="mono">{{ v.nro_comprobante }}</td>
+                      <td>{{ v.sucursal }}</td>
+                      <td>{{ canalLegible(v.canal) }}</td>
+                      <td class="mono num">{{ v.unidades }}</td>
+                      <td class="mono num">{{ moneda(v.subtotal) }}</td>
+                      <td class="mono num">{{ v.descuento > 0 ? '−' + moneda(v.descuento) : '—' }}</td>
+                      <td class="mono num"><b>{{ moneda(v.total) }}</b></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+      } @else {
+        <p class="mensaje">Generando reporte…</p>
+      }
+    }
+
+    <!-- ============================================================ INVENTARIO -->
+    @if (reporte() === 'inventario') {
+      @if (inventario(); as r) {
+        <div class="fichas">
+          <div class="ficha"><div class="ceja">Unidades en stock</div><div class="numero">{{ r.totales.unidades }}</div><div class="apoyo">{{ r.totales.reservadas }} reservadas · {{ r.totales.disponibles }} disponibles</div></div>
+          <div class="ficha"><div class="ceja">Valor a costo</div><div class="numero">Bs {{ moneda(r.totales.valor_costo) }}</div><div class="apoyo">lo invertido en mercaderia</div></div>
+          <div class="ficha"><div class="ceja">Valor a precio de venta</div><div class="numero">Bs {{ moneda(r.totales.valor_venta) }}</div><div class="apoyo">si se vendiera todo a precio de lista</div></div>
+          <div class="ficha" [class.alerta]="r.totales.bajo_minimo > 0"><div class="ceja">Variantes en su minimo</div><div class="numero">{{ r.totales.bajo_minimo }}</div><div class="apoyo">{{ r.totales.sin_stock }} sin unidades disponibles</div></div>
+        </div>
+
+        <div class="dos-columnas">
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Valor del stock por sucursal</h2><span class="ceja">a costo</span></div>
+            <app-barras-h [filas]="barrasValorStock()" />
+          </section>
+          <section class="panel">
+            <div class="cabecera-panel"><h2>Movimientos del periodo</h2></div>
+            <ul class="lista-simple">
+              @for (m of r.movimientos_por_tipo; track m.tipo) {
+                <li>
+                  <span class="estado" [class]="claseMovimiento(m.tipo)">{{ m.tipo }}</span>
+                  <span class="ceja">{{ m.movimientos }} {{ m.movimientos === 1 ? 'movimiento' : 'movimientos' }}</span>
+                  <b class="mono">{{ m.unidades }} unidades</b>
+                </li>
+              } @empty {
+                <li class="gris">Sin movimientos en el periodo.</li>
+              }
+            </ul>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="cabecera-panel"><h2>Stock por prenda y sucursal</h2><span class="ceja">foto de hoy</span></div>
+          <div class="marco-tabla">
+            <table>
+              <thead>
+                <tr><th>Prenda</th><th>Sucursal</th><th class="num">Variantes</th><th class="num">Unidades</th><th class="num">Reserv.</th><th class="num">Dispon.</th><th class="num">En minimo</th><th class="num">Valor costo</th><th class="num">Valor venta</th></tr>
+              </thead>
+              <tbody>
+                @for (f of r.stock; track f.prenda_id + '-' + f.sucursal_id) {
+                  <tr>
+                    <td>{{ f.prenda }}</td>
+                    <td>{{ f.sucursal }}</td>
+                    <td class="mono num">{{ f.variantes }}</td>
+                    <td class="mono num"><b>{{ f.unidades }}</b></td>
+                    <td class="mono num">{{ f.reservadas }}</td>
+                    <td class="mono num">{{ f.disponibles }}</td>
+                    <td class="mono num">
+                      @if (f.bajo_minimo > 0) {
+                        <span class="estado bajo">{{ f.bajo_minimo }}</span>
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td class="mono num">{{ moneda(f.valor_costo) }}</td>
+                    <td class="mono num">{{ moneda(f.valor_venta) }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="9" class="gris">No hay stock cargado.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="cabecera-panel">
+            <h2>Movimientos</h2>
+            <span class="ceja">{{ r.movimientos.length }} en el periodo · del mas nuevo al mas viejo</span>
+          </div>
+          <div class="marco-tabla">
+            <table>
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>SKU</th><th>Variante</th><th>Sucursal</th><th class="num">Cant.</th><th>Motivo</th><th>Usuario</th></tr>
+              </thead>
+              <tbody>
+                @for (m of movimientosVisibles(); track m.id) {
+                  <tr>
+                    <td class="mono nowrap">{{ fechaHora(m.fecha) }}</td>
+                    <td><span class="estado" [class]="claseMovimiento(m.tipo)">{{ m.tipo }}</span></td>
+                    <td class="mono">{{ m.sku }}</td>
+                    <td>{{ m.prenda }} · {{ m.talla }} · {{ m.color }}</td>
+                    <td>{{ m.sucursal }}</td>
+                    <td class="mono num">{{ m.cantidad }}</td>
+                    <td>{{ m.motivo || '—' }}</td>
+                    <td>{{ m.usuario || '—' }}</td>
+                  </tr>
+                } @empty {
+                  <tr><td colspan="8" class="gris">Sin movimientos en el periodo.</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (r.movimientos.length > movimientosVisibles().length) {
+            <button type="button" class="btn linea ver-mas sin-imprimir" (click)="todosLosMovimientos.set(true)">
+              Ver los {{ r.movimientos.length }} movimientos
+            </button>
+            <p class="ceja nota-export">El CSV exportado los trae todos.</p>
+          }
+        </section>
+      } @else {
+        <p class="mensaje">Generando reporte…</p>
+      }
+    }
+
+    <!-- ================================================================ MARGEN -->
+    @if (reporte() === 'margen') {
+      @if (margen(); as r) {
+        <div class="fichas">
+          <div class="ficha destacada"><div class="ceja">Ganancia promedio por prenda</div><div class="numero">Bs {{ moneda(r.resumen.ganancia_promedio_por_prenda) }}</div><div class="apoyo">promedio de (precio de venta − costo) en {{ r.resumen.prendas }} prendas activas</div></div>
+          <div class="ficha"><div class="ceja">Margen promedio</div><div class="numero">{{ pct(r.resumen.margen_promedio_porcentaje) }}</div><div class="apoyo">ganancia sobre el precio de venta</div></div>
+          <div class="ficha"><div class="ceja">Ganancia por unidad vendida</div><div class="numero">Bs {{ moneda(r.resumen.ganancia_promedio_por_unidad_vendida) }}</div><div class="apoyo">lo realizado en {{ r.resumen.unidades_vendidas }} unidades, con descuentos ya restados</div></div>
+          <div class="ficha"><div class="ceja">Ganancia realizada</div><div class="numero">Bs {{ moneda(r.resumen.ganancia_realizada) }}</div><div class="apoyo">mayor: {{ r.resumen.mayor_ganancia }} · menor: {{ r.resumen.menor_ganancia }}</div></div>
+        </div>
+
+        <section class="panel">
+          <div class="cabecera-panel">
+            <h2>Ganancia por prenda</h2>
+            <span class="ceja">ordenado por ganancia unitaria · el costo es el actual de la prenda</span>
+          </div>
+          <div class="marco-tabla">
+            <table>
+              <thead>
+                <tr>
+                  <th>Prenda</th><th>Categoria</th><th class="num">Precio</th><th class="num">Costo</th><th class="num">Ganancia</th><th class="col-barra"></th><th class="num">Margen</th>
+                  <th>Promocion hoy</th><th class="num">Ganancia c/ promo</th><th class="num">Vendidas</th><th class="num">Ingreso</th><th class="num">Ganancia realizada</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (p of margenOrdenado(); track p.prenda_id) {
+                  <tr>
+                    <td>{{ p.prenda }}</td>
+                    <td>{{ p.categoria || '—' }}</td>
+                    <td class="mono num">{{ moneda(p.precio_venta) }}</td>
+                    <td class="mono num">{{ moneda(p.costo) }}</td>
+                    <td class="mono num"><b>{{ moneda(p.ganancia_unitaria) }}</b></td>
+                    <td class="col-barra"><div class="pista"><div class="barra" [style.width.%]="ancho(p.ganancia_unitaria)"></div></div></td>
+                    <td class="mono num">{{ pct(p.margen_porcentaje) }}</td>
+                    <td>
+                      @if (p.promocion) {
+                        <span class="estado rosa">{{ p.promocion }}</span>
+                      } @else {
+                        —
+                      }
+                    </td>
+                    <td class="mono num" [class.negativo]="p.ganancia_con_promocion < 0">{{ p.promocion ? moneda(p.ganancia_con_promocion) : '—' }}</td>
+                    <td class="mono num">{{ p.unidades_vendidas }}</td>
+                    <td class="mono num">{{ moneda(p.ingreso) }}</td>
+                    <td class="mono num"><b>{{ moneda(p.ganancia_realizada) }}</b></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      } @else {
+        <p class="mensaje">Generando reporte…</p>
+      }
+    }
+  </div>
+}

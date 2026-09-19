@@ -4,10 +4,11 @@ import { CanActivateFn, Router } from '@angular/router';
 import { Notificaciones } from './notificaciones';
 import { SesionStore } from './sesion';
 
-/** Ruta inicial segun el rol: el personal va al panel, el cliente al catalogo. */
+/** Ruta inicial segun el rol: el personal va al panel, el proveedor a su portal y el cliente al catalogo. */
 export function rutaInicial(roles: string[]): string {
   const esPersonal = ['administrador', 'encargado', 'cajero'].some((r) => roles.includes(r));
-  return esPersonal ? '/admin' : '/catalogo';
+  if (esPersonal) return '/admin';
+  return roles.includes('proveedor') ? '/proveedor' : '/catalogo';
 }
 
 /** Exige sesion iniciada. Recuerda a donde queria ir para volver despues del login. */
@@ -33,6 +34,23 @@ export const rolGuard: CanActivateFn = (ruta) => {
   avisos.error(
     `Esta seccion es solo para: ${requeridos.join(', ')}. Tu rol es: ${sesion.roles().join(', ') || 'ninguno'}.`,
   );
+  return router.createUrlTree([rutaInicial(sesion.roles())]);
+};
+
+/**
+ * Exige el permiso declarado en `data.permiso`. Se usa en las secciones que el
+ * administrador puede dar o quitar desde la pantalla de roles (reportes): asi el
+ * menu, la ruta y la API responden a lo mismo.
+ */
+export const permisoGuard: CanActivateFn = (ruta) => {
+  const sesion = inject(SesionStore);
+  const router = inject(Router);
+  const avisos = inject(Notificaciones);
+  const permiso = ruta.data['permiso'] as string | undefined;
+
+  if (!permiso || sesion.tienePermiso(permiso)) return true;
+
+  avisos.error(`Tu rol no tiene el permiso necesario para esta seccion (${permiso}).`);
   return router.createUrlTree([rutaInicial(sesion.roles())]);
 };
 

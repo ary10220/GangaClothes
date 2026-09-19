@@ -66,3 +66,10 @@ h1 {
     width: 100%;
   }
 }
+
+.de-proveedor {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+  margin-top: 3px;
+}

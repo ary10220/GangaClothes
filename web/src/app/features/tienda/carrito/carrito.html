@@ -25,6 +25,11 @@
           </li>
         }
       </ul>
+      @if (c.venta.descuento > 0) {
+        <div class="total ahorro">
+          <span>Ahorraste con promociones</span><b class="mono">− Bs {{ moneda(c.venta.descuento) }}</b>
+        </div>
+      }
       <div class="total">
         <span>Total pagado</span><b class="mono">Bs {{ moneda(c.venta.total) }}</b>
       </div>
@@ -65,11 +70,21 @@
                   <td>
                     <b>{{ l.prenda }}</b>
                     <span class="variante">{{ l.talla }} · {{ l.color }} · <span class="mono">{{ l.sku }}</span></span>
+                    @if (l.promocion; as promo) {
+                      <span class="promo"><span class="estado rosa">{{ promo.etiqueta }}</span> {{ promo.nombre }}</span>
+                    }
                     @if (l.alcanza === false) {
                       <span class="ayuda-error">Solo hay {{ l.disponible }} en {{ venta.sucursal }}.</span>
                     }
                   </td>
-                  <td class="mono num">{{ moneda(l.precio_unitario) }}</td>
+                  <td class="mono num">
+                    @if (l.promocion) {
+                      {{ moneda(l.precio_final) }}
+                      <s class="antes">{{ moneda(l.precio_unitario) }}</s>
+                    } @else {
+                      {{ moneda(l.precio_unitario) }}
+                    }
+                  </td>
                   <td class="col-cantidad">
                     <div class="contador">
                       <button
@@ -117,6 +132,9 @@
         <p class="nota">El stock se toma de esta sucursal.</p>
 
         <div class="fila"><span>{{ venta.unidades }} {{ venta.unidades === 1 ? 'prenda' : 'prendas' }}</span><span class="mono">Bs {{ moneda(venta.subtotal) }}</span></div>
+        @if (venta.descuento > 0) {
+          <div class="fila ahorro"><span>Descuento por promociones</span><span class="mono">− Bs {{ moneda(venta.descuento) }}</span></div>
+        }
         <div class="fila total"><span>Total</span><b class="mono">Bs {{ moneda(venta.total) }}</b></div>
 
         @if (faltantes().length > 0) {

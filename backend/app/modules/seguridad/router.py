@@ -12,6 +12,7 @@ from sqlalchemy import func
 
 from app.core import permisos as cat
 from app.core.auditoria import registrar
+from app.core.fechas import utc_iso
 from app.core.deps import get_db, require_permiso
 from app.models.seguridad import Bitacora, Permiso, RolPermiso
 from app.models.usuarios import Rol, UsuarioRol
@@ -205,7 +206,7 @@ def listar_bitacora(
     filas = consulta.order_by(Bitacora.fecha.desc(), Bitacora.id.desc()).limit(limite).all()
     return [{
         "id": f.id,
-        "fecha": f.fecha.isoformat() if f.fecha else None,
+        "fecha": utc_iso(f.fecha),
         "actor": f.actor,
         "modulo": f.modulo,
         "accion": f.accion,

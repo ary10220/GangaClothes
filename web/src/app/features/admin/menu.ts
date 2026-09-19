@@ -4,6 +4,8 @@ export interface ItemMenu {
   etiqueta: string;
   ruta: string;
   roles: Rol[];
+  /** Si se indica, el item solo aparece cuando la sesion tiene ese permiso. */
+  permiso?: string;
   /** Los casos de uso de iteraciones posteriores se listan, pero aun sin pantalla. */
   disponible: boolean;
 }
@@ -19,6 +21,25 @@ export const MENU: GrupoMenu[] = [
   {
     titulo: 'General',
     items: [{ etiqueta: 'Panel', ruta: '/admin', roles: ['administrador', 'encargado', 'cajero'], disponible: true }],
+  },
+  {
+    titulo: 'Analisis',
+    items: [
+      {
+        etiqueta: 'Dashboard',
+        ruta: '/admin/dashboard',
+        roles: ['administrador', 'encargado'],
+        permiso: 'reportes:ver',
+        disponible: true,
+      },
+      {
+        etiqueta: 'Reportes',
+        ruta: '/admin/reportes',
+        roles: ['administrador', 'encargado'],
+        permiso: 'reportes:ver',
+        disponible: true,
+      },
+    ],
   },
   {
     titulo: 'Seguridad',
@@ -47,7 +68,10 @@ export const MENU: GrupoMenu[] = [
   },
   {
     titulo: 'Productos',
-    items: [{ etiqueta: 'Prendas y variantes', ruta: '/admin/prendas', roles: ADMIN, disponible: true }],
+    items: [
+      { etiqueta: 'Prendas y variantes', ruta: '/admin/prendas', roles: ADMIN, disponible: true },
+      { etiqueta: 'Promociones', ruta: '/admin/promociones', roles: ADMIN, permiso: 'promociones:ver', disponible: true },
+    ],
   },
   {
     titulo: 'Operacion',
@@ -56,16 +80,29 @@ export const MENU: GrupoMenu[] = [
       { etiqueta: 'Movimientos', ruta: '/admin/movimientos', roles: ['administrador', 'encargado'], disponible: true },
       { etiqueta: 'Compras', ruta: '/admin/compras', roles: ['administrador', 'encargado'], disponible: true },
       { etiqueta: 'Proveedores', ruta: '/admin/proveedores', roles: ['administrador', 'encargado'], disponible: true },
+      {
+        etiqueta: 'Oferta de proveedores',
+        ruta: '/admin/oferta-proveedores',
+        roles: ['administrador', 'encargado'],
+        permiso: 'inventario:crear',
+        disponible: true,
+      },
       { etiqueta: 'Reservas', ruta: '/admin/reservas', roles: ['administrador', 'encargado'], disponible: true },
       { etiqueta: 'Caja', ruta: '/admin/caja', roles: ['administrador', 'cajero'], disponible: true },
     ],
   },
+  {
+    titulo: 'Portal del proveedor',
+    items: [{ etiqueta: 'Mi oferta', ruta: '/proveedor', roles: ['proveedor'], permiso: 'oferta:ver', disponible: true }],
+  },
 ];
 
-/** Deja solo los grupos e items que el rol del usuario puede ver. */
-export function menuParaRoles(roles: string[]): GrupoMenu[] {
+/** Deja solo los grupos e items que el rol (y, si el item lo pide, el permiso) del usuario puede ver. */
+export function menuParaRoles(roles: string[], permisos: string[] = []): GrupoMenu[] {
   return MENU.map((grupo) => ({
     ...grupo,
-    items: grupo.items.filter((item) => item.roles.some((r) => roles.includes(r))),
+    items: grupo.items.filter(
+      (item) => item.roles.some((r) => roles.includes(r)) && (!item.permiso || permisos.includes(item.permiso)),
+    ),
   })).filter((grupo) => grupo.items.length > 0);
 }

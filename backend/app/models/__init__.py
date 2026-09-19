@@ -6,7 +6,8 @@ from app.models.sucursales import Ciudad, Sucursal                          # no
 from app.models.catalogo import (Categoria, Temporada, Coleccion, Talla,    # noqa
                                  Color, Prenda, Variante, AssetAR)
 from app.models.inventario import (Inventario, MovimientoInventario,        # noqa
-                                   Proveedor, Compra, DetalleCompra)
+                                   Proveedor, Compra, DetalleCompra,
+                                   ProductoProveedor, ProductoProveedorTemporada)
 from app.models.ventas import (Reserva, DetalleReserva, Venta, DetalleVenta,  # noqa
                                Pago, Promocion, PromocionPrenda)
 from app.models.ia import EventoNavegacion, Recomendacion                   # noqa

@@ -36,7 +36,11 @@ interface PrendaCatalogo {
   nombre: string;
   descripcion: string | null;
   marca: string | null;
+  /** Precio de lista. Con una promocion vigente (CU18) se paga `precio_final`. */
   precio_venta: number;
+  precio_final: number;
+  descuento: number;
+  promocion: { id: number; nombre: string; etiqueta: string; fecha_fin: string | null } | null;
   imagen_url: string | null;
   categoria_id: number;
   coleccion_id: number | null;
