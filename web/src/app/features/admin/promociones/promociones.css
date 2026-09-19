@@ -1,0 +1,241 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.contador {
+  font-size: 10.5px;
+  padding: 5px 11px;
+}
+.filtros {
+  margin-bottom: 14px;
+}
+.pie {
+  margin-top: 12px;
+}
+
+/* ---------------------------------------------------------------- tarjetas */
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 14px;
+}
+.promo {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  padding: 16px 18px 12px;
+}
+.promo.apagada .sello {
+  background: var(--gris);
+}
+.promo.apagada .prendas b {
+  color: var(--gris);
+}
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sello {
+  flex: none;
+  background: var(--ganga);
+  color: #fff;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 14px;
+  border-radius: 10px;
+  padding: 9px 11px;
+  min-width: 62px;
+  text-align: center;
+}
+.quien {
+  margin-right: auto;
+  min-width: 0;
+}
+.promo h2 {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.descripcion {
+  font-size: 12.5px;
+  color: var(--gris);
+  margin-top: 10px;
+  line-height: 1.45;
+}
+.prendas {
+  list-style: none;
+  margin: 12px 0 10px;
+  border-top: 1px solid var(--linea);
+}
+.prendas li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--linea);
+  font-size: 12.5px;
+}
+.prendas img,
+.sin-foto {
+  width: 34px;
+  height: 42px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #ecece5;
+  flex: none;
+}
+.nombre-prenda {
+  margin-right: auto;
+}
+.precios s {
+  color: var(--gris);
+  margin-right: 7px;
+}
+.precios b {
+  color: var(--ganga);
+}
+.sin-prendas {
+  color: var(--gris);
+}
+.pie-tarjeta {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* ------------------------------------------------------------ solapamiento */
+.cruce {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #fce9e2;
+  color: var(--alerta);
+  border-radius: 9px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 12px;
+}
+.nota-cruce {
+  color: var(--tinta);
+  opacity: 0.75;
+}
+
+/* -------------------------------------------------------------- formulario */
+.modal.promo-form {
+  max-width: 720px;
+}
+.cabecera-prendas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 18px 0 8px;
+}
+.cabecera-prendas .etiqueta {
+  margin: 0;
+}
+.buscador {
+  width: 220px;
+  padding: 7px 11px;
+}
+.atajos {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.atajos .chip {
+  font-family: inherit;
+  margin: 0 2px 0 0;
+  padding: 3px 10px;
+}
+.atajos .enlace {
+  margin-left: auto;
+}
+.selector-prendas {
+  max-height: 210px;
+  overflow-y: auto;
+  border: 1.5px solid var(--linea);
+  border-radius: 10px;
+}
+.opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--linea);
+  cursor: pointer;
+}
+.opcion:last-child {
+  border-bottom: none;
+}
+.opcion:hover {
+  background: var(--suave);
+}
+.opcion.on {
+  background: #fce3ec;
+}
+.opcion input {
+  accent-color: var(--ganga);
+}
+.nota {
+  font-size: 12px;
+  color: var(--gris);
+  padding: 12px;
+}
+.previa {
+  margin-top: 12px;
+  border: 1.5px dashed var(--linea);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.fila-previa {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  padding: 4px 0;
+}
+.fila-previa > span:first-child {
+  margin-right: auto;
+}
+.fila-previa s {
+  color: var(--gris);
+  margin-right: 7px;
+}
+.fila-previa b {
+  color: var(--ganga);
+}
+.fila-previa.mal b {
+  color: var(--alerta);
+}
+.advertencia {
+  font-size: 12.5px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+
+@media (max-width: 620px) {
+  .tarjetas {
+    grid-template-columns: 1fr;
+  }
+}

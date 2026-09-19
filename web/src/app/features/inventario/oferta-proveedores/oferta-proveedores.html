@@ -1,0 +1,111 @@
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Oferta de proveedores</h1>
+    <span class="ceja">lo que cada proveedor informo que vende · aca se define a que prenda del catalogo corresponde</span>
+  </div>
+  @if (!cargando() && sinCorrespondencia() > 0) {
+    <span class="estado bajo contador">{{ sinCorrespondencia() }} sin correspondencia</span>
+  }
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="filtros" />
+  <label class="selector">
+    <span class="ceja">Proveedor</span>
+    <select class="campo" aria-label="Proveedor" (change)="elegirProveedor($any($event.target).value)">
+      <option value="">Todos</option>
+      @for (p of proveedores(); track p.id) {
+        <option [value]="p.id" [selected]="p.id === proveedorId()">{{ p.nombre }}</option>
+      }
+    </select>
+  </label>
+</div>
+
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else if (productos().length === 0) {
+  <div class="mensaje vacio">
+    <p>Ningun proveedor cargo productos todavia. Cada proveedor los informa desde su portal, con su propia cuenta.</p>
+  </div>
+} @else if (visibles().length === 0) {
+  <div class="mensaje vacio">
+    <p>Ningun producto coincide con esos filtros.</p>
+    <button type="button" class="btn linea" (click)="filtro.set('todos'); proveedorId.set(null)">Ver todos</button>
+  </div>
+} @else {
+  <div class="marco-tabla">
+    <table>
+      <thead>
+        <tr>
+          <th>Proveedor</th>
+          <th>Producto ofrecido</th>
+          <th>Temporadas</th>
+          <th class="num">Precio ref. (Bs)</th>
+          <th class="num">Minimo</th>
+          <th>Actualizado</th>
+          <th class="col-prenda">Corresponde a la prenda</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (p of visibles(); track p.id) {
+          <tr [class.inactiva]="!p.disponible">
+            <td>{{ p.proveedor }}</td>
+            <td>
+              <b>{{ p.nombre }}</b>
+              <span class="descripcion">
+                {{ p.categoria || 'sin categoria' }}{{ p.descripcion ? ' · ' + p.descripcion : '' }}
+                @if (!p.disponible) {
+                  · <span class="pausado">sin disponibilidad</span>
+                }
+              </span>
+            </td>
+            <td>
+              @for (t of p.temporadas; track t.id) {
+                <span class="estado rosa temporada">{{ t.nombre }}</span>
+              } @empty {
+                —
+              }
+            </td>
+            <td class="mono num"><b>{{ moneda(p.precio_referencial) }}</b></td>
+            <td class="mono num">{{ p.cantidad_minima }} u.</td>
+            <td class="mono fecha">{{ fecha(p.fecha_actualizacion) }}</td>
+            <td class="col-prenda">
+              @if (puedeAsociar()) {
+                @let opciones = opcionesPara(p);
+                <select
+                  class="campo"
+                  [class.sin-definir]="p.prenda_id === null"
+                  [disabled]="guardando() === p.id"
+                  [attr.aria-label]="'Prenda a la que corresponde ' + p.nombre"
+                  (change)="asociar(p, $any($event.target).value)"
+                >
+                  <option value="" [selected]="p.prenda_id === null">— sin correspondencia —</option>
+                  @if (opciones.sugeridas.length > 0) {
+                    <optgroup [label]="'De la categoria ' + (p.categoria ?? '')">
+                      @for (prenda of opciones.sugeridas; track prenda.id) {
+                        <option [value]="prenda.id" [selected]="prenda.id === p.prenda_id">{{ prenda.nombre }}</option>
+                      }
+                    </optgroup>
+                  }
+                  <optgroup label="Otras prendas">
+                    @for (prenda of opciones.otras; track prenda.id) {
+                      <option [value]="prenda.id" [selected]="prenda.id === p.prenda_id">{{ prenda.nombre }}</option>
+                    }
+                  </optgroup>
+                </select>
+              } @else {
+                {{ p.prenda || '— sin correspondencia —' }}
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <p class="ceja pie">{{ visibles().length }} de {{ productos().length }} productos ofrecidos</p>
+}

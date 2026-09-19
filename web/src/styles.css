@@ -361,3 +361,23 @@ tr.inactiva td:not(.col-acciones) {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- promociones en la caja (CU18): precio de lista tachado y renglones del ticket ---------- */
+.caja-antes,
+.caja-promo {
+  display: block;
+  color: var(--gris);
+  font-size: 10.5px;
+}
+.caja-promo {
+  color: var(--ganga);
+  font-weight: 700;
+}
+.ticket-promo {
+  color: var(--gris);
+}
+.ticket-subtotales {
+  border-top: 1px dashed var(--linea);
+  margin-top: 6px;
+  padding-top: 6px;
+}

@@ -113,6 +113,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       if (isCustomer)
         GcAppBarDestination(
+          label: 'Mis compras',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.purchaseHistory),
+        ),
+      if (isCustomer)
+        GcAppBarDestination(
           label: 'Carrito',
           onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
         ),

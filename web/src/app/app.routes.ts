@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, invitadoGuard, rolGuard } from './core/auth.guard';
+import { authGuard, invitadoGuard, permisoGuard, rolGuard } from './core/auth.guard';
 import {
   CATEGORIAS,
   CIUDADES,
@@ -14,7 +14,7 @@ import {
 import { ConfigCrud } from './shared/crud/config';
 
 const SOLO_ADMIN = { roles: ['administrador'] };
-/** Reservas y carrito son de la cuenta del cliente: el personal usa el panel. */
+/** Reservas, compras y carrito son de la cuenta del cliente: el personal usa el panel. */
 const SOLO_CLIENTE = { roles: ['cliente'] };
 /** Panel del encargado de sucursal: inventario, movimientos, compras y reservas. */
 const OPERACION_SUCURSAL = { roles: ['administrador', 'encargado'] };
@@ -59,6 +59,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/tienda/mis-reservas/mis-reservas').then((m) => m.MisReservas),
   },
   {
+    path: 'mis-compras',
+    canActivate: [authGuard, rolGuard],
+    data: SOLO_CLIENTE,
+    loadComponent: () => import('./features/tienda/mis-compras/mis-compras').then((m) => m.MisCompras),
+  },
+  {
     path: 'carrito',
     canActivate: [authGuard, rolGuard],
     data: SOLO_CLIENTE,
@@ -73,6 +79,24 @@ export const routes: Routes = [
       {
         path: '',
         loadComponent: () => import('./features/admin/inicio/inicio').then((m) => m.AdminInicio),
+      },
+      {
+        path: 'dashboard',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'reportes:ver' },
+        loadComponent: () => import('./features/reportes/dashboard/dashboard').then((m) => m.Dashboard),
+      },
+      {
+        path: 'reportes',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'reportes:ver' },
+        loadComponent: () => import('./features/reportes/reportes/reportes').then((m) => m.Reportes),
+      },
+      {
+        path: 'promociones',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...SOLO_ADMIN, permiso: 'promociones:ver' },
+        loadComponent: () => import('./features/admin/promociones/promociones').then((m) => m.Promociones),
       },
       {
         path: 'usuarios',
@@ -125,6 +149,14 @@ export const routes: Routes = [
       },
       rutaCrud('proveedores', PROVEEDORES, OPERACION_SUCURSAL),
       {
+        // CU9/CU10: a que prenda del catalogo corresponde cada producto que ofrecen los proveedores.
+        path: 'oferta-proveedores',
+        canActivate: [rolGuard, permisoGuard],
+        data: { ...OPERACION_SUCURSAL, permiso: 'inventario:crear' },
+        loadComponent: () =>
+          import('./features/inventario/oferta-proveedores/oferta-proveedores').then((m) => m.OfertaProveedores),
+      },
+      {
         path: 'reservas',
         canActivate: [rolGuard],
         data: OPERACION_SUCURSAL,
@@ -136,6 +168,19 @@ export const routes: Routes = [
         canActivate: [rolGuard],
         data: { roles: ['administrador', 'cajero'] },
         loadComponent: () => import('./features/caja/caja').then((m) => m.Caja),
+      },
+    ],
+  },
+  {
+    // CU9: portal del proveedor. Reusa el marco del panel con su propio menu.
+    path: 'proveedor',
+    canActivate: [authGuard, rolGuard],
+    data: { roles: ['proveedor'] },
+    loadComponent: () => import('./features/admin/shell').then((m) => m.AdminShell),
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/proveedor/mi-oferta/mi-oferta').then((m) => m.MiOferta),
       },
     ],
   },

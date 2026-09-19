@@ -1,0 +1,117 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.fichas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ficha {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  padding: 14px 16px;
+}
+.numero {
+  font-family: var(--mono);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ganga);
+  margin: 5px 0 4px;
+}
+.numero.chico {
+  font-size: 16px;
+  color: var(--tinta);
+  margin-top: 10px;
+}
+.dato {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 9px 0 5px;
+}
+.apoyo {
+  font-size: 11.5px;
+  color: var(--gris);
+  line-height: 1.4;
+}
+.filtros {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selector select {
+  width: auto;
+  min-width: 200px;
+  padding: 8px 11px;
+}
+.num {
+  text-align: right;
+}
+.fecha {
+  white-space: nowrap;
+}
+.descripcion {
+  display: block;
+  font-size: 11.5px;
+  color: var(--gris);
+  margin-top: 2px;
+}
+.temporada {
+  margin: 1px 4px 1px 0;
+}
+.pie {
+  margin-top: 10px;
+}
+.ayuda {
+  font-size: 11.5px;
+  color: var(--gris);
+  margin-top: 4px;
+}
+.casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 10px 0;
+  cursor: pointer;
+}
+.casilla input {
+  accent-color: var(--ganga);
+  width: 15px;
+  height: 15px;
+}
+.modal .chip {
+  font-family: inherit;
+}
+.advertencia {
+  font-size: 12.5px;
+  color: var(--gris);
+  line-height: 1.5;
+}
+.mensaje.vacio p {
+  max-width: 520px;
+}

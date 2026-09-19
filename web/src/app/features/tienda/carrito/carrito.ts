@@ -19,7 +19,12 @@ interface LineaCarrito {
   talla: string;
   color: string;
   cantidad: number;
+  /** Precio de lista; `precio_final` ya trae la promocion vigente (CU18). */
   precio_unitario: number;
+  precio_final: number;
+  /** Descuento total de la linea. */
+  descuento: number;
+  promocion: { id: number; nombre: string; etiqueta: string } | null;
   subtotal: number;
   /** Solo en el carrito: lo que hay hoy en la sucursal de despacho. */
   disponible?: number;

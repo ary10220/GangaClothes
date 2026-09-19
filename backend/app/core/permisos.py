@@ -74,6 +74,11 @@ MODULOS: dict[str, tuple[str, str, tuple[str, ...]]] = {
         "Ventas, ganancia promedio y prendas mas vendidas",
         ("VER",),
     ),
+    "OFERTA": (
+        "Oferta del proveedor",
+        "Productos que un proveedor informa que puede vender (su portal)",
+        ("VER", "CREAR", "EDITAR", "ELIMINAR"),
+    ),
 }
 
 
@@ -126,6 +131,11 @@ PERMISOS_POR_ROL: dict[str, list[str]] = {
     ],
     # El cliente no entra al panel: usa el catalogo publico, que no pide permisos.
     "cliente": [],
+    # El proveedor solo administra SU oferta (CU9). El personal la consulta con
+    # inventario:crear, asi que no necesita permisos de este modulo.
+    "proveedor": [
+        *_codigos("OFERTA", "VER", "CREAR", "EDITAR", "ELIMINAR"),
+    ],
 }
 
 DESCRIPCION_ROLES = {
@@ -133,4 +143,5 @@ DESCRIPCION_ROLES = {
     "encargado": "Inventario y reservas de su sucursal",
     "cajero": "Ventas y cobros en caja",
     "cliente": "Compra en la tienda en linea",
+    "proveedor": "Informa los productos que ofrece a la tienda",
 }

@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 
 import { API_URL } from '../../../core/api';
 import { mensajeDeError } from '../../../core/errores.interceptor';
+import { fechaLocal } from '../../../shared/formato';
 
 interface EventoBitacora {
   id: number;
@@ -103,16 +104,8 @@ export class Bitacora {
     this.buscar();
   }
 
-  fechaLegible(iso: string | null): string {
-    if (!iso) return '—';
-    const f = new Date(iso);
-    if (Number.isNaN(f.getTime())) return iso;
-    const dd = String(f.getDate()).padStart(2, '0');
-    const mm = String(f.getMonth() + 1).padStart(2, '0');
-    const hh = String(f.getHours()).padStart(2, '0');
-    const mi = String(f.getMinutes()).padStart(2, '0');
-    return `${dd}/${mm}/${f.getFullYear()} ${hh}:${mi}`;
-  }
+  /** La API manda UTC; se muestra en la hora local con la funcion compartida. */
+  readonly fechaLegible = fechaLocal;
 
   /** El nombre va en negrita y el correo en gris, pero llega en un solo texto. */
   partesActor(actor: string): { nombre: string; correo: string | null } {

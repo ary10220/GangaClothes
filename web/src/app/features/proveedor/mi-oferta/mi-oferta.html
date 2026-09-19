@@ -1,0 +1,241 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Mi oferta{{ perfil() ? ' · ' + perfil()!.nombre : '' }}</h1>
+    <span class="ceja">productos que le ofreces a GangaClothes, con su precio referencial y sus temporadas</span>
+  </div>
+  @if (perfil() && puedeCrear()) {
+    <button type="button" class="btn rosa" (click)="abrirNuevo()">+ Agregar producto</button>
+  }
+</div>
+
+@if (cargando()) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sinEnlace()) {
+  <div class="mensaje vacio">
+    <p><b>Tu cuenta todavia no esta enlazada a un proveedor.</b></p>
+    <p>Pedile al administrador de GangaClothes que la enlace desde la pantalla de usuarios. Despues vuelve a entrar.</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+  </div>
+} @else {
+  @let p = perfil()!;
+  <div class="fichas">
+    <div class="ficha">
+      <div class="ceja">Productos informados</div>
+      <div class="numero">{{ p.productos }}</div>
+      <div class="apoyo">{{ p.disponibles }} disponibles para la tienda</div>
+    </div>
+    <div class="ficha">
+      <div class="ceja">Ultima actualizacion</div>
+      <div class="numero chico">{{ p.ultima_actualizacion ? fecha(p.ultima_actualizacion) : '—' }}</div>
+      <div class="apoyo">mantene los precios al dia: la tienda los usa para decidir sus compras</div>
+    </div>
+    <div class="ficha">
+      <div class="ceja">Tus datos</div>
+      <div class="dato">{{ p.contacto || 'Sin contacto' }} · {{ p.telefono || 'sin telefono' }}</div>
+      <div class="apoyo">NIT {{ p.nit || '—' }} · {{ p.email || 'sin correo' }}. Si cambian, avisale a la tienda.</div>
+    </div>
+  </div>
+
+  <div class="filtros">
+    <app-selector-estado [(valor)]="filtro" [opciones]="filtros" />
+    <label class="selector">
+      <span class="ceja">Temporada</span>
+      <select class="campo" (change)="elegirTemporadaFiltro($any($event.target).value)">
+        <option value="">Todas</option>
+        @for (t of temporadas(); track t.id) {
+          <option [value]="t.id" [selected]="t.id === temporadaFiltro()">{{ t.nombre }}</option>
+        }
+      </select>
+    </label>
+  </div>
+
+  @if (productos().length === 0) {
+    <div class="mensaje vacio">
+      <p>Todavia no informaste ningun producto. Agrega el primero para que la tienda lo vea al armar sus compras.</p>
+      @if (puedeCrear()) {
+        <button type="button" class="btn rosa" (click)="abrirNuevo()">Agregar el primero</button>
+      }
+    </div>
+  } @else if (visibles().length === 0) {
+    <div class="mensaje vacio">
+      <p>Ningun producto coincide con esos filtros.</p>
+      <button type="button" class="btn linea" (click)="filtro.set('todos'); temporadaFiltro.set(null)">Ver todos</button>
+    </div>
+  } @else {
+    <div class="marco-tabla">
+      <table>
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Categoria</th>
+            <th>Temporadas</th>
+            <th class="num">Precio ref. (Bs)</th>
+            <th class="num">Pedido minimo</th>
+            <th>Estado</th>
+            <th>Actualizado</th>
+            <th class="col-acciones">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (prod of visibles(); track prod.id) {
+            <tr [class.inactiva]="!prod.disponible">
+              <td>
+                <b>{{ prod.nombre }}</b>
+                @if (prod.descripcion) {
+                  <span class="descripcion">{{ prod.descripcion }}</span>
+                }
+              </td>
+              <td>{{ prod.categoria || '—' }}</td>
+              <td>
+                @for (t of prod.temporadas; track t.id) {
+                  <span class="estado rosa temporada">{{ t.nombre }}</span>
+                } @empty {
+                  —
+                }
+              </td>
+              <td class="mono num"><b>{{ moneda(prod.precio_referencial) }}</b></td>
+              <td class="mono num">{{ prod.cantidad_minima }} u.</td>
+              <td>
+                <span class="estado" [class.ok]="prod.disponible" [class.bajo]="!prod.disponible">
+                  {{ prod.disponible ? 'Disponible' : 'Sin disponibilidad' }}
+                </span>
+              </td>
+              <td class="mono fecha">{{ fecha(prod.fecha_actualizacion) }}</td>
+              <td class="col-acciones">
+                @if (puedeEditar()) {
+                  <button type="button" class="enlace" (click)="abrirEdicion(prod)">Editar</button>
+                  <span class="separador">·</span>
+                  @if (prod.disponible) {
+                    <button type="button" class="enlace peligro" [disabled]="cambiando() === prod.id" (click)="cambiarDisponible(prod, false)">Pausar</button>
+                  } @else {
+                    <button type="button" class="enlace reactivar" [disabled]="cambiando() === prod.id" (click)="cambiarDisponible(prod, true)">Ofrecer</button>
+                  }
+                }
+                @if (puedeEliminar()) {
+                  <span class="separador">·</span>
+                  <button type="button" class="enlace peligro" (click)="aQuitar.set(prod)">Quitar</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="ceja pie">{{ visibles().length }} de {{ productos().length }} productos</p>
+  }
+}
+
+<!-- ---------------------------------------------------------- formulario -->
+@if (modal()) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal" (click)="$event.stopPropagation()">
+      <div class="ceja">{{ editando() ? 'Actualizar producto' : 'Nuevo producto' }}</div>
+      <h2>{{ editando()?.nombre || 'Producto ofrecido' }}</h2>
+
+      <form [formGroup]="formulario" (ngSubmit)="guardar()" novalidate>
+        <div class="rejilla">
+          <div class="grupo completo">
+            <label class="etiqueta" for="o-nombre">Producto<b class="req">*</b></label>
+            <input id="o-nombre" type="text" class="campo" maxlength="120" formControlName="nombre" placeholder="Polera algodon peinado 180 g" [class.invalido]="intento() && errores().nombre" />
+            @if (intento() && errores().nombre) {
+              <p class="ayuda-error">{{ errores().nombre }}</p>
+            }
+          </div>
+
+          <div class="grupo completo">
+            <label class="etiqueta" for="o-descripcion">Detalle (telas, colores, tallas)</label>
+            <input id="o-descripcion" type="text" class="campo" maxlength="300" formControlName="descripcion" />
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="o-categoria">Categoria</label>
+            <select id="o-categoria" class="campo" formControlName="categoria_id">
+              <option value="">— sin categoria —</option>
+              @for (c of categorias(); track c.id) {
+                <option [value]="c.id">{{ c.nombre }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="o-precio">Precio referencial (Bs)<b class="req">*</b></label>
+            <input id="o-precio" type="text" inputmode="decimal" class="campo" formControlName="precio_referencial" placeholder="0,00" [class.invalido]="intento() && errores().precio" />
+            @if (intento() && errores().precio) {
+              <p class="ayuda-error">{{ errores().precio }}</p>
+            } @else {
+              <p class="ayuda">Por unidad, al por mayor. No compromete el precio final de una compra.</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <label class="etiqueta" for="o-minimo">Pedido minimo (unidades)<b class="req">*</b></label>
+            <input id="o-minimo" type="number" min="1" step="1" class="campo" formControlName="cantidad_minima" [class.invalido]="intento() && errores().minimo" />
+            @if (intento() && errores().minimo) {
+              <p class="ayuda-error">{{ errores().minimo }}</p>
+            }
+          </div>
+
+          <div class="grupo">
+            <span class="etiqueta">Disponibilidad</span>
+            <label class="casilla">
+              <input type="checkbox" formControlName="disponible" />
+              Lo puedo entregar ahora
+            </label>
+          </div>
+
+          <div class="grupo completo">
+            <span class="etiqueta">Temporadas para las que sirve<b class="req">*</b></span>
+            <div>
+              @for (t of temporadas(); track t.id) {
+                <button type="button" class="chip" [class.on]="temporadasElegidas().includes(t.id)" [attr.aria-pressed]="temporadasElegidas().includes(t.id)" (click)="alternarTemporada(t.id)">
+                  {{ t.nombre }}
+                </button>
+              } @empty {
+                <span class="ayuda">La tienda todavia no definio temporadas.</span>
+              }
+            </div>
+            @if (intento() && errores().temporadas) {
+              <p class="ayuda-error">{{ errores().temporadas }}</p>
+            }
+          </div>
+        </div>
+
+        @if (errorServidor()) {
+          <p class="error-servidor" role="alert">{{ errorServidor() }}</p>
+        }
+
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarModales()">Cancelar</button>
+          <button type="submit" class="btn rosa" [disabled]="guardando()">
+            {{ guardando() ? 'Guardando…' : editando() ? 'Actualizar' : 'Agregar a mi oferta' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+}
+
+<!-- --------------------------------------------------------------- quitar -->
+@if (aQuitar(); as prod) {
+  <div class="fondo" (click)="cerrarModales()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Quitar «{{ prod.nombre }}»?</h2>
+      <p class="advertencia">
+        Sale de tu oferta y la tienda deja de verlo. Si solo se te acabo por ahora, mejor usa «Pausar»: conserva el
+        precio y las temporadas.
+      </p>
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="quitando()" (click)="cerrarModales()">Cancelar</button>
+        <button type="button" class="btn peligro" [disabled]="quitando()" (click)="confirmarQuitar()">
+          {{ quitando() ? 'Quitando…' : 'Si, quitar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

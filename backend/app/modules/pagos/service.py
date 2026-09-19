@@ -18,6 +18,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
+from app.core.fechas import utc_iso
 from app.models.inventario import Inventario, MovimientoInventario
 from app.models.sucursales import Sucursal
 from app.models.usuarios import Usuario
@@ -56,7 +57,7 @@ def _salida_pago(pago: Pago) -> dict:
         "moneda": pago.moneda,
         "estado": pago.estado,
         "referencia_externa": pago.referencia_externa,
-        "fecha": pago.fecha.isoformat() if pago.fecha else None,
+        "fecha": utc_iso(pago.fecha),
     }
 
 

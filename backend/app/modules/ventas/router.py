@@ -56,6 +56,11 @@ def confirmar(peticion: Request, db=Depends(get_db), usuario=Depends(get_current
     return venta
 
 
+@router.get("/mias", summary="Mis compras pagadas con detalle y pagos")
+def mias(db=Depends(get_db), usuario=Depends(get_current_user)):
+    return service.mias(db, usuario)
+
+
 # -------------------------------------------------------- CU14 presencial
 @router.post("/presencial", status_code=201, summary="CU14: venta en caja, opcionalmente desde una reserva")
 def crear_presencial(datos: VentaPresencialIn, peticion: Request,

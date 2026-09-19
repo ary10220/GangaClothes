@@ -25,7 +25,7 @@ export class SesionStore {
   });
   /** El rol de mayor jerarquia, para mostrarlo en la barra superior. */
   readonly rolPrincipal = computed<Rol | null>(() => {
-    const jerarquia: Rol[] = ['administrador', 'encargado', 'cajero', 'cliente'];
+    const jerarquia: Rol[] = ['administrador', 'encargado', 'cajero', 'proveedor', 'cliente'];
     return jerarquia.find((r) => this.roles().includes(r)) ?? null;
   });
 
@@ -47,6 +47,10 @@ export class SesionStore {
 
   tieneAlgunRol(...roles: string[]): boolean {
     return roles.some((r) => this.roles().includes(r));
+  }
+
+  tienePermiso(codigo: string): boolean {
+    return this.permisos().includes(codigo);
   }
 
   private leerUsuario(): Usuario | null {

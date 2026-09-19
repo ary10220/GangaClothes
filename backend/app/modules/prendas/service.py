@@ -17,11 +17,13 @@ from sqlalchemy import case, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import to_dict
 from app.models.catalogo import AssetAR, Coleccion, Color, Prenda, Talla, Variante
 from app.models.inventario import Inventario
 from app.models.sucursales import Sucursal
 from app.modules.inventario import service as inventario
+from app.modules.promociones import service as promociones
 
 
 # ------------------------------------------------------------ resumen stock
@@ -298,6 +300,24 @@ def recursos_ar_publicos(db: Session, variante_id: int) -> dict:
     }
 
 
+def url_imagen(ruta: str | None) -> str | None:
+    """Una ruta relativa del sitio web se completa con IMAGENES_BASE_URL, si esta
+    definida (la app movil no tiene un dominio propio contra el cual resolverla)."""
+    if ruta and ruta.startswith("/") and settings.imagenes_base_url:
+        return settings.imagenes_base_url.rstrip("/") + ruta
+    return ruta
+
+
+def _precio_con_promocion(prenda: Prenda, promos) -> dict:
+    """precio_venta es el precio de lista; precio_final, lo que paga el cliente hoy."""
+    calculo = promociones.aplicar(prenda.precio_venta, promos)
+    return {
+        "precio_final": float(calculo["precio_final"]),
+        "descuento": float(calculo["descuento"]),
+        "promocion": promociones.resumen_publico(calculo["promocion"]),
+    }
+
+
 def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
                    categoria_id: int | None = None, temporada_id: int | None = None,
                    coleccion_id: int | None = None, talla_id: int | None = None,
@@ -370,12 +390,15 @@ def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
             "id": v.id, "sku": v.sku,
             "talla_id": talla.id, "talla": talla.nombre,
             "color_id": color.id, "color": color.nombre, "color_hex": color.codigo_hex,
-            "imagen_url": v.imagen_url,
+            "imagen_url": url_imagen(v.imagen_url),
             "disponible_total": sum(max(d["disponible"], 0) for d in disponibilidad),
             "disponibilidad": disponibilidad,
             "tiene_probador": bool(recursos[v.id]),
             "recursos_ar": recursos[v.id],
         })
+
+    # CU18: el precio con descuento sale siempre del modulo de promociones.
+    vigentes = promociones.vigentes_por_prenda(db, [p.id for p in prendas])
 
     resultado = []
     for p in prendas:
@@ -387,7 +410,8 @@ def armar_catalogo(db: Session, *, solo_publicadas: bool, q: str | None = None,
             continue
         resultado.append({
             "id": p.id, "nombre": p.nombre, "descripcion": p.descripcion, "marca": p.marca,
-            "genero": p.genero, "precio_venta": float(p.precio_venta), "imagen_url": p.imagen_url,
+            "genero": p.genero, "precio_venta": float(p.precio_venta), "imagen_url": url_imagen(p.imagen_url),
+            **_precio_con_promocion(p, vigentes.get(p.id)),
             "categoria_id": p.categoria_id, "coleccion_id": p.coleccion_id,
             "publicado": bool(p.publicado),
             "disponible_total": disponible,

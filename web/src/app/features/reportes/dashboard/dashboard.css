@@ -1,0 +1,188 @@
+.encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.titulo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+}
+h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.controles {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.selector select {
+  width: auto;
+  min-width: 170px;
+  padding: 8px 11px;
+}
+.cuerpo {
+  transition: opacity 0.15s ease;
+}
+.cuerpo.refrescando {
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------- indicadores */
+.fichas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ficha {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  padding: 14px 16px;
+}
+.numero {
+  font-family: var(--mono);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 6px 0 5px;
+  letter-spacing: -0.02em;
+}
+.apoyo {
+  font-size: 11.5px;
+  color: var(--gris);
+  line-height: 1.4;
+}
+.apoyo.sube {
+  color: var(--ok);
+}
+.apoyo.baja {
+  color: var(--alerta);
+}
+.apoyo a {
+  text-decoration: underline;
+}
+.ficha.destacada {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: #fff;
+}
+.ficha.destacada .ceja,
+.ficha.destacada .apoyo {
+  color: #c9cbd0;
+}
+.ficha.destacada .numero {
+  color: #ff5c93;
+}
+.ficha.alerta {
+  border-color: var(--alerta);
+}
+.ficha.alerta .numero {
+  color: var(--alerta);
+}
+
+/* ----------------------------------------------------------------- paneles */
+.panel {
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 13px;
+  padding: 16px 18px 18px;
+}
+.panel.ancho-total {
+  margin-bottom: 14px;
+}
+.cabecera-panel {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cabecera-panel .enlace {
+  margin-left: auto;
+}
+h2 {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.dos-columnas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+/* ---------------------------------------------------- ganancia por prenda */
+.num {
+  text-align: right;
+}
+.col-barra {
+  width: 22%;
+}
+.pista {
+  height: 8px;
+  background: #ecece5;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.barra {
+  height: 100%;
+  background: var(--tinta);
+  border-radius: 0 4px 4px 0;
+}
+td .estado {
+  margin-left: 6px;
+}
+
+.lista-simple {
+  list-style: none;
+}
+.lista-simple li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--linea);
+  font-size: 12.5px;
+}
+.lista-simple li:last-child {
+  border-bottom: none;
+}
+.lista-simple b {
+  margin-left: auto;
+}
+.capital {
+  text-transform: capitalize;
+}
+.gris {
+  color: var(--gris);
+}
+
+@media (max-width: 900px) {
+  .dos-columnas {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .sin-imprimir {
+    display: none !important;
+  }
+  .panel,
+  .ficha {
+    break-inside: avoid;
+  }
+}

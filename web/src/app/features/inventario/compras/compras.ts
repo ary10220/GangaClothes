@@ -33,6 +33,8 @@ interface Compra {
 
 interface LineaCompra {
   id: number;
+  /** Producto de la oferta del proveedor del que partio la linea (null: compra sin oferta). */
+  producto_proveedor: string | null;
   variante_id: number;
   sku: string;
   prenda: string;
@@ -70,8 +72,25 @@ interface PrendaCatalogo {
   }[];
 }
 
+/** GET /api/oferta?proveedor_id= : lo que el proveedor informo en su portal (CU9). */
+interface ProductoOfrecido {
+  id: number;
+  nombre: string;
+  descripcion: string | null;
+  categoria: string | null;
+  precio_referencial: number;
+  cantidad_minima: number;
+  temporadas: { id: number; nombre: string }[];
+  fecha_actualizacion: string | null;
+  /** Prenda del catalogo a la que corresponde (la define la tienda en «Oferta de proveedores»). */
+  prenda_id: number | null;
+  prenda: string | null;
+}
+
 interface OpcionVariante {
   id: number;
+  prenda_id: number;
+  prenda: string;
   sku: string;
   talla: string;
   color: string;
@@ -80,17 +99,23 @@ interface OpcionVariante {
 }
 
 interface GrupoVariantes {
+  prenda_id: number;
   prenda: string;
+  /** Es la prenda a la que corresponde el producto elegido en la linea. */
+  asociada?: boolean;
   variantes: OpcionVariante[];
 }
 
 type LineaForm = FormGroup<{
+  /** Producto de la oferta del proveedor: de ahi parte la linea. Vacio si no hay oferta. */
+  producto_id: FormControl<string>;
   variante_id: FormControl<string>;
   cantidad: FormControl<string>;
   precio_unitario: FormControl<string>;
 }>;
 
 interface ErroresLinea {
+  producto: string | null;
   variante: string | null;
   cantidad: string | null;
   precio: string | null;
@@ -112,6 +137,10 @@ const precioDe = (valor: unknown) => (PRECIO.test(texto(valor)) ? Number(texto(v
 /**
  * CU10: compras a proveedor de la sucursal. Una compra nace pendiente; al
  * recibirla el backend suma el stock de cada linea y deja su movimiento.
+ *
+ * La compra parte de lo que el proveedor ofrece (CU9): cada linea es
+ * producto del proveedor -> variante destino del catalogo -> cantidad. Solo si
+ * el proveedor no cargo oferta se arma libremente, y la pantalla lo avisa.
  */
 @Component({
   selector: 'app-compras',
@@ -171,6 +200,36 @@ export class Compras {
   private readonly valores = toSignal(this.formCompra.valueChanges, {
     initialValue: this.formCompra.getRawValue(),
   });
+  // ---- oferta del proveedor elegido (CU9) ----
+  readonly oferta = signal<ProductoOfrecido[]>([]);
+  readonly cargandoOferta = signal(false);
+  readonly errorOferta = signal<string | null>(null);
+  readonly temporadaOferta = signal<number | null>(null);
+  private pedidoOferta = 0;
+
+  private readonly proveedorIdElegido = computed(() => Number(this.valores().proveedor_id) || null);
+  readonly proveedorElegido = computed(
+    () => this.proveedores().find((p) => p.id === this.proveedorIdElegido()) ?? null,
+  );
+  readonly temporadasOferta = computed(() => {
+    const vistas = new Map<number, string>();
+    this.oferta().forEach((p) => p.temporadas.forEach((t) => vistas.set(t.id, t.nombre)));
+    return [...vistas].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre));
+  });
+  readonly ofertaVisible = computed(() => {
+    const temporada = this.temporadaOferta();
+    return temporada === null
+      ? this.oferta()
+      : this.oferta().filter((p) => p.temporadas.some((t) => t.id === temporada));
+  });
+  private readonly productosPorId = computed(() => new Map(this.oferta().map((p) => [p.id, p] as const)));
+  /** El proveedor elegido cargo productos: las lineas tienen que partir de ellos. */
+  readonly hayOferta = computed(() => this.oferta().length > 0);
+  readonly sinOferta = computed(
+    () => this.proveedorElegido() !== null && !this.cargandoOferta() && !this.errorOferta() && !this.hayOferta(),
+  );
+  readonly asociando = signal<number | null>(null);
+
   /** Precio que puso la pantalla en cada linea: mientras nadie lo cambie, sigue a la variante elegida. */
   private readonly sugeridos = new WeakMap<LineaForm, string>();
 
@@ -224,6 +283,141 @@ export class Compras {
       this.valores();
       untracked(() => this.errorServidor.set(null));
     });
+    effect(() => {
+      // Depende del id y no del formulario entero: al llegar la oferta se tocan las
+      // lineas, y eso no tiene que volver a pedirla.
+      const proveedorId = this.proveedorIdElegido();
+      const abierto = this.modalNueva();
+      untracked(() => this.cargarOferta(abierto ? proveedorId : null));
+    });
+  }
+
+  /** Lo que ese proveedor informo que puede vender: se consulta, no se edita. */
+  private cargarOferta(proveedorId: number | null): void {
+    const pedido = ++this.pedidoOferta;
+    this.oferta.set([]);
+    this.errorOferta.set(null);
+    this.temporadaOferta.set(null);
+    if (proveedorId === null) {
+      this.cargandoOferta.set(false);
+      return;
+    }
+    this.cargandoOferta.set(true);
+    this.http.get<ProductoOfrecido[]>(`${API_URL}/oferta`, { params: { proveedor_id: proveedorId } }).subscribe({
+      next: (productos) => {
+        if (pedido !== this.pedidoOferta) return;
+        this.oferta.set(productos);
+        this.cargandoOferta.set(false);
+        this.alCambiarOferta();
+      },
+      error: (err) => {
+        if (pedido !== this.pedidoOferta) return;
+        this.errorOferta.set(mensajeDeError(err, 'No se pudo consultar la oferta del proveedor.'));
+        this.cargandoOferta.set(false);
+      },
+    });
+  }
+
+  elegirTemporadaOferta(valor: string): void {
+    this.temporadaOferta.set(valor ? Number(valor) : null);
+  }
+
+  /**
+   * Cambio el proveedor: los productos elegidos eran del anterior. Si una linea ya
+   * traia su variante (boton «Reponer» del inventario) y un solo producto de la
+   * oferta nueva corresponde a esa prenda, queda elegido.
+   */
+  private alCambiarOferta(): void {
+    this.lineas.controls.forEach((linea, i) => {
+      const variante = this.variantesPorId().get(Number(linea.controls.variante_id.value));
+      const candidatos = variante ? this.oferta().filter((p) => p.prenda_id === variante.prenda_id) : [];
+      linea.controls.producto_id.setValue(candidatos.length === 1 ? String(candidatos[0].id) : '');
+      this.sugerirPrecio(i);
+    });
+  }
+
+  producto(indice: number): ProductoOfrecido | null {
+    const linea = (this.valores().lineas ?? [])[indice];
+    return this.productosPorId().get(Number(linea?.producto_id)) ?? null;
+  }
+
+  /** Productos que se ofrecen en el selector de la linea: los de la temporada filtrada, mas el ya elegido. */
+  productosPara(indice: number): ProductoOfrecido[] {
+    const elegido = this.producto(indice);
+    const visibles = this.ofertaVisible();
+    return elegido && !visibles.includes(elegido) ? [elegido, ...visibles] : visibles;
+  }
+
+  /** Variantes destino: primero las de la prenda a la que corresponde el producto elegido. */
+  gruposPara(indice: number): GrupoVariantes[] {
+    const prendaId = this.producto(indice)?.prenda_id ?? null;
+    if (prendaId === null) return this.grupos();
+    const asociada = this.grupos().find((g) => g.prenda_id === prendaId);
+    if (!asociada) return this.grupos();
+    return [{ ...asociada, asociada: true }, ...this.grupos().filter((g) => g !== asociada)];
+  }
+
+  alElegirProducto(indice: number): void {
+    const linea = this.lineas.at(indice);
+    const producto = this.productosPorId().get(Number(linea.controls.producto_id.value));
+    const variante = this.variantesPorId().get(Number(linea.controls.variante_id.value));
+    // La variante que habia era de otra prenda: se vuelve a elegir entre las que corresponden.
+    if (producto?.prenda_id && variante && variante.prenda_id !== producto.prenda_id) {
+      linea.controls.variante_id.setValue('');
+    }
+    this.sugerirPrecio(indice);
+  }
+
+  /** Avisos de la linea que no impiden guardar. */
+  avisosLinea(indice: number): string[] {
+    const producto = this.producto(indice);
+    if (!producto) return [];
+    const linea = (this.valores().lineas ?? [])[indice];
+    const variante = this.variantesPorId().get(Number(linea?.variante_id));
+    const avisos: string[] = [];
+    if (producto.prenda_id === null) {
+      avisos.push(
+        `«${producto.nombre}» no tiene correspondencia definida todavia con una prenda del catalogo: ` +
+          'podes elegir cualquier variante.',
+      );
+    } else if (variante && variante.prenda_id !== producto.prenda_id) {
+      avisos.push(`«${producto.nombre}» corresponde a ${producto.prenda}, y elegiste una variante de ${variante.prenda}.`);
+    }
+    const pedidas = (this.valores().lineas ?? [])
+      .filter((l) => Number(l.producto_id) === producto.id && ENTERO_POSITIVO.test(texto(l.cantidad)))
+      .reduce((suma, l) => suma + Number(texto(l.cantidad)), 0);
+    if (pedidas > 0 && pedidas < producto.cantidad_minima) {
+      avisos.push(`El pedido minimo de «${producto.nombre}» es de ${producto.cantidad_minima} unidades y llevas ${pedidas}.`);
+    }
+    return avisos;
+  }
+
+  /** Se puede dejar definida la correspondencia desde aca: producto sin prenda + variante ya elegida. */
+  prendaParaAsociar(indice: number): { productoId: number; prendaId: number; prenda: string } | null {
+    const producto = this.producto(indice);
+    const linea = (this.valores().lineas ?? [])[indice];
+    const variante = this.variantesPorId().get(Number(linea?.variante_id));
+    if (!producto || producto.prenda_id !== null || !variante || !this.puedeRecibir()) return null;
+    return { productoId: producto.id, prendaId: variante.prenda_id, prenda: variante.prenda };
+  }
+
+  asociar(indice: number): void {
+    const destino = this.prendaParaAsociar(indice);
+    if (!destino) return;
+    this.asociando.set(destino.productoId);
+    this.http
+      .put<ProductoOfrecido>(`${API_URL}/oferta/${destino.productoId}/prenda`, { prenda_id: destino.prendaId })
+      .subscribe({
+        next: (actualizado) => {
+          this.asociando.set(null);
+          this.oferta.update((lista) => lista.map((p) => (p.id === actualizado.id ? { ...p, ...actualizado } : p)));
+          this.avisos.ok(`«${actualizado.nombre}» queda asociado a ${actualizado.prenda}: la proxima vez se ofrecen primero sus variantes.`);
+        },
+        error: (err) => {
+          this.asociando.set(null);
+          this.avisos.error(mensajeDeError(err, 'No se pudo guardar la correspondencia.'));
+        },
+      });
   }
 
   // ------------------------------------------------------------------ carga
@@ -275,9 +469,12 @@ export class Compras {
             .filter((p) => p.variantes.length > 0)
             .sort((a, b) => a.nombre.localeCompare(b.nombre))
             .map((p) => ({
+              prenda_id: p.id,
               prenda: p.nombre,
               variantes: p.variantes.map((v) => ({
                 id: v.id,
+                prenda_id: p.id,
+                prenda: p.nombre,
                 sku: v.sku,
                 talla: v.talla ?? '—',
                 color: v.color ?? '—',
@@ -310,6 +507,7 @@ export class Compras {
 
   agregarLinea(varianteId: number | null = null): void {
     const linea = this.fb.nonNullable.group({
+      producto_id: '',
       variante_id: varianteId === null ? '' : String(varianteId),
       cantidad: '',
       precio_unitario: '',
@@ -322,13 +520,25 @@ export class Compras {
     this.lineas.removeAt(indice);
   }
 
-  /** Sugiere el costo de la prenda, salvo que el usuario ya haya escrito un precio propio. */
   alElegirVariante(indice: number): void {
+    this.sugerirPrecio(indice);
+  }
+
+  /**
+   * Sugiere el precio referencial del producto del proveedor; sin oferta, el costo
+   * de la prenda. Nunca pisa un precio que el usuario ya escribio a mano.
+   */
+  private sugerirPrecio(indice: number): void {
     const linea = this.lineas.at(indice);
-    const costo = this.variantesPorId().get(Number(linea.controls.variante_id.value))?.costo;
+    const producto = this.productosPorId().get(Number(linea.controls.producto_id.value));
+    const base = producto
+      ? producto.precio_referencial
+      : this.hayOferta()
+        ? null
+        : this.variantesPorId().get(Number(linea.controls.variante_id.value))?.costo;
     const actual = texto(linea.controls.precio_unitario.value);
-    if (costo == null || (actual !== '' && actual !== this.sugeridos.get(linea))) return;
-    const sugerido = costo.toFixed(2);
+    if (base == null || (actual !== '' && actual !== this.sugeridos.get(linea))) return;
+    const sugerido = base.toFixed(2);
     linea.controls.precio_unitario.setValue(sugerido);
     this.sugeridos.set(linea, sugerido);
   }
@@ -356,6 +566,10 @@ export class Compras {
       const precio = texto(linea.precio_unitario);
       const primera = lineas.findIndex((otra) => texto(otra.variante_id) === variante);
       return {
+        producto:
+          this.hayOferta() && !texto(linea.producto_id) && mostrarFaltantes
+            ? 'Elegi el producto del proveedor.'
+            : null,
         variante: !variante
           ? mostrarFaltantes
             ? 'Elegi la variante.'
@@ -384,7 +598,9 @@ export class Compras {
   /** Los errores de una linea en una sola frase, o cadena vacia si esta bien. */
   mensajesLinea(indice: number): string {
     const errores = this.erroresLinea()[indice];
-    return errores ? [errores.variante, errores.cantidad, errores.precio].filter((m) => m !== null).join(' ') : '';
+    return errores
+      ? [errores.producto, errores.variante, errores.cantidad, errores.precio].filter((m) => m !== null).join(' ')
+      : '';
   }
 
   subtotalLinea(indice: number): number {
@@ -401,20 +617,22 @@ export class Compras {
     const sucursalId = Number(this.valores().sucursal_id);
     const stock = variante.disponibilidad.find((d) => d.sucursal_id === sucursalId);
     const partes = [stock ? `${stock.disponible} disponibles en la sucursal` : 'sin stock en la sucursal: se abre al recibir'];
-    if (variante.costo !== null) partes.push(`costo Bs ${moneda(variante.costo)}`);
+    if (variante.costo !== null) partes.push(`costo actual Bs ${moneda(variante.costo)}`);
     return partes.join(' · ');
   }
 
   guardar(): void {
     this.intento.set(true);
     const crudo = this.formCompra.getRawValue();
-    const conErrores = this.revisarLineas(true).some((e) => e.variante || e.cantidad || e.precio);
+    const conErrores = this.revisarLineas(true).some((e) => e.producto || e.variante || e.cantidad || e.precio);
+    if (this.cargandoOferta()) return;
     if (!texto(crudo.proveedor_id) || !texto(crudo.sucursal_id) || crudo.lineas.length === 0 || conErrores) return;
 
     const datos = {
       proveedor_id: Number(crudo.proveedor_id),
       sucursal_id: Number(crudo.sucursal_id),
       detalle: crudo.lineas.map((l) => ({
+        producto_proveedor_id: texto(l.producto_id) ? Number(l.producto_id) : null,
         variante_id: Number(l.variante_id),
         cantidad: Number(texto(l.cantidad)),
         precio_unitario: precioDe(l.precio_unitario),

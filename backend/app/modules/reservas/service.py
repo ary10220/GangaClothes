@@ -16,6 +16,7 @@ from fastapi import HTTPException
 from sqlalchemy import case, update
 from sqlalchemy.orm import Session
 
+from app.core.fechas import utc_iso
 from app.models.catalogo import Color, Prenda, Talla, Variante
 from app.models.inventario import Inventario
 from app.models.sucursales import Sucursal
@@ -64,7 +65,8 @@ def _salida(db: Session, reserva: Reserva, con_cliente: bool = False) -> dict:
     salida = {
         "id": reserva.id,
         "estado": reserva.estado,
-        "fecha_creacion": reserva.fecha_creacion.isoformat() if reserva.fecha_creacion else None,
+        "fecha_creacion": utc_iso(reserva.fecha_creacion),
+        # Hora de la tienda elegida por el cliente: no es UTC, viaja sin zona.
         "fecha_hora_prueba": reserva.fecha_hora_prueba.isoformat() if reserva.fecha_hora_prueba else None,
         "notas": reserva.notas,
         "sucursal_id": reserva.sucursal_id,

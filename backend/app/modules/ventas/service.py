@@ -10,11 +10,14 @@ from fastapi import HTTPException
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from app.core.fechas import utc_iso
 from app.models.catalogo import Color, Prenda, Talla, Variante
 from app.models.inventario import Inventario
 from app.models.sucursales import Sucursal
 from app.models.usuarios import Cliente, Usuario
-from app.models.ventas import DetalleReserva, DetalleVenta, Pago, Reserva, Venta
+from app.models.ventas import DetalleReserva, DetalleVenta, Pago, Promocion, Reserva, Venta
+from app.modules.prendas.service import url_imagen
+from app.modules.promociones import service as promociones
 from app.modules.reservas import service as reservas
 
 ESTADOS = {"carrito", "pendiente", "pagada", "anulada"}
@@ -90,21 +93,42 @@ def _variante_vendible(db: Session, variante_id: int, en_linea: bool = False):
     return fila
 
 
+def valorizar(db: Session, linea: DetalleVenta, prenda: Prenda, promos=None) -> None:
+    """Pone en la linea el precio de lista y el descuento de la promocion vigente
+    (CU18). `descuento` es el total de la linea, no por unidad."""
+    if promos is None:
+        promos = promociones.vigentes_por_prenda(db, [prenda.id]).get(prenda.id)
+    calculo = promociones.aplicar(prenda.precio_venta, promos)
+    linea.precio_unitario = calculo["precio_lista"]
+    linea.descuento = dinero(calculo["descuento"] * linea.cantidad)
+    linea.promocion_id = calculo["promocion"].id if calculo["promocion"] else None
+
+
 def recalcular(db: Session, venta: Venta, refrescar_precios: bool = False) -> None:
-    """Rehace subtotales y total desde las lineas. En el carrito el precio se
-    actualiza al vigente: todavia no es una venta cerrada."""
+    """Rehace subtotales y total desde las lineas. En el carrito el precio y la
+    promocion se actualizan a lo vigente: todavia no es una venta cerrada.
+
+    venta.subtotal es la suma a precio de lista; venta.descuento, lo que rebajan
+    las promociones; venta.total, lo que se cobra. Cada linea guarda su neto."""
     db.flush()
-    subtotal = Decimal("0")
-    for d in db.query(DetalleVenta).filter(DetalleVenta.venta_id == venta.id).all():
-        if refrescar_precios:
-            fila = _variante(db, d.variante_id)
+    lineas = db.query(DetalleVenta).filter(DetalleVenta.venta_id == venta.id).all()
+    if refrescar_precios and lineas:
+        filas = {d.id: _variante(db, d.variante_id) for d in lineas}
+        vigentes = promociones.vigentes_por_prenda(db, [f[1].id for f in filas.values() if f])
+        for d in lineas:
+            fila = filas[d.id]
             if fila:
-                d.precio_unitario = dinero(fila[1].precio_venta)
-        d.subtotal = dinero(dinero(d.precio_unitario) * d.cantidad - dinero(d.descuento))
-        subtotal += d.subtotal
-    venta.subtotal = subtotal
-    venta.descuento = dinero(venta.descuento)
-    venta.total = subtotal - venta.descuento
+                valorizar(db, d, fila[1], vigentes.get(fila[1].id, []))
+    bruto, rebaja = Decimal("0"), Decimal("0")
+    for d in lineas:
+        importe = dinero(dinero(d.precio_unitario) * d.cantidad)
+        d.descuento = min(dinero(d.descuento), importe)
+        d.subtotal = importe - d.descuento
+        bruto += importe
+        rebaja += d.descuento
+    venta.subtotal = bruto
+    venta.descuento = rebaja
+    venta.total = bruto - rebaja
     db.flush()
 
 
@@ -120,8 +144,14 @@ def salida(db: Session, venta: Venta, con_stock: bool = False) -> dict:
         .order_by(DetalleVenta.id)
         .all()
     )
+    nombres_promo = {}
+    ids_promo = {d.promocion_id for d, *_ in filas if d.promocion_id}
+    if ids_promo:
+        nombres_promo = {pr.id: pr for pr in db.query(Promocion).filter(Promocion.id.in_(ids_promo)).all()}
     detalle = []
     for d, v, p, t, c in filas:
+        promo = nombres_promo.get(d.promocion_id)
+        rebaja = dinero(d.descuento)
         item = {
             "id": d.id,
             "variante_id": d.variante_id,
@@ -130,7 +160,13 @@ def salida(db: Session, venta: Venta, con_stock: bool = False) -> dict:
             "talla": t.nombre,
             "color": c.nombre,
             "cantidad": d.cantidad,
+            "imagen_url": url_imagen(v.imagen_url or p.imagen_url),
+            # precio_unitario es el de lista; precio_final, el de una unidad con su promocion.
             "precio_unitario": float(dinero(d.precio_unitario)),
+            "precio_final": float(dinero(d.precio_unitario) - dinero(rebaja / d.cantidad)) if d.cantidad else 0.0,
+            "descuento": float(rebaja),
+            "promocion": ({"id": promo.id, "nombre": promo.nombre, "etiqueta": promociones.etiqueta(promo)}
+                          if promo and rebaja > 0 else None),
             "subtotal": float(dinero(d.subtotal)),
         }
         if con_stock:
@@ -159,7 +195,7 @@ def salida(db: Session, venta: Venta, con_stock: bool = False) -> dict:
         "id": venta.id,
         "estado": venta.estado,
         "canal": venta.canal,
-        "fecha": venta.fecha.isoformat() if venta.fecha else None,
+        "fecha": utc_iso(venta.fecha),
         "sucursal_id": venta.sucursal_id,
         "sucursal": sucursal.nombre if sucursal else None,
         "cliente": cliente,
@@ -266,6 +302,7 @@ def agregar_item(db: Session, usuario: Usuario, datos) -> dict:
     if linea:
         linea.cantidad = total_pedido
     else:
+        # recalcular() le pone enseguida el descuento de la promocion vigente.
         db.add(DetalleVenta(venta_id=venta.id, variante_id=variante.id, cantidad=datos.cantidad,
                             precio_unitario=precio, descuento=0, subtotal=precio * datos.cantidad))
     recalcular(db, venta, refrescar_precios=True)
@@ -378,13 +415,13 @@ def crear_presencial(db: Session, usuario: Usuario, datos) -> dict:
         raise HTTPException(400, f"Variantes repetidas en el detalle: {repetidas}")
 
     # Para esta venta cuenta como disponible lo libre MAS lo que su reserva retiene.
-    faltantes, precios = [], {}
+    faltantes, prendas = [], {}
     for variante_id, cantidad in lineas:
         fila = _variante_vendible(db, variante_id)
         alcanza = disponible(db, variante_id, datos.sucursal_id) + retenido.get(variante_id, 0)
         if cantidad > alcanza:
             faltantes.append(f"{nombre_variante(*fila)}: se venden {cantidad} y hay {alcanza}")
-        precios[variante_id] = dinero(fila[1].precio_venta)
+        prendas[variante_id] = fila[1]
     if faltantes:
         raise HTTPException(400, "No hay stock para la venta. " + "; ".join(faltantes))
 
@@ -399,10 +436,15 @@ def crear_presencial(db: Session, usuario: Usuario, datos) -> dict:
     )
     db.add(venta)
     db.flush()
+    # CU18: en caja rige la misma promocion que en la tienda en linea. El precio y
+    # el descuento quedan congelados en la venta desde este momento.
+    vigentes = promociones.vigentes_por_prenda(db, [p.id for p in prendas.values()])
     for variante_id, cantidad in lineas:
-        precio = precios[variante_id]
-        db.add(DetalleVenta(venta_id=venta.id, variante_id=variante_id, cantidad=cantidad,
-                            precio_unitario=precio, descuento=0, subtotal=precio * cantidad))
+        prenda = prendas[variante_id]
+        linea = DetalleVenta(venta_id=venta.id, variante_id=variante_id, cantidad=cantidad,
+                             precio_unitario=dinero(prenda.precio_venta), descuento=0, subtotal=0)
+        valorizar(db, linea, prenda, vigentes.get(prenda.id, []))
+        db.add(linea)
     recalcular(db, venta)
     db.commit()
     return salida(db, db.get(Venta, venta.id))
@@ -422,6 +464,18 @@ def listar(db: Session, sucursal_id: int | None = None, canal: str | None = None
             raise HTTPException(400, f"Estado invalido. Use uno de: {', '.join(sorted(ESTADOS))}")
         consulta = consulta.filter(Venta.estado == estado)
     return [salida(db, v) for v in consulta.order_by(Venta.fecha.desc(), Venta.id.desc()).all()]
+
+
+def mias(db: Session, usuario: Usuario) -> list[dict]:
+    """Devuelve solo las compras pagadas del cliente autenticado."""
+    cliente = cliente_de(db, usuario, "consultar sus compras")
+    ventas = (
+        db.query(Venta)
+        .filter(Venta.cliente_id == cliente.id, Venta.estado == "pagada")
+        .order_by(Venta.fecha.desc(), Venta.id.desc())
+        .all()
+    )
+    return [salida(db, venta) for venta in ventas]
 
 
 # ------------------------------------------------------ CU15 comprobante
@@ -446,7 +500,7 @@ def comprobante(db: Session, usuario: Usuario, venta_id: int, personal: bool) ->
     recibido = dinero(pago.monto) if pago else total
     return {
         "nro_comprobante": venta.nro_comprobante,
-        "fecha": pago.fecha.isoformat() if pago and pago.fecha else None,
+        "fecha": utc_iso(pago.fecha) if pago else None,
         "tienda": "GANGACLOTHES",
         "sucursal": {"nombre": sucursal.nombre, "direccion": sucursal.direccion} if sucursal else None,
         "canal": venta.canal,
@@ -459,6 +513,8 @@ def comprobante(db: Session, usuario: Usuario, venta_id: int, personal: bool) ->
             "sku": i["sku"],
             "cantidad": i["cantidad"],
             "precio_unitario": i["precio_unitario"],
+            "descuento": i["descuento"],
+            "promocion": i["promocion"]["nombre"] if i["promocion"] else None,
             "subtotal": i["subtotal"],
         } for i in datos["detalle"]],
         "subtotal": datos["subtotal"],

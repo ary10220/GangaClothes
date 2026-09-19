@@ -13,7 +13,11 @@ import { menuParaRoles } from './menu';
 export class AdminShell {
   private auth = inject(AuthService);
   readonly sesion = this.auth.sesion;
-  readonly menu = computed(() => menuParaRoles(this.sesion.roles()));
+  readonly menu = computed(() => menuParaRoles(this.sesion.roles(), this.sesion.permisos()));
+  /** El proveedor usa el mismo marco, pero no es personal de la tienda. */
+  readonly subtitulo = computed(() =>
+    this.sesion.rolPrincipal() === 'proveedor' ? 'portal de proveedores' : 'panel interno',
+  );
 
   salir(): void {
     this.auth.salir();

@@ -20,7 +20,10 @@ type Metodo = 'efectivo' | 'tarjeta' | 'qr';
 interface PrendaCatalogo {
   id: number;
   nombre: string;
+  /** Precio de lista. Con promocion vigente (CU18) en caja se cobra `precio_final`. */
   precio_venta: number;
+  precio_final: number;
+  promocion: { nombre: string; etiqueta: string } | null;
   variantes: {
     id: number;
     sku: string;
@@ -36,7 +39,10 @@ interface VarianteVenta {
   prenda: string;
   talla: string;
   color: string;
+  /** Lo que se cobra por unidad (con la promocion vigente ya aplicada). */
   precio: number;
+  precioLista: number;
+  promocion: { nombre: string; etiqueta: string } | null;
   disponibilidad: { sucursal_id: number; disponible: number }[];
 }
 
@@ -64,7 +70,17 @@ interface VentaCaja {
   reserva_id: number | null;
   cajero: { nombre: string } | null;
   cliente: { nombre: string | null } | null;
-  detalle: { sku: string; prenda: string; talla: string; color: string; cantidad: number; precio_unitario: number; subtotal: number }[];
+  detalle: {
+    sku: string;
+    prenda: string;
+    talla: string;
+    color: string;
+    cantidad: number;
+    precio_unitario: number;
+    descuento: number;
+    promocion: { nombre: string } | null;
+    subtotal: number;
+  }[];
 }
 
 /** POST /api/pagos cuando el cobro sale bien. */
@@ -86,7 +102,15 @@ interface Comprobante {
   reserva_id: number | null;
   cajero: { nombre: string } | null;
   cliente: { nombre: string | null } | null;
-  items: { descripcion: string; sku: string; cantidad: number; precio_unitario: number; subtotal: number }[];
+  items: {
+    descripcion: string;
+    sku: string;
+    cantidad: number;
+    precio_unitario: number;
+    descuento?: number;
+    promocion?: string | null;
+    subtotal: number;
+  }[];
   subtotal: number;
   descuento: number;
   total: number;
@@ -160,6 +184,10 @@ export class Caja {
   });
 
   readonly total = computed(() => centavos(this.lineas().reduce((s, l) => s + l.variante.precio * l.cantidad, 0)));
+  /** Lo que rebajan las promociones vigentes sobre el precio de lista. */
+  readonly descuento = computed(() =>
+    centavos(this.lineas().reduce((s, l) => s + (l.variante.precioLista - l.variante.precio) * l.cantidad, 0)),
+  );
   readonly unidades = computed(() => this.lineas().reduce((s, l) => s + l.cantidad, 0));
   readonly hayExcesos = computed(() => this.lineas().some((l) => this.excede(l)));
 
@@ -218,7 +246,9 @@ export class Caja {
             prenda: p.nombre,
             talla: v.talla ?? '—',
             color: v.color ?? '—',
-            precio: Number(p.precio_venta),
+            precio: Number(p.precio_final ?? p.precio_venta),
+            precioLista: Number(p.precio_venta),
+            promocion: p.promocion ?? null,
             disponibilidad: v.disponibilidad,
           })),
         );
@@ -421,6 +451,8 @@ export class Caja {
         sku: i.sku,
         cantidad: i.cantidad,
         precio_unitario: i.precio_unitario,
+        descuento: i.descuento,
+        promocion: i.promocion?.nombre ?? null,
         subtotal: i.subtotal,
       })),
       subtotal: r.venta.subtotal,

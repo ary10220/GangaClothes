@@ -1,0 +1,198 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>Dashboard · {{ nombreSucursal() }}</h1>
+    @if (datos(); as d) {
+      <span class="ceja">ventas pagadas del {{ fecha(d.periodo.desde) }} al {{ fecha(d.periodo.hasta) }}</span>
+    }
+  </div>
+
+  <div class="sin-imprimir controles">
+    <app-selector-estado [(valor)]="periodo" [opciones]="periodos" />
+    <label class="selector">
+      <span class="ceja">Sucursal</span>
+      <select class="campo" aria-label="Sucursal" (change)="elegirSucursal($any($event.target).value)">
+        <option value="">Todas</option>
+        @for (s of sucursales.sucursales(); track s.id) {
+          <option [value]="s.id" [selected]="s.id === sucursalId()">{{ s.nombre }}</option>
+        }
+      </select>
+    </label>
+    <button type="button" class="btn linea" [disabled]="exportando() || !datos()" (click)="exportar()">
+      {{ exportando() ? 'Exportando…' : 'Exportar CSV' }}
+    </button>
+    <button type="button" class="btn linea" [disabled]="!datos()" (click)="imprimir()">Imprimir / PDF</button>
+  </div>
+</div>
+
+@if (error()) {
+  <div class="mensaje error">
+    <p>{{ error() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (!datos()) {
+  <p class="mensaje">Calculando indicadores…</p>
+} @else {
+  @let d = datos()!;
+  @let i = d.indicadores;
+
+  <div class="cuerpo" [class.refrescando]="cargando()">
+    <!-- ------------------------------------------------------- indicadores -->
+    <div class="fichas">
+      <div class="ficha">
+        <div class="ceja">Ventas del periodo</div>
+        <div class="numero">Bs {{ moneda(i.total) }}</div>
+        <div class="apoyo" [class.sube]="(i.variacion_porcentaje ?? 0) > 0" [class.baja]="(i.variacion_porcentaje ?? 0) < 0">
+          {{ textoVariacion(i.variacion_porcentaje) }}
+        </div>
+      </div>
+      <div class="ficha">
+        <div class="ceja">Ventas cobradas</div>
+        <div class="numero">{{ i.ventas }}</div>
+        <div class="apoyo">ticket promedio Bs {{ moneda(i.ticket_promedio) }} · {{ i.unidades }} unidades</div>
+      </div>
+      <div class="ficha">
+        <div class="ceja">Ganancia bruta</div>
+        <div class="numero">Bs {{ moneda(i.ganancia) }}</div>
+        <div class="apoyo">margen {{ pct(i.margen_porcentaje) }} sobre lo vendido · Bs {{ moneda(i.ganancia_por_unidad) }} por unidad</div>
+      </div>
+      <div class="ficha destacada">
+        <div class="ceja">Ganancia promedio por prenda</div>
+        <div class="numero">Bs {{ moneda(i.ganancia_promedio_por_prenda) }}</div>
+        <div class="apoyo">
+          promedio de (precio de venta − costo) en {{ i.prendas_activas }} prendas · margen {{ pct(i.margen_promedio_porcentaje) }}
+        </div>
+      </div>
+      <div class="ficha">
+        <div class="ceja">Descuentos otorgados</div>
+        <div class="numero">Bs {{ moneda(i.descuento) }}</div>
+        <div class="apoyo">
+          {{ i.promociones_vigentes }} {{ i.promociones_vigentes === 1 ? 'promocion vigente' : 'promociones vigentes' }} hoy
+        </div>
+      </div>
+      <div class="ficha" [class.alerta]="i.alertas_stock > 0">
+        <div class="ceja">Alertas de stock</div>
+        <div class="numero">{{ i.alertas_stock }}</div>
+        <div class="apoyo">
+          variantes en su minimo ·
+          <a routerLink="/admin/inventario" class="sin-imprimir">ver inventario</a>
+        </div>
+      </div>
+      <div class="ficha">
+        <div class="ceja">Inventario a costo</div>
+        <div class="numero">Bs {{ moneda(i.valor_inventario_costo) }}</div>
+        <div class="apoyo">{{ i.unidades_en_stock }} unidades · Bs {{ moneda(i.valor_inventario_venta) }} a precio de venta</div>
+      </div>
+      <div class="ficha">
+        <div class="ceja">Pendientes</div>
+        <div class="numero">{{ i.reservas_activas }}</div>
+        <div class="apoyo">
+          reservas por atender · {{ i.compras_pendientes }}
+          {{ i.compras_pendientes === 1 ? 'compra por recibir' : 'compras por recibir' }}
+        </div>
+      </div>
+    </div>
+
+    <!-- ------------------------------------------------------ ventas por dia -->
+    <section class="panel ancho-total">
+      <div class="cabecera-panel">
+        <h2>Ventas por dia (Bs)</h2>
+        <span class="ceja">{{ d.periodo.dias }} dias · los dias sin ventas van en cero</span>
+      </div>
+      <app-serie-dias [puntos]="serie()" titulo="Ventas por dia en bolivianos" />
+    </section>
+
+    <div class="dos-columnas">
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Ventas por canal</h2></div>
+        <app-barras-h [filas]="porCanal()" />
+      </section>
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Ventas por sucursal</h2></div>
+        <app-barras-h [filas]="porSucursal()" />
+      </section>
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Prendas mas vendidas</h2><span class="ceja">por ingreso</span></div>
+        <app-barras-h [filas]="topPrendas()" />
+      </section>
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Ventas por categoria</h2></div>
+        <app-barras-h [filas]="porCategoria()" />
+      </section>
+    </div>
+
+    <!-- ------------------------------------------------ ganancia por prenda -->
+    <section class="panel ancho-total">
+      <div class="cabecera-panel">
+        <h2>Ganancia por prenda</h2>
+        <span class="ceja">precio de venta − costo · promedio Bs {{ moneda(i.ganancia_promedio_por_prenda) }}</span>
+        <a routerLink="/admin/reportes" [queryParams]="{ reporte: 'margen' }" class="enlace sin-imprimir">Ver reporte completo →</a>
+      </div>
+      <div class="marco-tabla">
+        <table>
+          <thead>
+            <tr>
+              <th>Prenda</th>
+              <th class="num">Precio (Bs)</th>
+              <th class="num">Costo (Bs)</th>
+              <th class="num">Ganancia (Bs)</th>
+              <th class="col-barra"></th>
+              <th class="num">Margen</th>
+              <th class="num">Vendidas</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of gananciaPorPrenda(); track p.prenda_id) {
+              <tr>
+                <td>
+                  {{ p.prenda }}
+                  @if (p.promocion) {
+                    <span class="estado rosa" [title]="'Con ' + p.promocion + ' la ganancia baja a Bs ' + moneda(p.ganancia_con_promocion)">promo</span>
+                  }
+                </td>
+                <td class="mono num">{{ moneda(p.precio_venta) }}</td>
+                <td class="mono num">{{ moneda(p.costo) }}</td>
+                <td class="mono num"><b>{{ moneda(p.ganancia_unitaria) }}</b></td>
+                <td class="col-barra">
+                  <div class="pista"><div class="barra" [style.width.%]="ancho(p.ganancia_unitaria)"></div></div>
+                </td>
+                <td class="mono num">{{ pct(p.margen_porcentaje) }}</td>
+                <td class="mono num">{{ p.unidades_vendidas }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="dos-columnas">
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Cobros por metodo</h2></div>
+        <ul class="lista-simple">
+          @for (m of d.metodos_pago; track m.metodo) {
+            <li>
+              <span class="capital">{{ m.metodo }}</span>
+              <span class="ceja">{{ m.pagos }} {{ m.pagos === 1 ? 'cobro' : 'cobros' }}</span>
+              <b class="mono">Bs {{ moneda(m.total) }}</b>
+            </li>
+          } @empty {
+            <li class="gris">Sin cobros en el periodo.</li>
+          }
+        </ul>
+      </section>
+      <section class="panel">
+        <div class="cabecera-panel"><h2>Reservas creadas en el periodo</h2></div>
+        <ul class="lista-simple">
+          @for (r of d.reservas_por_estado; track r.estado) {
+            <li>
+              <span class="capital">{{ r.estado }}</span>
+              <b class="mono">{{ r.reservas }}</b>
+            </li>
+          } @empty {
+            <li class="gris">Sin reservas en el periodo.</li>
+          }
+        </ul>
+      </section>
+    </div>
+  </div>
+}

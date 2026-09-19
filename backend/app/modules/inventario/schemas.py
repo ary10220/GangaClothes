@@ -28,6 +28,9 @@ class MovimientoIn(BaseModel):
 
 
 class LineaCompraIn(BaseModel):
+    # Producto de la oferta del proveedor del que parte la linea. Obligatorio
+    # cuando el proveedor tiene oferta cargada.
+    producto_proveedor_id: int | None = None
     variante_id: int
     cantidad: int = Field(gt=0)
     precio_unitario: float = Field(ge=0)

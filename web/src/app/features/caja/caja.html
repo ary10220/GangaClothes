@@ -43,7 +43,12 @@
                 <button type="button" class="resultado" [disabled]="limite(v) === 0" (click)="agregar(v)">
                   <span class="mono">{{ v.sku }}</span>
                   <span>{{ v.prenda }} · {{ v.talla }} · {{ v.color }}</span>
-                  <span class="mono precio">Bs {{ moneda(v.precio) }}</span>
+                  <span class="mono precio">
+                    Bs {{ moneda(v.precio) }}
+                    @if (v.promocion) {
+                      <span class="estado rosa">{{ v.promocion.etiqueta }}</span>
+                    }
+                  </span>
                   <span class="stock" [class.agotado]="limite(v) === 0">
                     {{ limite(v) === 0 ? 'sin stock' : limite(v) + ' disp.' }}
                   </span>
@@ -135,7 +140,13 @@
                       (change)="cambiarCantidad(i, $event)"
                     />
                   </td>
-                  <td class="mono num">{{ moneda(linea.variante.precio) }}</td>
+                  <td class="mono num">
+                    {{ moneda(linea.variante.precio) }}
+                    @if (linea.variante.promocion; as promo) {
+                      <s class="caja-antes">{{ moneda(linea.variante.precioLista) }}</s>
+                      <span class="caja-promo" [title]="promo.nombre">{{ promo.etiqueta }}</span>
+                    }
+                  </td>
                   <td class="mono num">{{ moneda(subtotal(linea)) }}</td>
                   <td>
                     <button
@@ -166,7 +177,23 @@
           @for (item of c.comprobante.items; track item.sku) {
             <div class="fila">
               <span>{{ item.cantidad }} × {{ item.descripcion }}</span>
-              <span>{{ moneda(item.subtotal) }}</span>
+              <span>{{ moneda(item.precio_unitario * item.cantidad) }}</span>
+            </div>
+            @if ((item.descuento ?? 0) > 0) {
+              <div class="fila pequeno ticket-promo">
+                <span>&nbsp;&nbsp;promo {{ item.promocion }}</span>
+                <span>-{{ moneda(item.descuento) }}</span>
+              </div>
+            }
+          }
+          @if (c.comprobante.descuento > 0) {
+            <div class="fila pequeno ticket-subtotales">
+              <span>subtotal</span>
+              <span>{{ moneda(c.comprobante.subtotal) }}</span>
+            </div>
+            <div class="fila pequeno">
+              <span>descuento promociones</span>
+              <span>-{{ moneda(c.comprobante.descuento) }}</span>
             </div>
           }
           <div class="fila tot">
@@ -209,10 +236,26 @@
               <span>
                 {{ linea.cantidad }} × {{ linea.variante.prenda }} {{ linea.variante.talla }}/{{ linea.variante.color }}
               </span>
-              <span>{{ moneda(subtotal(linea)) }}</span>
+              <span>{{ moneda(linea.variante.precioLista * linea.cantidad) }}</span>
             </div>
+            @if (linea.variante.promocion; as promo) {
+              <div class="fila pequeno ticket-promo">
+                <span>&nbsp;&nbsp;promo {{ promo.nombre }}</span>
+                <span>-{{ moneda((linea.variante.precioLista - linea.variante.precio) * linea.cantidad) }}</span>
+              </div>
+            }
           } @empty {
             <div class="centro pequeno gris">sin prendas todavia</div>
+          }
+          @if (descuento() > 0) {
+            <div class="fila pequeno ticket-subtotales">
+              <span>subtotal</span>
+              <span>{{ moneda(total() + descuento()) }}</span>
+            </div>
+            <div class="fila pequeno">
+              <span>descuento promociones</span>
+              <span>-{{ moneda(descuento()) }}</span>
+            </div>
           }
           <div class="fila tot">
             <span>TOTAL Bs</span>

@@ -5,7 +5,7 @@ import { AuthService } from '../../core/auth.service';
 import { SesionStore } from '../../core/sesion';
 
 /**
- * Barra superior de la tienda en linea: catalogo, reservas y carrito del cliente.
+ * Barra superior de la tienda en linea: catalogo, compras, reservas y carrito del cliente.
  * Uso: `<app-barra-tienda />`.
  */
 @Component({
@@ -18,6 +18,7 @@ import { SesionStore } from '../../core/sesion';
         <a routerLink="/catalogo" routerLinkActive="on">Catalogo</a>
         @if (esCliente()) {
           <a routerLink="/mis-reservas" routerLinkActive="on">Mis reservas</a>
+          <a routerLink="/mis-compras" routerLinkActive="on">Mis compras</a>
           <a routerLink="/carrito" routerLinkActive="on">Carrito</a>
         }
       </nav>

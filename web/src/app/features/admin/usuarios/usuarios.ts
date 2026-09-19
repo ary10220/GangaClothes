@@ -47,6 +47,10 @@ export class Usuarios {
   /** Los roles se manejan aparte del FormGroup porque son chips, no un control. */
   readonly rolesElegidos = signal<string[]>([]);
   readonly errorRoles = signal(false);
+  /** CU9: una cuenta con rol proveedor administra la oferta de UN proveedor. */
+  readonly proveedores = signal<{ id: number; nombre: string; activo: boolean | null; usuario_id: number | null }[]>([]);
+  readonly proveedorElegido = signal<number | null>(null);
+  readonly errorProveedor = signal(false);
   formulario: FormGroup = this.fb.group({});
 
   readonly cambiandoEstado = signal<number | null>(null);
@@ -73,8 +77,26 @@ export class Usuarios {
 
   constructor() {
     this.cargarRoles();
+    this.cargarProveedores();
     this.cargar();
   }
+
+  private cargarProveedores(): void {
+    this.http
+      .get<{ id: number; nombre: string; activo: boolean | null; usuario_id: number | null }[]>(
+        `${API_URL}/admin/proveedores`,
+      )
+      .subscribe({
+        next: (filas) => this.proveedores.set(filas.filter((p) => p.activo !== false)),
+        error: () => this.proveedores.set([]),
+      });
+  }
+
+  /** Proveedores sin cuenta, mas el que ya tiene este usuario. */
+  readonly proveedoresLibres = computed(() => {
+    const usuarioId = this.editando()?.id ?? null;
+    return this.proveedores().filter((p) => p.usuario_id === null || p.usuario_id === usuarioId);
+  });
 
   private cargarRoles(): void {
     this.http.get<{ nombre: string; activo: boolean }[]>(`${API_URL}/seguridad/roles`).subscribe({
@@ -104,6 +126,8 @@ export class Usuarios {
     this.errorFormulario.set(null);
     this.errorRoles.set(false);
     this.rolesElegidos.set(['cliente']);
+    this.proveedorElegido.set(null);
+    this.errorProveedor.set(false);
     this.formulario = this.fb.group({
       nombre: ['', Validators.required],
       apellido: [''],
@@ -119,6 +143,8 @@ export class Usuarios {
     this.errorFormulario.set(null);
     this.errorRoles.set(false);
     this.rolesElegidos.set([...((usuario['roles'] as string[]) ?? [])]);
+    this.proveedorElegido.set((usuario['proveedor'] as { id: number } | null)?.id ?? null);
+    this.errorProveedor.set(false);
     const texto = (clave: string) =>
       usuario[clave] === null || usuario[clave] === undefined ? '' : String(usuario[clave]);
     // Al editar, el correo se muestra pero no se toca: el backend no lo actualiza.
@@ -150,7 +176,10 @@ export class Usuarios {
     // Sin rol el usuario entraria al sistema sin poder hacer nada.
     if (this.rolesElegidos().length === 0) this.errorRoles.set(true);
     if (this.formulario.invalid) this.formulario.markAllAsTouched();
-    if (this.formulario.invalid || this.rolesElegidos().length === 0) return;
+    const esProveedor = this.rolesElegidos().includes('proveedor');
+    this.errorProveedor.set(esProveedor && this.proveedorElegido() === null);
+    if (this.formulario.invalid || this.rolesElegidos().length === 0 || this.errorProveedor()) return;
+    const proveedor_id = esProveedor ? this.proveedorElegido() : null;
 
     this.errorFormulario.set(null);
     this.guardando.set(true);
@@ -164,6 +193,7 @@ export class Usuarios {
           apellido: crudo.apellido || null,
           telefono: crudo.telefono || null,
           roles: this.rolesElegidos(),
+          proveedor_id,
         })
       : this.http.post<Registro>(`${API_URL}/usuarios`, {
           nombre: crudo.nombre,
@@ -172,6 +202,7 @@ export class Usuarios {
           password: crudo.password,
           telefono: crudo.telefono || null,
           roles: this.rolesElegidos(),
+          proveedor_id,
         });
 
     peticion.subscribe({
@@ -180,6 +211,7 @@ export class Usuarios {
         this.modalAbierto.set(false);
         this.avisos.ok(usuario ? 'Se actualizo el usuario.' : 'Se creo el usuario.');
         this.cargar();
+        this.cargarProveedores();
       },
       error: (err) => {
         this.guardando.set(false);
@@ -211,6 +243,10 @@ export class Usuarios {
   // ------------------------------------------------------------ presentacion
   esInactivo(usuario: Registro): boolean {
     return esInactivo(usuario);
+  }
+
+  proveedorDe(usuario: Registro): string | null {
+    return (usuario['proveedor'] as { nombre: string } | null)?.nombre ?? null;
   }
 
   rolesDe(usuario: Registro): string[] {

@@ -47,8 +47,11 @@ class DetalleVenta(Base):
     variante_id = Column(Integer, ForeignKey("variante.id"), nullable=False)
     cantidad = Column(Integer, nullable=False)
     precio_unitario = Column(Numeric(10, 2), nullable=False)
+    # Descuento total de la linea (no por unidad): subtotal = precio * cantidad - descuento.
     descuento = Column(Numeric(10, 2), default=0)
     subtotal = Column(Numeric(12, 2), nullable=False)
+    # Promocion que origino el descuento (CU18); queda para el comprobante y los reportes.
+    promocion_id = Column(Integer, ForeignKey("promocion.id"))
 
 
 class Pago(Base):

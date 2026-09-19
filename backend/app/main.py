@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import models  # noqa: F401  (registra las 28 tablas)
+from app import models  # noqa: F401  (registra todas las tablas)
 from app.core import migraciones
 from app.core.config import settings
 from app.core.database import Base, engine
@@ -18,6 +18,7 @@ from app.modules.ventas.router import router as ventas_router
 from app.modules.pagos.router import router as pagos_router
 from app.modules.promociones.router import router as promociones_router
 from app.modules.reportes.router import router as reportes_router
+from app.modules.proveedores.router import router as oferta_router
 from app.modules.ia.router import router as ia_router
 
 # Mensajes propios (por ejemplo, si un correo no se pudo enviar) en la consola,
@@ -47,6 +48,8 @@ app.add_middleware(
     allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
     allow_methods=["*"],
     allow_headers=["*"],
+    # La web lee de aqui el nombre del archivo al exportar un reporte (CU19).
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth_router, prefix="/api/auth", tags=["1. Autenticacion (CU1-CU2, CU20-CU21)"])
@@ -60,8 +63,9 @@ app.include_router(compras_router, prefix="/api/compras", tags=["6b. Compras a p
 app.include_router(reservas_router, prefix="/api/reservas", tags=["7. Reservas (CU13, CU23-CU24)"])
 app.include_router(ventas_router, prefix="/api/ventas", tags=["8. Ventas (CU14, CU17)"])
 app.include_router(pagos_router, prefix="/api/pagos", tags=["9. Pagos (CU15, pasarela CU17)"])
-app.include_router(promociones_router, prefix="/api/promociones", tags=["10. Promociones (CU18) [pendiente]"])
-app.include_router(reportes_router, prefix="/api/reportes", tags=["11. Reportes (CU19) [pendiente]"])
+app.include_router(oferta_router, prefix="/api/oferta", tags=["6c. Oferta del proveedor (CU9)"])
+app.include_router(promociones_router, prefix="/api/promociones", tags=["10. Promociones (CU18)"])
+app.include_router(reportes_router, prefix="/api/reportes", tags=["11. Reportes y dashboard (CU19)"])
 app.include_router(ia_router, prefix="/api/ia", tags=["12. IA (CU28) [pendiente]"])
 
 

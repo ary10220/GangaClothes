@@ -9,9 +9,10 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.fechas import utc_iso
 from app.models.catalogo import Color, Prenda, Talla, Variante
 from app.models.inventario import (Compra, DetalleCompra, Inventario,
-                                   MovimientoInventario, Proveedor)
+                                   MovimientoInventario, ProductoProveedor, Proveedor)
 from app.models.sucursales import Sucursal
 from app.models.usuarios import Usuario
 
@@ -260,7 +261,7 @@ def _fila_movimiento(db: Session, m: MovimientoInventario) -> dict:
     usuario = db.get(Usuario, m.usuario_id) if m.usuario_id else None
     return {
         "id": m.id,
-        "fecha": m.fecha.isoformat() if m.fecha else None,
+        "fecha": utc_iso(m.fecha),
         "tipo": m.tipo,
         "cantidad": m.cantidad,
         "motivo": m.motivo,
@@ -296,7 +297,7 @@ def _fila_compra(db: Session, compra: Compra, con_detalle: bool = False) -> dict
     sucursal = db.get(Sucursal, compra.sucursal_id)
     salida = {
         "id": compra.id,
-        "fecha": compra.fecha.isoformat() if compra.fecha else None,
+        "fecha": utc_iso(compra.fecha),
         "estado": compra.estado,
         "total": float(compra.total or 0),
         "proveedor_id": compra.proveedor_id,
@@ -316,8 +317,12 @@ def _fila_detalle(db: Session, d: DetalleCompra) -> dict:
     prenda = db.get(Prenda, variante.prenda_id) if variante else None
     talla = db.get(Talla, variante.talla_id) if variante else None
     color = db.get(Color, variante.color_id) if variante else None
+    producto = db.get(ProductoProveedor, d.producto_proveedor_id) if d.producto_proveedor_id else None
     return {
         "id": d.id,
+        # De que producto de la oferta del proveedor partio la linea (CU9).
+        "producto_proveedor_id": d.producto_proveedor_id,
+        "producto_proveedor": producto.nombre if producto else None,
         "variante_id": d.variante_id,
         "sku": variante.sku if variante else None,
         "prenda": prenda.nombre if prenda else None,
@@ -330,8 +335,15 @@ def _fila_detalle(db: Session, d: DetalleCompra) -> dict:
 
 
 def crear_compra(db: Session, datos) -> dict:
-    if db.get(Proveedor, datos.proveedor_id) is None:
+    """La compra parte de lo que el proveedor ofrece: si tiene oferta cargada,
+    cada linea nace de uno de sus productos y recien despues se dice a que
+    variante del catalogo va. Sin oferta, la compra se arma libremente."""
+    proveedor = db.get(Proveedor, datos.proveedor_id)
+    if proveedor is None:
         raise HTTPException(404, "El proveedor no existe")
+    oferta = {p.id: p for p in db.query(ProductoProveedor)
+              .filter(ProductoProveedor.proveedor_id == proveedor.id).all()}
+    ofrece = any(p.disponible is not False for p in oferta.values())
     if db.get(Sucursal, datos.sucursal_id) is None:
         raise HTTPException(404, "La sucursal no existe")
     if not datos.detalle:
@@ -348,6 +360,18 @@ def crear_compra(db: Session, datos) -> dict:
         if linea.variante_id in vistas:
             raise HTTPException(400, f"La variante {linea.variante_id} esta repetida en el detalle")
         vistas.add(linea.variante_id)
+        if linea.producto_proveedor_id is None:
+            if ofrece:
+                raise HTTPException(
+                    400, f"{proveedor.nombre} tiene oferta cargada: cada linea de la compra tiene que "
+                         "partir de un producto de su oferta")
+        else:
+            producto = oferta.get(linea.producto_proveedor_id)
+            if producto is None:
+                raise HTTPException(400, f"El producto {linea.producto_proveedor_id} no es de la oferta "
+                                         f"de {proveedor.nombre}")
+            if producto.disponible is False:
+                raise HTTPException(400, f"{proveedor.nombre} marco '{producto.nombre}' sin disponibilidad")
 
     compra = Compra(proveedor_id=datos.proveedor_id, sucursal_id=datos.sucursal_id,
                     estado="pendiente", total=0)
@@ -360,6 +384,7 @@ def crear_compra(db: Session, datos) -> dict:
         subtotal = precio * linea.cantidad
         total += subtotal
         db.add(DetalleCompra(compra_id=compra.id, variante_id=linea.variante_id,
+                             producto_proveedor_id=linea.producto_proveedor_id,
                              cantidad=linea.cantidad, precio_unitario=precio, subtotal=subtotal))
 
     compra.total = total

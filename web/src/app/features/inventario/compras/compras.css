@@ -164,3 +164,88 @@ h1 {
     display: none;
   }
 }
+
+/* ---------------------------- la compra parte de la oferta del proveedor (CU9) */
+.modal.compra {
+  max-width: 1020px;
+}
+.aviso-oferta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  border: 1.5px dashed var(--linea);
+  border-radius: 11px;
+  padding: 10px 14px;
+  background: var(--suave);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.aviso-oferta.alerta {
+  display: block;
+  border-color: var(--alerta);
+  background: #fce9e2;
+}
+.temporada-oferta {
+  flex: none;
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.lineas.con-oferta .fila-linea {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) 84px 112px 88px 28px;
+}
+.aviso-linea {
+  font-size: 11.5px;
+  color: var(--alerta);
+  background: #fce9e2;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.aviso-linea .enlace {
+  margin-left: 6px;
+  text-decoration: underline;
+}
+.origen {
+  display: block;
+  font-size: 11px;
+  color: var(--gris);
+}
+
+@media (max-width: 760px) {
+  .lineas.con-oferta .fila-linea {
+    grid-template-columns: 1fr 1fr;
+  }
+  .lineas.con-oferta .fila-linea > div {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Ficha del producto elegido: el detalle que escribio el proveedor, a la vista al elegir la variante. */
+.ficha-producto {
+  border-left: 3px solid var(--ganga);
+  background: var(--suave);
+  border-radius: 0 9px 9px 0;
+  padding: 8px 12px;
+  margin-top: 0;
+}
+.detalle-producto {
+  font-size: 12.5px;
+  line-height: 1.45;
+  margin: 3px 0 5px;
+}
+.sin-detalle {
+  color: var(--gris);
+}
+.datos-producto {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 11.5px;
+  color: var(--gris);
+}
+.datos-producto .sin-correspondencia {
+  color: var(--alerta);
+}
