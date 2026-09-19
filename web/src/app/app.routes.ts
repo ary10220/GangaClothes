@@ -14,7 +14,7 @@ import {
 import { ConfigCrud } from './shared/crud/config';
 
 const SOLO_ADMIN = { roles: ['administrador'] };
-/** Reservas y carrito son de la cuenta del cliente: el personal usa el panel. */
+/** Reservas, compras y carrito son de la cuenta del cliente: el personal usa el panel. */
 const SOLO_CLIENTE = { roles: ['cliente'] };
 /** Panel del encargado de sucursal: inventario, movimientos, compras y reservas. */
 const OPERACION_SUCURSAL = { roles: ['administrador', 'encargado'] };
@@ -57,6 +57,12 @@ export const routes: Routes = [
     canActivate: [authGuard, rolGuard],
     data: SOLO_CLIENTE,
     loadComponent: () => import('./features/tienda/mis-reservas/mis-reservas').then((m) => m.MisReservas),
+  },
+  {
+    path: 'mis-compras',
+    canActivate: [authGuard, rolGuard],
+    data: SOLO_CLIENTE,
+    loadComponent: () => import('./features/tienda/mis-compras/mis-compras').then((m) => m.MisCompras),
   },
   {
     path: 'carrito',

@@ -1,0 +1,69 @@
+<app-barra-tienda />
+
+<main class="pagina">
+  <div class="encabezado">
+    <div class="titulo">
+      <h1>Mis compras</h1>
+      <span class="ceja">compras pagadas y comprobantes de tus pedidos</span>
+    </div>
+    <a class="btn rosa" routerLink="/catalogo">Seguir comprando</a>
+  </div>
+
+  @if (cargando() && compras().length === 0) {
+    <p class="mensaje">Cargando…</p>
+  } @else if (error()) {
+    <div class="mensaje error">
+      <p>{{ error() }}</p>
+      <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+    </div>
+  } @else if (compras().length === 0) {
+    <div class="mensaje vacio">
+      <p>Todavia no tienes compras pagadas. Elige una prenda en el catalogo para comenzar.</p>
+      <a class="btn rosa" routerLink="/catalogo">Ir al catalogo</a>
+    </div>
+  } @else {
+    <div class="lista">
+      @for (compra of compras(); track compra.id) {
+        @let pago = pagoExitoso(compra);
+        <article class="compra">
+          <header>
+            <div>
+              <span class="mono">{{ compra.nro_comprobante || '#V-' + compra.id }}</span>
+              <span class="ceja tipo">compra</span>
+            </div>
+            <span class="estado ok">{{ compra.estado }}</span>
+          </header>
+
+          <div class="datos">
+            <span><b>Comprada:</b> {{ fechaCompra(compra.fecha) }}</span>
+            <span><b>Sucursal:</b> {{ compra.sucursal || 'No informada' }}</span>
+          </div>
+          <p class="pago">
+            <b>Pago:</b> {{ metodoPago(pago?.metodo) }} · {{ estadoPago(pago?.estado) }}
+          </p>
+
+          <ul>
+            @for (detalle of compra.detalle; track detalle.id) {
+              <li>
+                <span class="detalle">
+                  <span>{{ detalle.prenda }} · {{ detalle.talla }} · {{ detalle.color }}</span>
+                  <small>Bs {{ moneda(detalle.subtotal) }}</small>
+                </span>
+                <b>×{{ detalle.cantidad }}</b>
+              </li>
+            }
+          </ul>
+
+          <div class="totales">
+            <span>{{ compra.unidades }} unidades</span>
+            <span>Subtotal Bs {{ moneda(compra.subtotal) }}</span>
+            @if (compra.descuento > 0) {
+              <span>Descuento −Bs {{ moneda(compra.descuento) }}</span>
+            }
+            <strong>Total Bs {{ moneda(compra.total) }}</strong>
+          </div>
+        </article>
+      }
+    </div>
+  }
+</main>

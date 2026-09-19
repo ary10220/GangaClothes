@@ -3,4 +3,4 @@
  * En la compilacion de produccion este archivo se reemplaza por
  * `api-url.prod.ts` (ver `fileReplacements` en angular.json).
  */
-export const API_URL = 'http://localhost:8000/api';
+export const API_URL = 'http://localhost:8001/api';
