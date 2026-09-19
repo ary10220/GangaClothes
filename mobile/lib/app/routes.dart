@@ -8,6 +8,8 @@ import '../features/auth/recovery/recovery_screen.dart';
 import '../features/auth/register/register_screen.dart';
 import '../features/auth/session_model.dart';
 import '../features/catalog/catalog_screen.dart';
+import '../features/cart/cart_screen.dart';
+import '../features/reservations/reservations_screen.dart';
 import '../features/showcase/theme_showcase_screen.dart';
 
 typedef SessionChanged = void Function(Session? session);
@@ -77,6 +79,10 @@ abstract final class AppRoutes {
     const protected = {reservations, cart, cartPayment};
     const guestOnly = {login, register, recovery};
     if (protected.contains(route) && session == null) return login;
+    if ((route == reservations || route == cart || route == cartPayment) &&
+        !(session?.user.roles.contains('cliente') ?? false)) {
+      return catalog;
+    }
     if (guestOnly.contains(route) && session != null) return catalog;
     return _known.contains(route) ? route : catalog;
   }
@@ -133,6 +139,30 @@ abstract final class AppRoutes {
           session: session,
           onLogout: onLogout,
         );
+      case reservations:
+        if (apiClient == null) {
+          throw StateError('Reservation routes require the app ApiClient.');
+        }
+        page = ReservationsScreen(
+          apiClient: apiClient,
+          session: session,
+          onLogout: onLogout,
+        );
+      case cart:
+      case cartPayment:
+        page = apiClient == null
+            ? PlaceholderScreen(
+                routeName: destination,
+                session: session,
+                returnTo: returnTo,
+                onLogout: onLogout,
+              )
+            : CartScreen(
+                apiClient: apiClient,
+                session: session,
+                openPayment: destination == cartPayment,
+                onLogout: onLogout,
+              );
       default:
         page = PlaceholderScreen(
           routeName: destination,
