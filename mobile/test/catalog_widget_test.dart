@@ -1,0 +1,243 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/app/theme.dart';
+import 'package:mobile/core/storage/preferences_storage.dart';
+import 'package:mobile/features/auth/session_model.dart';
+import 'package:mobile/features/catalog/catalog_detail_models.dart';
+import 'package:mobile/features/catalog/catalog_detail_service.dart';
+import 'package:mobile/features/catalog/catalog_models.dart';
+import 'package:mobile/features/catalog/catalog_screen.dart';
+import 'package:mobile/features/catalog/catalog_service.dart';
+
+void main() {
+  testWidgets('renders loading and retryable error states', (tester) async {
+    final api = _FakeCatalogApi()..error = true;
+    await tester.pumpWidget(
+      _host(CatalogScreen(catalogService: api, preferenceStore: _Prefs())),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('No se pudo cargar el catálogo'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
+  });
+
+  testWidgets('renders the explicit loading state', (tester) async {
+    final api = _FakeCatalogApi()..pending = true;
+    await tester.pumpWidget(
+      _host(CatalogScreen(catalogService: api, preferenceStore: _Prefs())),
+    );
+    await tester.pump();
+    expect(find.text('Cargando…'), findsOneWidget);
+  });
+
+  testWidgets('renders no published products and result count', (tester) async {
+    final api = _FakeCatalogApi();
+    await tester.pumpWidget(
+      _host(CatalogScreen(catalogService: api, preferenceStore: _Prefs())),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Todavía no hay prendas publicadas.'), findsOneWidget);
+
+    final productsApi = _FakeCatalogApi(products: [_product(available: 2)]);
+    await tester.pumpWidget(
+      _host(
+        CatalogScreen(
+          key: const ValueKey('products'),
+          catalogService: productsApi,
+          preferenceStore: _Prefs(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 prenda'), findsOneWidget);
+    expect(find.text('Bs 1.234,50'), findsOneWidget);
+    expect(find.text('M · L'), findsOneWidget);
+    expect(find.text('Ver detalle'), findsOneWidget);
+  });
+
+  testWidgets(
+    'renders no-stock branch state and guest/authenticated app bars',
+    (tester) async {
+      final api = _FakeCatalogApi(
+        branches: const [
+          BranchOption(id: 4, displayName: 'Centro', active: true),
+        ],
+      );
+      final prefs = _Prefs(saved: 4);
+      await tester.pumpWidget(
+        _host(CatalogScreen(catalogService: api, preferenceStore: prefs)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('No hay prendas con stock en la sucursal seleccionada.'),
+        findsOneWidget,
+      );
+      expect(find.text('Iniciar sesión'), findsOneWidget);
+
+      await tester.pumpWidget(
+        _host(
+          CatalogScreen(
+            catalogService: _FakeCatalogApi(),
+            preferenceStore: _Prefs(),
+            session: const Session(
+              accessToken: 'token',
+              user: User(
+                id: 1,
+                name: 'Ada',
+                email: 'ada@example.com',
+                roles: ['cliente'],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Mis reservas'), findsOneWidget);
+      expect(find.text('Carrito'), findsOneWidget);
+      expect(find.text('Iniciar sesión'), findsNothing);
+    },
+  );
+
+  testWidgets('opens the real detail sheet from a catalog card', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        CatalogScreen(
+          catalogService: _FakeCatalogApi(products: [_product(available: 2)]),
+          detailService: _FakeDetailApi(),
+          preferenceStore: _Prefs(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -420));
+    await tester.pumpAndSettle();
+    final detailAction = find.ancestor(
+      of: find.text('Ver detalle'),
+      matching: find.byType(TextButton),
+    );
+    await tester.tap(detailAction);
+    await tester.pumpAndSettle();
+
+    expect(find.text('DETALLE DE LA PRENDA'), findsOneWidget);
+    expect(
+      find.text('Para reservar o comprar necesitas una cuenta de cliente.'),
+      findsOneWidget,
+    );
+    expect(find.text('Iniciar sesión'), findsNWidgets(2));
+  });
+}
+
+Widget _host(Widget child) => MaterialApp(theme: gangaTheme(), home: child);
+
+class _Prefs implements BranchPreferenceStore {
+  _Prefs({this.saved});
+  int? saved;
+
+  @override
+  Future<int?> readSelectedBranch() async => saved;
+
+  @override
+  Future<void> saveSelectedBranch(int? branchId) async => saved = branchId;
+}
+
+class _FakeCatalogApi implements CatalogDataSource {
+  _FakeCatalogApi({this.branches = const [], this.products = const []});
+
+  final List<BranchOption> branches;
+  bool error = false;
+  bool pending = false;
+  final List<Product> products;
+
+  @override
+  Future<List<Product>> fetchCatalog(CatalogFilters filters) async {
+    if (error) throw StateError('backend unavailable');
+    if (pending) return Completer<List<Product>>().future;
+    return products;
+  }
+
+  @override
+  Future<CatalogOptions> fetchOptions() async {
+    if (pending) return Completer<CatalogOptions>().future;
+    return CatalogOptions(branches: branches);
+  }
+}
+
+class _FakeDetailApi implements CatalogActionDataSource {
+  @override
+  Future<ReservationSummary> createReservation(
+    ReservationRequest request,
+  ) async => const ReservationSummary(
+    id: 1,
+    branchId: 1,
+    branchName: 'Centro',
+    visitAt: null,
+  );
+
+  @override
+  Future<CartSummary?> fetchCart() async => null;
+
+  @override
+  Future<CartSummary> openCart({required int branchId}) async => CartSummary(
+    id: 1,
+    branchId: branchId,
+    branchName: 'Centro',
+    units: 0,
+    total: 0,
+    detail: const [],
+  );
+
+  @override
+  Future<CartSummary> addCartItem({
+    required int variantId,
+    required int quantity,
+  }) async => const CartSummary(
+    id: 1,
+    branchId: 1,
+    branchName: 'Centro',
+    units: 1,
+    total: 1,
+    detail: [],
+  );
+}
+
+Product _product({required int available}) => Product(
+  id: 1,
+  name: 'Camisa Oxford',
+  description: null,
+  brand: 'Ganga',
+  salePrice: 1234.5,
+  imageUrl: null,
+  categoryId: 1,
+  collectionId: null,
+  availableTotal: available,
+  variants: const [
+    Variant(
+      id: 1,
+      sku: 'SKU-1',
+      sizeId: 1,
+      sizeName: 'M',
+      colorId: 1,
+      colorName: 'Azul',
+      colorHex: '#112233',
+      imageUrl: null,
+      availableTotal: 1,
+      availability: [],
+    ),
+    Variant(
+      id: 2,
+      sku: 'SKU-2',
+      sizeId: 2,
+      sizeName: 'L',
+      colorId: 1,
+      colorName: 'Azul',
+      colorHex: '#112233',
+      imageUrl: null,
+      availableTotal: 1,
+      availability: [],
+    ),
+  ],
+);
