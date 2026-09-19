@@ -466,6 +466,18 @@ def listar(db: Session, sucursal_id: int | None = None, canal: str | None = None
     return [salida(db, v) for v in consulta.order_by(Venta.fecha.desc(), Venta.id.desc()).all()]
 
 
+def mias(db: Session, usuario: Usuario) -> list[dict]:
+    """Devuelve solo las compras pagadas del cliente autenticado."""
+    cliente = cliente_de(db, usuario, "consultar sus compras")
+    ventas = (
+        db.query(Venta)
+        .filter(Venta.cliente_id == cliente.id, Venta.estado == "pagada")
+        .order_by(Venta.fecha.desc(), Venta.id.desc())
+        .all()
+    )
+    return [salida(db, venta) for venta in ventas]
+
+
 # ------------------------------------------------------ CU15 comprobante
 def comprobante(db: Session, usuario: Usuario, venta_id: int, personal: bool) -> dict:
     venta = db.get(Venta, venta_id)
