@@ -14,6 +14,10 @@ void main() {
   test('redirects protected routes to login without a session', () {
     expect(AppRoutes.destinationFor(AppRoutes.cart, null), AppRoutes.login);
     expect(
+      AppRoutes.destinationFor(AppRoutes.purchaseHistory, null),
+      AppRoutes.login,
+    );
+    expect(
       AppRoutes.destinationFor(AppRoutes.reservations, null),
       AppRoutes.login,
     );
@@ -31,6 +35,10 @@ void main() {
       AppRoutes.destinationFor(AppRoutes.reservations, session),
       AppRoutes.reservations,
     );
+    expect(
+      AppRoutes.destinationFor(AppRoutes.purchaseHistory, session),
+      AppRoutes.purchaseHistory,
+    );
     const staff = Session(
       accessToken: 'token',
       user: User(
@@ -46,6 +54,10 @@ void main() {
     );
     expect(AppRoutes.destinationFor(AppRoutes.cart, staff), AppRoutes.catalog);
     expect(
+      AppRoutes.destinationFor(AppRoutes.purchaseHistory, staff),
+      AppRoutes.catalog,
+    );
+    expect(
       AppRoutes.destinationFor(AppRoutes.cartPayment, session),
       AppRoutes.cartPayment,
     );
@@ -54,6 +66,7 @@ void main() {
   test('accepts only known internal return destinations', () {
     expect(AppRoutes.safeReturnTo('/cart'), AppRoutes.cart);
     expect(AppRoutes.safeReturnTo('/catalogo'), AppRoutes.catalog);
+    expect(AppRoutes.safeReturnTo('/mis-compras'), AppRoutes.purchaseHistory);
     expect(AppRoutes.safeReturnTo('https://evil.example'), isNull);
     expect(AppRoutes.safeReturnTo('//evil.example'), isNull);
     expect(AppRoutes.safeReturnTo('/cart?next=https://evil.example'), isNull);

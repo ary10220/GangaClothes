@@ -107,6 +107,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ),
         if (customer)
           GcAppBarDestination(
+            label: 'Mis compras',
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.purchaseHistory),
+          ),
+        if (customer)
+          GcAppBarDestination(
             label: 'Carrito',
             onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
           ),

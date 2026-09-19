@@ -93,6 +93,11 @@ class _CartScreenState extends State<CartScreen> {
           onPressed: () =>
               Navigator.of(context).pushNamed(AppRoutes.reservations),
         ),
+        GcAppBarDestination(
+          label: 'Mis compras',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.purchaseHistory),
+        ),
         GcAppBarDestination(label: 'Carrito', selected: true, onPressed: () {}),
       ],
       accountName: widget.session?.user.fullName,

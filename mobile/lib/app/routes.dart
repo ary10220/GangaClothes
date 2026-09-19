@@ -9,6 +9,7 @@ import '../features/auth/register/register_screen.dart';
 import '../features/auth/session_model.dart';
 import '../features/catalog/catalog_screen.dart';
 import '../features/cart/cart_screen.dart';
+import '../features/purchase_history/purchase_history_screen.dart';
 import '../features/reservations/reservations_screen.dart';
 import '../features/showcase/theme_showcase_screen.dart';
 
@@ -28,6 +29,7 @@ abstract final class AppRoutes {
   static const catalog = 'catalog';
   static const catalogDetail = 'catalog/detail';
   static const reservations = 'reservations';
+  static const purchaseHistory = 'purchase-history';
   static const cart = 'cart';
   static const cartPayment = 'cart/payment';
 
@@ -38,6 +40,7 @@ abstract final class AppRoutes {
     catalog,
     catalogDetail,
     reservations,
+    purchaseHistory,
     cart,
     cartPayment,
   };
@@ -45,6 +48,7 @@ abstract final class AppRoutes {
     catalog,
     catalogDetail,
     reservations,
+    purchaseHistory,
     cart,
     cartPayment,
   };
@@ -63,6 +67,7 @@ abstract final class AppRoutes {
     const aliases = {
       'catalogo': catalog,
       'mis-reservas': reservations,
+      'mis-compras': purchaseHistory,
       'carrito': cart,
     };
     candidate = aliases[candidate] ?? candidate;
@@ -76,10 +81,13 @@ abstract final class AppRoutes {
 
   static String destinationFor(String requested, Session? session) {
     final route = _normalize(requested) ?? catalog;
-    const protected = {reservations, cart, cartPayment};
+    const protected = {reservations, purchaseHistory, cart, cartPayment};
     const guestOnly = {login, register, recovery};
     if (protected.contains(route) && session == null) return login;
-    if ((route == reservations || route == cart || route == cartPayment) &&
+    if ((route == reservations ||
+            route == purchaseHistory ||
+            route == cart ||
+            route == cartPayment) &&
         !(session?.user.roles.contains('cliente') ?? false)) {
       return catalog;
     }
@@ -144,6 +152,17 @@ abstract final class AppRoutes {
           throw StateError('Reservation routes require the app ApiClient.');
         }
         page = ReservationsScreen(
+          apiClient: apiClient,
+          session: session,
+          onLogout: onLogout,
+        );
+      case purchaseHistory:
+        if (apiClient == null) {
+          throw StateError(
+            'Purchase history routes require the app ApiClient.',
+          );
+        }
+        page = PurchaseHistoryScreen(
           apiClient: apiClient,
           session: session,
           onLogout: onLogout,
