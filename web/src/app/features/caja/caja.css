@@ -295,3 +295,14 @@ tr.excede:hover {
     border-radius: 0 0 12px 12px;
   }
 }
+
+/* Imprimir o descargar el comprobante recien cobrado (CU15). */
+.acciones-comprobante {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 12px 0;
+}
+.acciones-comprobante .btn {
+  flex: 1 1 140px;
+}

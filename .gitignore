@@ -14,6 +14,16 @@ mobile/build/
 mobile/.dart_tool/
 mobile/.flutter-plugins*
 *.apk
+# Certificados de las pasarelas: jamas al repositorio.
+# La carpeta entera, y ademas por extension por si alguien los deja en otro lado.
+certificados/
+*.pfx
+*.p12
+*.pem
+*.crt
+*.key
+*.cer
+
 # Otros
 .DS_Store
 # Herramientas locales (no se suben)

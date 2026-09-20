@@ -1,0 +1,121 @@
+<app-barra-tienda />
+
+<main class="pagina">
+  <div class="encabezado">
+    <div class="titulo">
+      <h1>Mis pedidos</h1>
+      <span class="ceja">seguimiento de las compras que te llevamos a domicilio</span>
+    </div>
+    <button type="button" class="btn linea" [disabled]="cargando()" (click)="cargar()">Actualizar</button>
+    <a class="btn rosa" routerLink="/catalogo">Seguir comprando</a>
+  </div>
+
+  @if (cargando() && envios().length === 0) {
+    <p class="mensaje">Cargando…</p>
+  } @else if (error()) {
+    <div class="mensaje error">
+      <p>{{ error() }}</p>
+      <button type="button" class="btn linea" (click)="cargar()">Reintentar</button>
+    </div>
+  } @else if (envios().length === 0) {
+    <div class="mensaje vacio">
+      <p>
+        Todavia no pediste ninguna compra a domicilio. En el carrito puedes elegir
+        «Delivery a domicilio» y te la llevamos.
+      </p>
+      <a class="btn rosa" routerLink="/catalogo">Ir al catalogo</a>
+    </div>
+  } @else {
+    @if (enCurso().length > 0) {
+      <p class="ceja seccion">
+        {{ enCurso().length }} {{ enCurso().length === 1 ? 'pedido en curso' : 'pedidos en curso' }} ·
+        esta pantalla se actualiza sola
+      </p>
+    }
+    <div class="lista">
+      @for (envio of envios(); track envio.id) {
+        <article class="pedido" [class.cerrado]="!envio.activo">
+          <header>
+            <div>
+              <span class="mono">{{ envio.venta?.nro_comprobante || '#E-' + envio.id }}</span>
+              <span class="ceja tipo">
+                {{ unidades(envio) }} {{ unidades(envio) === 1 ? 'prenda' : 'prendas' }} ·
+                {{ envio.distancia_km }} km
+                @if (envio.express) {
+                  · express
+                }
+              </span>
+            </div>
+            <span class="estado" [class]="claseEstado(envio.estado)">{{ envio.etiqueta_estado }}</span>
+          </header>
+
+          <p class="promesa">{{ promesa(envio) }}</p>
+
+          <div class="cuerpo">
+            <!-- -------------------------------------------------- el mapa -->
+            <div class="mapa">
+              <app-mapa [puntos]="mapa(envio)" [unirPuntos]="true" alto="250px" />
+              <p class="ceja leyenda">
+                sale de {{ envio.sucursal?.nombre }} · llega a {{ envio.direccion }}
+              </p>
+            </div>
+
+            <!-- ------------------------------------------ linea de tiempo -->
+            <ol class="tiempo">
+              @for (paso of linea(envio); track paso.etiqueta) {
+                <li [class.cumplido]="paso.cumplido" [class.actual]="paso.actual">
+                  <span class="punto" aria-hidden="true"></span>
+                  <div>
+                    <b>{{ paso.etiqueta }}</b>
+                    @if (paso.detalle) {
+                      <span class="detalle">{{ paso.detalle }}</span>
+                    }
+                    @if (paso.fecha) {
+                      <span class="cuando mono">{{ fecha(paso.fecha) }}</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ol>
+          </div>
+
+          <!-- ------------------------------------------------ datos y total -->
+          <div class="datos">
+            <span><b>Direccion:</b> {{ envio.direccion }}</span>
+            @if (envio.referencia) {
+              <span><b>Referencia:</b> {{ envio.referencia }}</span>
+            }
+            @if (envio.telefono_contacto) {
+              <span><b>Contacto:</b> {{ envio.telefono_contacto }}</span>
+            }
+            @if (envio.repartidor) {
+              <span><b>Repartidor:</b> {{ envio.repartidor }}</span>
+            }
+            @if (envio.pago; as pago) {
+              <span><b>Pagado con:</b> {{ pago.etiqueta }}</span>
+            }
+          </div>
+
+          <ul class="prendas">
+            @for (prenda of envio.prendas; track prenda.id) {
+              <li>
+                <span>{{ prenda.prenda }} · {{ prenda.talla }} · {{ prenda.color }}</span>
+                <b>×{{ prenda.cantidad }}</b>
+              </li>
+            }
+          </ul>
+
+          @if (envio.venta; as venta) {
+            <div class="totales">
+              <span>Prendas Bs {{ moneda(venta.subtotal - venta.descuento) }}</span>
+              <span [class.ahorro]="envio.costo_envio === 0">
+                Envio {{ envio.costo_envio > 0 ? 'Bs ' + moneda(envio.costo_envio) : 'gratis' }}
+              </span>
+              <strong>Total Bs {{ moneda(venta.total) }}</strong>
+            </div>
+          }
+        </article>
+      }
+    </div>
+  }
+</main>

@@ -4,7 +4,7 @@
   <div class="encabezado">
     <div class="titulo">
       <h1>Carrito</h1>
-      <span class="ceja">compra en linea · pago con tarjeta (modo prueba)</span>
+      <span class="ceja">compra en linea · tarjeta o QR (modo prueba)</span>
     </div>
   </div>
 
@@ -30,11 +30,52 @@
           <span>Ahorraste con promociones</span><b class="mono">− Bs {{ moneda(c.venta.descuento) }}</b>
         </div>
       }
+      @if (c.venta.tipo_entrega === 'delivery') {
+        <div class="total" [class.ahorro]="c.venta.costo_envio === 0">
+          <span>Envio a domicilio</span>
+          <b class="mono">{{ c.venta.costo_envio > 0 ? 'Bs ' + moneda(c.venta.costo_envio) : 'GRATIS' }}</b>
+        </div>
+      }
       <div class="total">
         <span>Total pagado</span><b class="mono">Bs {{ moneda(c.venta.total) }}</b>
       </div>
+
+      @if (c.venta.envio; as envio) {
+        <!-- CU29: a donde va el pedido y donde se sigue -->
+        <div class="entrega-ticket">
+          <div class="ceja">llega a tu domicilio</div>
+          <p><b>{{ envio.direccion }}</b></p>
+          @if (envio.referencia) {
+            <p class="ceja">{{ envio.referencia }}</p>
+          }
+          <p class="ceja">
+            {{ envio.distancia_km }} km desde {{ c.venta.sucursal }}
+            @if (envio.express) {
+              · entrega express
+            }
+          </p>
+          <a class="enlace" routerLink="/mis-envios">Seguir mi pedido →</a>
+        </div>
+      } @else {
+        <p class="ceja">retiras tu compra en {{ c.venta.sucursal }}</p>
+      }
+      <p class="ceja">
+        pagado con {{ c.pago.etiqueta }}
+        @if (c.tarjeta?.ultimos4) {
+          · {{ c.tarjeta!.marca }} terminada en {{ c.tarjeta!.ultimos4 }}
+        }
+      </p>
       <p class="ceja">referencia de la pasarela · {{ c.pago.referencia_externa }}</p>
-      <button type="button" class="btn rosa" routerLink="/catalogo" (click)="seguirComprando()">Seguir comprando</button>
+
+      <div class="acciones-comprobante">
+        <button type="button" class="btn rosa" (click)="comprobantes.imprimir(c.venta.id)">
+          Imprimir comprobante
+        </button>
+        <button type="button" class="btn linea" (click)="comprobantes.descargar(c.venta.id, c.nro_comprobante)">
+          Descargar PDF
+        </button>
+      </div>
+      <a class="enlace seguir" routerLink="/catalogo" (click)="seguirComprando()">← Seguir comprando</a>
     </section>
   } @else if (cargando() && !carrito()) {
     <p class="mensaje">Cargando…</p>
@@ -129,11 +170,31 @@
             }
           </select>
         </label>
-        <p class="nota">El stock se toma de esta sucursal.</p>
+        <p class="nota">
+          El stock se toma de esta sucursal
+          @if (venta.tipo_entrega === 'delivery') {
+            , y el delivery sale desde ahi.
+          } @else {
+            , y ahi retiras tu compra.
+          }
+        </p>
+
+        <!-- CU29: retiro en sucursal o delivery, con su mapa y su desglose -->
+        <app-selector-entrega
+          [venta]="venta"
+          [deshabilitado]="ocupado() !== null"
+          (actualizado)="entregaCambiada($event)"
+        />
 
         <div class="fila"><span>{{ venta.unidades }} {{ venta.unidades === 1 ? 'prenda' : 'prendas' }}</span><span class="mono">Bs {{ moneda(venta.subtotal) }}</span></div>
         @if (venta.descuento > 0) {
           <div class="fila ahorro"><span>Descuento por promociones</span><span class="mono">− Bs {{ moneda(venta.descuento) }}</span></div>
+        }
+        @if (venta.tipo_entrega === 'delivery') {
+          <div class="fila" [class.ahorro]="venta.costo_envio === 0">
+            <span>Envio a domicilio</span>
+            <span class="mono">{{ venta.costo_envio > 0 ? 'Bs ' + moneda(venta.costo_envio) : 'GRATIS' }}</span>
+          </div>
         }
         <div class="fila total"><span>Total</span><b class="mono">Bs {{ moneda(venta.total) }}</b></div>
 
@@ -158,55 +219,112 @@
       <div class="ceja">pasarela de pago · modo prueba</div>
       <h2>Pagar Bs {{ moneda(venta.total) }}</h2>
 
-      <form (submit)="$event.preventDefault(); pagar()" novalidate>
-        <div class="grupo">
-          <label class="etiqueta" for="t-numero">Numero de tarjeta</label>
-          <input id="t-numero" class="campo mono" inputmode="numeric" autocomplete="cc-number" [class.invalido]="error_('numero')" [value]="numero()" (input)="numero.set($any($event.target).value)" />
-          @if (error_('numero'); as e) {
-            <p class="ayuda-error">{{ e }}</p>
+      <!-- ------------------------------------------------- elegir el metodo -->
+      @if (paso() === 'metodo') {
+        @if (errorPago()) {
+          <p class="error-servidor">{{ errorPago() }}</p>
+        }
+        <p class="nota">Elige como quieres pagar.</p>
+        <div class="metodos">
+          @for (m of metodos(); track m.valor) {
+            <button type="button" class="metodo" [disabled]="!m.disponible" (click)="elegir(m.valor)">
+              <span class="icono" aria-hidden="true">{{ m.valor === 'tarjeta' ? '💳' : '📱' }}</span>
+              <span class="texto">
+                <b>{{ m.etiqueta }}</b>
+                <small>{{ m.detalle }}</small>
+              </span>
+            </button>
+          }
+          @if (metodos().length === 0) {
+            <p class="error-servidor">No hay ningun metodo de pago disponible en este momento.</p>
           }
         </div>
-        <div class="grupo">
-          <label class="etiqueta" for="t-titular">Titular</label>
-          <input id="t-titular" class="campo" autocomplete="cc-name" [class.invalido]="error_('titular')" [value]="titular()" (input)="titular.set($any($event.target).value)" />
-          @if (error_('titular'); as e) {
-            <p class="ayuda-error">{{ e }}</p>
-          }
+        <div class="acciones">
+          <button type="button" class="btn linea" (click)="cerrarPago()">Cancelar</button>
         </div>
-        <div class="rejilla">
-          <div class="grupo">
-            <label class="etiqueta" for="t-vence">Vence (MM/AA)</label>
-            <input id="t-vence" class="campo mono" autocomplete="cc-exp" [class.invalido]="error_('vence')" [value]="vence()" (input)="vence.set($any($event.target).value)" />
-            @if (error_('vence'); as e) {
-              <p class="ayuda-error">{{ e }}</p>
-            }
-          </div>
-          <div class="grupo">
-            <label class="etiqueta" for="t-cvc">CVC</label>
-            <input id="t-cvc" class="campo mono" inputmode="numeric" autocomplete="cc-csc" [class.invalido]="error_('cvc')" [value]="cvc()" (input)="cvc.set($any($event.target).value)" />
-            @if (error_('cvc'); as e) {
-              <p class="ayuda-error">{{ e }}</p>
-            }
-          </div>
-        </div>
+      }
 
-        <label class="simular">
-          <input type="checkbox" [checked]="simularRechazo()" (change)="simularRechazo.set($any($event.target).checked)" />
-          Simular tarjeta rechazada (para probar el caso de error)
-        </label>
-        <p class="nota">Es una tarjeta de prueba de Stripe: no se cobra dinero real. El stock se descuenta al aprobarse el pago.</p>
+      <!-- ---------------------------------------------------------- tarjeta -->
+      @if (paso() === 'tarjeta') {
+        <form (submit)="$event.preventDefault(); pagar()" novalidate>
+          <div class="grupo">
+            <label class="etiqueta" for="t-numero">Numero de tarjeta</label>
+            <input id="t-numero" class="campo mono" inputmode="numeric" autocomplete="cc-number" [class.invalido]="error_('numero')" [value]="numero()" (input)="numero.set($any($event.target).value)" />
+            @if (error_('numero'); as e) {
+              <p class="ayuda-error">{{ e }}</p>
+            }
+          </div>
+          <div class="grupo">
+            <label class="etiqueta" for="t-titular">Titular</label>
+            <input id="t-titular" class="campo" autocomplete="cc-name" [class.invalido]="error_('titular')" [value]="titular()" (input)="titular.set($any($event.target).value)" />
+            @if (error_('titular'); as e) {
+              <p class="ayuda-error">{{ e }}</p>
+            }
+          </div>
+          <div class="rejilla">
+            <div class="grupo">
+              <label class="etiqueta" for="t-vence">Vence (MM/AA)</label>
+              <input id="t-vence" class="campo mono" autocomplete="cc-exp" [class.invalido]="error_('vence')" [value]="vence()" (input)="vence.set($any($event.target).value)" />
+              @if (error_('vence'); as e) {
+                <p class="ayuda-error">{{ e }}</p>
+              }
+            </div>
+            <div class="grupo">
+              <label class="etiqueta" for="t-cvc">CVC</label>
+              <input id="t-cvc" class="campo mono" inputmode="numeric" autocomplete="cc-csc" [class.invalido]="error_('cvc')" [value]="cvc()" (input)="cvc.set($any($event.target).value)" />
+              @if (error_('cvc'); as e) {
+                <p class="ayuda-error">{{ e }}</p>
+              }
+            </div>
+          </div>
+
+          <p class="nota">
+            Pasarela en modo prueba: no se mueve dinero real y solo se aceptan las tarjetas de
+            prueba de Stripe. El stock se descuenta recien cuando el pago se aprueba.
+          </p>
+
+          @if (errorPago()) {
+            <p class="error-servidor">{{ errorPago() }}</p>
+          }
+
+          <div class="acciones">
+            <button type="button" class="btn linea" [disabled]="procesando()" (click)="volverAMetodos()">Volver</button>
+            <button type="submit" class="btn rosa" [disabled]="procesando()">
+              {{ procesando() ? 'Procesando…' : 'Pagar' }}
+            </button>
+          </div>
+        </form>
+      }
+
+      <!-- --------------------------------------------------------------- QR -->
+      @if (paso() === 'qr') {
+        @if (qr(); as cobro) {
+          <div class="qr">
+            <img
+              class="qr-imagen"
+              [src]="'data:image/png;base64,' + cobro.imagen_base64"
+              alt="Codigo QR para pagar Bs {{ moneda(cobro.monto) }}"
+            />
+            <p class="qr-monto mono">Bs {{ moneda(cobro.monto) }}</p>
+            <p class="nota">Escanea el codigo con la app de tu banco. Vence a las <b>{{ horaQr(cobro.expira) }}</b>.</p>
+            @if (esperandoQr()) {
+              <p class="qr-espera"><span class="punto"></span> Esperando la confirmacion del banco…</p>
+            }
+            <p class="ceja">identificador del cobro · {{ cobro.qr_id }}</p>
+          </div>
+        } @else if (procesando()) {
+          <p class="nota">Generando el codigo QR…</p>
+        }
 
         @if (errorPago()) {
           <p class="error-servidor">{{ errorPago() }}</p>
         }
 
         <div class="acciones">
+          <button type="button" class="btn linea" [disabled]="procesando()" (click)="volverAMetodos()">Volver</button>
           <button type="button" class="btn linea" [disabled]="procesando()" (click)="cerrarPago()">Cancelar</button>
-          <button type="submit" class="btn rosa" [disabled]="procesando()">
-            {{ procesando() ? 'Procesando…' : 'Pagar' }}
-          </button>
         </div>
-      </form>
+      }
     </div>
   </div>
 }

@@ -88,6 +88,13 @@ export const MENU: GrupoMenu[] = [
         disponible: true,
       },
       { etiqueta: 'Reservas', ruta: '/admin/reservas', roles: ['administrador', 'encargado'], disponible: true },
+      {
+        etiqueta: 'Envios a domicilio',
+        ruta: '/admin/envios',
+        roles: ['administrador', 'encargado', 'cajero'],
+        permiso: 'envios:ver',
+        disponible: true,
+      },
       { etiqueta: 'Caja', ruta: '/admin/caja', roles: ['administrador', 'cajero'], disponible: true },
     ],
   },

@@ -74,6 +74,11 @@ MODULOS: dict[str, tuple[str, str, tuple[str, ...]]] = {
         "Ventas, ganancia promedio y prendas mas vendidas",
         ("VER",),
     ),
+    "ENVIOS": (
+        "Envios a domicilio",
+        "Delivery de las compras en linea: asignar repartidor y seguir el pedido",
+        ("VER", "EDITAR"),
+    ),
     "OFERTA": (
         "Oferta del proveedor",
         "Productos que un proveedor informa que puede vender (su portal)",
@@ -120,6 +125,9 @@ PERMISOS_POR_ROL: dict[str, list[str]] = {
         *_codigos("PRENDAS", "VER", "EDITAR"),
         *_codigos("INVENTARIO", "VER", "CREAR", "EDITAR", "ELIMINAR"),
         *_codigos("RESERVAS", "VER", "CREAR", "EDITAR", "ELIMINAR"),
+        # El delivery lo despacha la sucursal: el encargado asigna repartidor
+        # y va marcando el avance (CU29).
+        *_codigos("ENVIOS", "VER", "EDITAR"),
         *_codigos("REPORTES", "VER"),
     ],
     "cajero": [
@@ -128,6 +136,9 @@ PERMISOS_POR_ROL: dict[str, list[str]] = {
         *_codigos("RESERVAS", "VER", "EDITAR"),
         *_codigos("VENTAS", "VER", "CREAR", "EDITAR"),
         *_codigos("PAGOS", "VER", "CREAR"),
+        # El cajero ve los envios de su sucursal (le preguntan por mostrador),
+        # pero no los mueve de estado: eso es del encargado.
+        *_codigos("ENVIOS", "VER"),
     ],
     # El cliente no entra al panel: usa el catalogo publico, que no pide permisos.
     "cliente": [],

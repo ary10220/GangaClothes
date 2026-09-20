@@ -6,7 +6,9 @@ base que ya tiene datos (la de produccion), sin duplicar nada:
 - catalogos, prendas, variantes, promociones y oferta se buscan por nombre;
 - el stock de una variante en una sucursal solo se crea si no existia;
 - el historial de ventas y reservas se genera una unica vez (lo marca la cuenta
-  de la clienta de demostracion: si ya tiene compras, no se vuelve a generar).
+  de la clienta de demostracion: si ya tiene compras, no se vuelve a generar);
+- los envios a domicilio llevan su propia marca (si ya hay algun envio, no se
+  cargan), asi que aparecen tambien en una base que ya traia ese historial.
 
 Las cantidades salen de un generador con semilla fija: dos corridas sobre una
 base vacia dejan exactamente los mismos datos.
@@ -20,6 +22,7 @@ from decimal import Decimal
 
 from app.core.security import hash_password
 from app.models.catalogo import Categoria, Coleccion, Color, Prenda, Talla, Temporada, Variante
+from app.models.envios import Envio
 from app.models.inventario import (Compra, DetalleCompra, Inventario, MovimientoInventario,
                                    ProductoProveedor, ProductoProveedorTemporada, Proveedor)
 from app.models.sucursales import Ciudad, Sucursal
@@ -27,6 +30,7 @@ from app.models.usuarios import Cliente, Usuario
 from app.models.ventas import (DetalleReserva, DetalleVenta, Pago, Promocion, PromocionPrenda,
                                Reserva, Venta)
 from app.modules.auth.service import asignar_rol
+from app.modules.envios import tarifa
 from app.modules.promociones import service as promociones
 
 UTC = timedelta(hours=4)  # Bolivia -> UTC
@@ -134,11 +138,146 @@ PROVEEDORES = [
        "Verde militar o negra.", None)]),
 ]
 
+# Donde esta cada sucursal en el mapa (CU29). Coordenadas reales, tomadas de
+# OpenStreetMap: Santa Cruz de la Sierra y el Prado de Cochabamba. Son el punto
+# desde el que sale el delivery y desde el que se mide la distancia.
+COORDENADAS_SUCURSAL = {
+    "Central": (-17.783400, -63.182100),      # casco viejo, plaza 24 de Septiembre
+    "Norte": (-17.749800, -63.178700),        # Av. Banzer, 4to anillo
+    "Cochabamba": (-17.386800, -66.158600),   # Av. Ballivian, El Prado
+}
+
+# Envios de demostracion: tres compras en linea que se entregan a domicilio, en
+# estados distintos, para que el panel del encargado y el seguimiento del
+# cliente tengan que mostrar desde el primer minuto de la demostracion.
+# (cliente, sucursal, direccion, referencia, telefono, lat, lon, express, estado, minutos_atras)
+ENVIOS = [
+    (0, "Central", "Av. San Martin #455, Barrio Equipetrol", "Edificio Torre Azul, departamento 5B",
+     "70011223", -17.767200, -63.189700, False, "entregado", 4320),
+    (1, "Norte", "Av. Banzer, 6to anillo, Condominio Las Palmas", "Casa 14, porton blanco",
+     "71234567", -17.730500, -63.175500, True, "en_camino", 55),
+    (2, "Central", "Av. Paurito, Barrio La Cuchilla (Plan 3000)", "Al lado de la farmacia",
+     "76543210", -17.825800, -63.109400, False, "pendiente", 25),
+]
+
+REPARTIDORES = ["Marcos Pena", "Luis Gutierrez", "Fabiola Aguilera"]
+
 CLIENTES = [
     ("Sofia", "Rojas", "sofia@gangaclothes.com", "Cliente#2026", "7654321 SC", "M"),
     ("Diego", "Mendoza", "diego@gangaclothes.com", "Cliente#2026", "8123456 SC", "L"),
     ("Valeria", "Suarez", "valeria@gangaclothes.com", "Cliente#2026", "6987452 CB", "S"),
 ]
+
+
+def envios_demo(db, rnd, sucursales, clientes, prendas) -> int:
+    """Tres compras en linea entregadas a domicilio, en estados distintos (CU29).
+
+    Van aparte del resto del historial y con su propia marca (si ya hay algun
+    envio, no hace nada) para que tambien se carguen sobre una base que ya traia
+    ventas de un ciclo anterior, que es el caso de la de produccion.
+
+    El costo sale de la misma tarifa que usa el checkout: nada se calcula a
+    mano para la demostracion.
+    """
+    if db.query(Envio).first():
+        return 0
+
+    ultimo = (db.query(Venta.nro_comprobante).filter(Venta.nro_comprobante.isnot(None))
+              .order_by(Venta.nro_comprobante.desc()).first())
+    nro = int(ultimo[0].split("-")[1]) if ultimo else 0
+    promos = db.query(Promocion).all()
+    alcance = {}
+    for pp in db.query(PromocionPrenda).all():
+        alcance.setdefault(pp.prenda_id, []).append(pp.promocion_id)
+
+    ids_prendas = [p.id for p in prendas.values()]
+    ahora = datetime.utcnow().replace(second=0, microsecond=0)
+    creados = 0
+
+    for i, (icliente, clave, direccion, referencia, telefono,
+            lat, lon, express, estado, atras) in enumerate(ENVIOS):
+        sucursal = sucursales[clave]
+        candidatos = (
+            db.query(Inventario, Variante, Prenda)
+            .join(Variante, Variante.id == Inventario.variante_id)
+            .join(Prenda, Prenda.id == Variante.prenda_id)
+            .filter(Inventario.sucursal_id == sucursal.id, Prenda.id.in_(ids_prendas),
+                    Inventario.cantidad - Inventario.cantidad_reservada > 2)
+            .order_by(Inventario.id).all()
+        )
+        if not candidatos:
+            continue
+
+        momento = ahora - timedelta(minutes=atras)
+        dia = (momento - UTC).date()          # el dia en Bolivia, para las promociones
+        nro += 1
+        numero = f"C-{nro:06d}"
+
+        venta = Venta(cliente_id=clientes[icliente].id, sucursal_id=sucursal.id,
+                      canal="web" if i % 2 == 0 else "movil", fecha=momento, estado="pagada",
+                      tipo_entrega="delivery", subtotal=0, descuento=0, costo_envio=0, total=0,
+                      nro_comprobante=numero)
+        db.add(venta)
+        db.flush()
+
+        bruto, rebaja = Decimal("0"), Decimal("0")
+        for inv, variante, prenda in rnd.sample(candidatos, k=min(len(candidatos), 2)):
+            cantidad = rnd.choice([1, 1, 2])
+            vigentes = [pr for pr in promos if pr.id in alcance.get(prenda.id, [])
+                        and pr.activo is not False and pr.fecha_inicio <= dia <= pr.fecha_fin]
+            calculo = promociones.aplicar(prenda.precio_venta, vigentes)
+            importe = (calculo["precio_lista"] * cantidad).quantize(CENTAVO)
+            descuento = (calculo["descuento"] * cantidad).quantize(CENTAVO)
+            db.add(DetalleVenta(venta_id=venta.id, variante_id=variante.id, cantidad=cantidad,
+                                precio_unitario=calculo["precio_lista"], descuento=descuento,
+                                subtotal=importe - descuento,
+                                promocion_id=calculo["promocion"].id if calculo["promocion"] else None))
+            inv.cantidad -= cantidad
+            bruto += importe
+            rebaja += descuento
+            db.add(MovimientoInventario(variante_id=variante.id, sucursal_id=inv.sucursal_id,
+                                        usuario_id=None, tipo="salida", cantidad=cantidad,
+                                        fecha=momento, motivo=f"Venta #{venta.id} ({numero})"))
+
+        mercaderia = bruto - rebaja
+        distancia = tarifa.distancia_km(sucursal.latitud, sucursal.longitud, lat, lon)
+        cotizacion = tarifa.cotizar(distancia, mercaderia, express)
+        costo = Decimal(str(cotizacion["costo_envio"]))
+        minutos = cotizacion["minutos_estimados"]
+
+        venta.subtotal, venta.descuento = bruto, rebaja
+        venta.costo_envio = costo
+        venta.total = mercaderia + costo      # total = subtotal - descuento + envio
+        # Se alternan los dos metodos de la tienda en linea para que la
+        # demostracion muestre tanto un cobro con tarjeta como uno con QR.
+        if i % 2 == 0:
+            metodo, pasarela = "tarjeta", "stripe"
+            referencia = f"pi_test_{rnd.getrandbits(96):024x}"
+        else:
+            metodo, pasarela = "qr", "bcp_qr"
+            referencia = f"SIM{rnd.getrandbits(40):010X}"
+        db.add(Pago(venta_id=venta.id, metodo=metodo, pasarela=pasarela, monto=venta.total,
+                    moneda="BOB", estado="exitoso", fecha=momento, referencia_externa=referencia))
+
+        envio = Envio(venta_id=venta.id, direccion=direccion, latitud=lat, longitud=lon,
+                      referencia=referencia, telefono_contacto=telefono,
+                      distancia_km=Decimal(str(cotizacion["distancia_km"])), costo_envio=costo,
+                      express=express, estado=estado, fecha_creacion=momento,
+                      fecha_estimada=momento + timedelta(minutes=minutos))
+        # Cada estado deja atras la hora de los pasos que ya ocurrieron: de ahi
+        # sale la linea de tiempo del seguimiento.
+        if estado in ("asignado", "en_camino", "entregado"):
+            envio.repartidor = REPARTIDORES[i % len(REPARTIDORES)]
+            envio.fecha_asignacion = momento + timedelta(minutes=10)
+        if estado in ("en_camino", "entregado"):
+            envio.fecha_salida = momento + timedelta(minutes=max(minutos // 2, 15))
+        if estado == "entregado":
+            envio.fecha_entrega = momento + timedelta(minutes=minutos + 6)
+        db.add(envio)
+        creados += 1
+
+    db.flush()
+    return creados
 
 
 def cargar(db, get_or_create) -> dict:
@@ -161,6 +300,12 @@ def cargar(db, get_or_create) -> dict:
             "ciudad_id": cbba.id, "direccion": "Av. Ballivian (El Prado) #540", "telefono": "4-4251100",
             "horario": "Lun-Sab 9:30-20:30"}),
     }
+
+    # Las sucursales del seed anterior no tenian punto en el mapa: sin el, la
+    # tienda no puede calcular la distancia y solo ofrece retiro en sucursal.
+    for clave, sucursal in sucursales.items():
+        if sucursal.latitud is None or sucursal.longitud is None:
+            sucursal.latitud, sucursal.longitud = COORDENADAS_SUCURSAL[clave]
 
     # ------------------------------------------------------ catalogos base
     tallas = [get_or_create(Talla, nombre=n, defaults={"orden": i})
@@ -270,9 +415,18 @@ def cargar(db, get_or_create) -> dict:
                                       defaults={"nit_ci": ci, "talla_preferida": talla}))
     db.flush()
 
-    resumen = {"prendas": len(prendas), "stock_nuevo": stock_nuevo, "ventas": 0, "reservas": 0}
+    resumen = {"prendas": len(prendas), "stock_nuevo": stock_nuevo, "ventas": 0,
+               "reservas": 0, "envios": 0}
+    # Los envios de demostracion llevan su propia marca (ver `envios_demo`), asi
+    # que se cargan igual sobre una base recien creada que sobre una que ya
+    # traia el historial de ventas de otro ciclo, como la de produccion.
+    def con_envios() -> dict:
+        resumen["envios"] = envios_demo(db, rnd, sucursales, clientes, prendas)
+        resumen["ventas"] += resumen["envios"]
+        return resumen
+
     if db.query(Venta).filter(Venta.cliente_id == clientes[0].id).first():
-        return resumen  # el historial ya se genero en una corrida anterior
+        return con_envios()  # el historial ya se genero en una corrida anterior
 
     # ------------------------------------------------- historial de ventas
     ultimo = db.query(Venta.nro_comprobante).filter(Venta.nro_comprobante.isnot(None)) \
@@ -413,4 +567,4 @@ def cargar(db, get_or_create) -> dict:
                                         cantidad=sobra, motivo="Prendas con falla retiradas de exhibicion",
                                         fecha=datetime.utcnow() - timedelta(days=3)))
     db.flush()
-    return resumen
+    return con_envios()

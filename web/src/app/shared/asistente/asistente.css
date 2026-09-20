@@ -1,0 +1,264 @@
+/* Asistente de GangaClothes (CU28). Flota sobre cualquier pantalla. */
+
+.burbuja {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 60;
+  width: 54px;
+  height: 54px;
+  border: none;
+  border-radius: 50%;
+  background: var(--ganga);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 22%);
+  transition: transform 0.15s;
+}
+.burbuja:hover {
+  transform: scale(1.06);
+}
+.burbuja.activa {
+  background: var(--tinta);
+}
+
+.asistente {
+  position: fixed;
+  right: 22px;
+  bottom: 88px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(400px, calc(100vw - 32px));
+  height: min(560px, calc(100vh - 140px));
+  overflow: hidden;
+  background: var(--papel);
+  border: 1.5px solid var(--tinta);
+  border-radius: 14px;
+  box-shadow: 0 14px 44px rgb(0 0 0 / 26%);
+}
+
+.asistente header {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #fff;
+  border-bottom: 1.5px solid var(--linea);
+}
+.asistente header b {
+  display: block;
+  color: var(--ganga);
+  font-size: 14px;
+}
+.asistente header small {
+  color: var(--gris);
+  font-size: 11.5px;
+}
+.acciones-cabecera {
+  display: flex;
+  gap: 4px;
+}
+.icono {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--gris);
+  cursor: pointer;
+  font-size: 14px;
+}
+.icono:hover {
+  background: var(--suave);
+  color: var(--tinta);
+}
+
+/* ------------------------------------------------------- conversacion */
+.conversacion {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bienvenida p {
+  color: var(--gris);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.sugerencias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.chip {
+  padding: 7px 11px;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 999px;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip:hover {
+  border-color: var(--ganga);
+  color: var(--ganga);
+}
+
+.turno {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  max-width: 88%;
+}
+.turno.mio {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.globo {
+  padding: 9px 13px;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-radius: 12px 12px 12px 3px;
+  font-size: 13px;
+  line-height: 1.5;
+  /* El backend responde con saltos de linea cuando lista prendas. */
+  white-space: pre-wrap;
+}
+.turno.mio .globo {
+  background: var(--ganga);
+  border-color: var(--ganga);
+  border-radius: 12px 12px 3px;
+  color: #fff;
+}
+
+/* Tres puntos mientras piensa: evita la sensacion de que se colgo. */
+.globo.pensando {
+  display: flex;
+  gap: 4px;
+  padding: 13px;
+}
+.globo.pensando span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gris);
+  animation: latir 1.2s ease-in-out infinite;
+}
+.globo.pensando span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.globo.pensando span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes latir {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .globo.pensando span { animation: none; opacity: 0.6; }
+}
+
+/* --------------------------------------------------------- prendas */
+.prendas {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+.prenda {
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  background: #fff;
+  border: 1.5px solid var(--linea);
+  border-left: 4px solid var(--ganga);
+  border-radius: 9px;
+  font-size: 12.5px;
+}
+.prenda .precio {
+  font-weight: 700;
+}
+.prenda small {
+  color: var(--gris);
+  font-size: 11px;
+}
+.prenda .motivo {
+  font-style: italic;
+}
+.prenda .estado {
+  justify-self: start;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+}
+.prenda .estado.rosa {
+  background: color-mix(in srgb, var(--ganga) 14%, #fff);
+  color: var(--ganga);
+}
+
+/* De donde salio la respuesta */
+.fuente {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--gris);
+  font: inherit;
+  font-size: 10.5px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+.fuente-detalle {
+  color: var(--gris);
+  font-size: 10.5px;
+  font-family: var(--mono);
+}
+
+.error-servidor {
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------ envio */
+.asistente form {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  border-top: 1.5px solid var(--linea);
+}
+.asistente form .campo {
+  flex: 1;
+  font-size: 13px;
+}
+.enviar {
+  width: 38px;
+  border: 1.5px solid var(--ganga);
+  border-radius: 9px;
+  background: var(--ganga);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+.enviar:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .asistente {
+    right: 12px;
+    left: 12px;
+    bottom: 80px;
+    width: auto;
+    height: min(70vh, calc(100vh - 120px));
+  }
+}

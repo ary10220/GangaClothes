@@ -80,4 +80,5 @@ print("  proveedor@gangaclothes.com  / Proveedor123  (proveedor: Textiles Andino
 print("  oriente@gangaclothes.com    / Proveedor123  (proveedor: Confecciones Oriente)")
 print(f"  {len(cat.todos_los_codigos())} permisos en {len(cat.MODULOS)} modulos")
 print(f"  {resumen['prendas']} prendas, {resumen['stock_nuevo']} registros de stock nuevos, "
-      f"{resumen['ventas']} ventas y {resumen['reservas']} reservas de historial")
+      f"{resumen['ventas']} ventas, {resumen['reservas']} reservas y "
+      f"{resumen['envios']} envios a domicilio de historial")

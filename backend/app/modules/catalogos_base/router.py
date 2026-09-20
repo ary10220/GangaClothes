@@ -25,9 +25,12 @@ router.include_router(crud_router(Coleccion, "coleccion", {
 router.include_router(crud_router(Ciudad, "ciudad", {
     "nombre": (str, ...), "departamento": (str | None, None)},
     modulo="SUCURSALES"), prefix="/ciudades")
+# latitud/longitud: el punto del mapa desde el que sale el delivery (CU29).
+# Sin ellas la sucursal funciona igual, pero solo ofrece retiro en sucursal.
 router.include_router(crud_router(Sucursal, "sucursal", {
     "ciudad_id": (int, ...), "nombre": (str, ...), "direccion": (str | None, None),
-    "telefono": (str | None, None), "horario": (str | None, None)},
+    "telefono": (str | None, None), "horario": (str | None, None),
+    "latitud": (float | None, None), "longitud": (float | None, None)},
     modulo="SUCURSALES"), prefix="/sucursales")
 router.include_router(crud_router(Proveedor, "proveedor", {
     "nombre": (str, ...), "nit": (str | None, None), "contacto": (str | None, None),

@@ -34,6 +34,10 @@ interface CompraCliente {
   unidades: number;
   subtotal: number;
   descuento: number;
+  /** CU29: "sucursal" (retiro) o "delivery"; y lo que se cobro por llevarla. */
+  tipo_entrega: 'sucursal' | 'delivery';
+  costo_envio: number;
+  envio: { id: number; estado: string; direccion: string } | null;
   total: number;
   nro_comprobante: string | null;
   detalle: DetalleCompra[];
