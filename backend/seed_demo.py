@@ -150,14 +150,22 @@ COORDENADAS_SUCURSAL = {
 # Envios de demostracion: tres compras en linea que se entregan a domicilio, en
 # estados distintos, para que el panel del encargado y el seguimiento del
 # cliente tengan que mostrar desde el primer minuto de la demostracion.
-# (cliente, sucursal, direccion, referencia, telefono, lat, lon, express, estado, minutos_atras)
+#
+# `gratis` dice que cara de la tarifa muestra cada uno. Con prendas al azar los
+# tres podrian pasar el minimo de envio gratis (paso en produccion, donde el
+# orden del inventario es otro) y entonces ninguna fila mostraria un costo de
+# reparto cobrado, que es justo lo que hay que poder explicar.
+# (cliente, sucursal, direccion, referencia, telefono, lat, lon, express, estado, minutos_atras, gratis)
 ENVIOS = [
+    # Compra grande: cruza el minimo y el envio lo pone la tienda.
     (0, "Central", "Av. San Martin #455, Barrio Equipetrol", "Edificio Torre Azul, departamento 5B",
-     "70011223", -17.767200, -63.189700, False, "entregado", 4320),
+     "70011223", -17.767200, -63.189700, False, "entregado", 4320, True),
+    # Compra chica y express: se ve el recargo por urgencia.
     (1, "Norte", "Av. Banzer, 6to anillo, Condominio Las Palmas", "Casa 14, porton blanco",
-     "71234567", -17.730500, -63.175500, True, "en_camino", 55),
+     "71234567", -17.730500, -63.175500, True, "en_camino", 55, False),
+    # Compra chica y lejos: se ve cuanto pesa el costo por kilometro.
     (2, "Central", "Av. Paurito, Barrio La Cuchilla (Plan 3000)", "Al lado de la farmacia",
-     "76543210", -17.825800, -63.109400, False, "pendiente", 25),
+     "76543210", -17.825800, -63.109400, False, "pendiente", 25, False),
 ]
 
 REPARTIDORES = ["Marcos Pena", "Luis Gutierrez", "Fabiola Aguilera"]
@@ -195,7 +203,7 @@ def envios_demo(db, rnd, sucursales, clientes, prendas) -> int:
     creados = 0
 
     for i, (icliente, clave, direccion, referencia, telefono,
-            lat, lon, express, estado, atras) in enumerate(ENVIOS):
+            lat, lon, express, estado, atras, gratis) in enumerate(ENVIOS):
         sucursal = sucursales[clave]
         candidatos = (
             db.query(Inventario, Variante, Prenda)
@@ -220,12 +228,29 @@ def envios_demo(db, rnd, sucursales, clientes, prendas) -> int:
         db.add(venta)
         db.flush()
 
-        bruto, rebaja = Decimal("0"), Decimal("0")
-        for inv, variante, prenda in rnd.sample(candidatos, k=min(len(candidatos), 2)):
-            cantidad = rnd.choice([1, 1, 2])
+        def precio_con_promocion(prenda):
             vigentes = [pr for pr in promos if pr.id in alcance.get(prenda.id, [])
                         and pr.activo is not False and pr.fecha_inicio <= dia <= pr.fecha_fin]
-            calculo = promociones.aplicar(prenda.precio_venta, vigentes)
+            return promociones.aplicar(prenda.precio_venta, vigentes)
+
+        # Las prendas no se eligen al azar: se eligen para que el envio salga
+        # gratis o cobrado, segun lo que ese pedido tiene que mostrar.
+        por_precio = sorted(candidatos, key=lambda f: float(f[2].precio_venta))
+        if gratis:
+            # De las mas caras hacia abajo, hasta cruzar el minimo de envio gratis.
+            seleccion, neto = [], Decimal("0")
+            for fila in reversed(por_precio):
+                seleccion.append((fila, 1))
+                neto += precio_con_promocion(fila[2])["precio_final"]
+                if neto >= tarifa.ENVIO_GRATIS_DESDE:
+                    break
+        else:
+            # Una sola prenda de las baratas: no llega al minimo y paga el envio.
+            seleccion = [(por_precio[0], 1)]
+
+        bruto, rebaja = Decimal("0"), Decimal("0")
+        for (inv, variante, prenda), cantidad in seleccion:
+            calculo = precio_con_promocion(prenda)
             importe = (calculo["precio_lista"] * cantidad).quantize(CENTAVO)
             descuento = (calculo["descuento"] * cantidad).quantize(CENTAVO)
             db.add(DetalleVenta(venta_id=venta.id, variante_id=variante.id, cantidad=cantidad,
