@@ -9,6 +9,7 @@ import 'catalog_detail_controller.dart';
 import 'catalog_detail_models.dart';
 import 'catalog_detail_service.dart';
 import 'catalog_models.dart';
+import '../ai/ai_service.dart';
 
 class CatalogDetailSheet extends StatefulWidget {
   const CatalogDetailSheet({
@@ -18,6 +19,7 @@ class CatalogDetailSheet extends StatefulWidget {
     this.preferredBranchId,
     this.session,
     this.onAvailabilityChanged,
+    this.aiEventSink,
     super.key,
   });
 
@@ -27,6 +29,7 @@ class CatalogDetailSheet extends StatefulWidget {
   final int? preferredBranchId;
   final Session? session;
   final VoidCallback? onAvailabilityChanged;
+  final AiEventSink? aiEventSink;
 
   @override
   State<CatalogDetailSheet> createState() => _CatalogDetailSheetState();
@@ -43,6 +46,7 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
       branches: widget.branches,
       api: widget.actionService,
       preferredBranchId: widget.preferredBranchId,
+      aiEventSink: widget.aiEventSink,
     )..addListener(_onChanged);
   }
 
@@ -370,13 +374,15 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
                 key: ValueKey(_controller.branchId),
                 initialValue: _controller.branchId,
                 decoration: const InputDecoration(labelText: 'Sucursal'),
+                isExpanded: true,
+                selectedItemBuilder: (context) => _controller.branchesWithStock
+                    .map(_buildBranchLabel)
+                    .toList(),
                 items: _controller.branchesWithStock
                     .map(
-                      (row) => DropdownMenuItem(
+                      (row) => DropdownMenuItem<int>(
                         value: row.branchId,
-                        child: Text(
-                          '${row.branchName} (${row.available} disp.)',
-                        ),
+                        child: _buildBranchLabel(row),
                       ),
                     )
                     .toList(),
@@ -394,6 +400,12 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
           ],
         ),
     ],
+  );
+
+  Widget _buildBranchLabel(Availability row) => Text(
+    '${row.branchName} (${row.available} disp.)',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
   );
 
   Widget _buildReservationForm() => Column(

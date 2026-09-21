@@ -57,6 +57,8 @@ void main() {
       AppRoutes.catalog,
     );
     expect(AppRoutes.destinationFor(AppRoutes.cart, staff), AppRoutes.catalog);
+    expect(AppRoutes.destinationFor('ai', session), AppRoutes.catalog);
+    expect(AppRoutes.safeReturnTo('ai'), isNull);
     expect(
       AppRoutes.destinationFor(AppRoutes.purchaseHistory, staff),
       AppRoutes.catalog,
@@ -70,6 +72,27 @@ void main() {
       AppRoutes.cartPayment,
     );
   });
+
+  test(
+    'shows the assistant affordance only outside auth and for customers',
+    () {
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.catalog, null), isTrue);
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.catalog, session), isTrue);
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.login, session), isFalse);
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.register, null), isFalse);
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.recovery, null), isFalse);
+      const staff = Session(
+        accessToken: 'token',
+        user: User(
+          id: 2,
+          name: 'Encargado',
+          email: 'staff@example.com',
+          roles: ['encargado'],
+        ),
+      );
+      expect(AppRoutes.shouldShowAssistant(AppRoutes.catalog, staff), isFalse);
+    },
+  );
 
   test('accepts only known internal return destinations', () {
     expect(AppRoutes.safeReturnTo('/cart'), AppRoutes.cart);

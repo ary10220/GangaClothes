@@ -195,6 +195,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Mis reservas'), findsOneWidget);
       expect(find.text('Carrito'), findsOneWidget);
+      expect(find.text('Asistente'), findsNothing);
       expect(find.text('Iniciar sesión'), findsNothing);
     },
   );
@@ -228,6 +229,77 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Iniciar sesión'), findsNWidgets(2));
+  });
+
+  testWidgets('ellipsizes long branch labels on a narrow detail sheet', (
+    tester,
+  ) async {
+    const longBranchName =
+        'Sucursal con un nombre suficientemente largo para desbordar';
+    final product = Product(
+      id: 1,
+      name: 'Camisa Oxford',
+      description: null,
+      brand: 'Ganga',
+      salePrice: 100,
+      finalPrice: 100,
+      imageUrl: null,
+      categoryId: 1,
+      collectionId: null,
+      availableTotal: 3,
+      variants: const [
+        Variant(
+          id: 1,
+          sku: 'SKU-1',
+          sizeId: 1,
+          sizeName: 'M',
+          colorId: 1,
+          colorName: 'Azul',
+          colorHex: '#112233',
+          imageUrl: null,
+          availableTotal: 3,
+          availability: [
+            Availability(branchId: 1, branchName: longBranchName, available: 3),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(280, 700)),
+        child: _host(
+          Scaffold(
+            body: CatalogDetailSheet(
+              product: product,
+              branches: const [],
+              actionService: _FakeDetailApi(),
+              session: const Session(
+                accessToken: 'token',
+                user: User(
+                  id: 1,
+                  name: 'Ada',
+                  email: 'ada@example.com',
+                  roles: ['cliente'],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.maxLines == 1 &&
+            widget.overflow == TextOverflow.ellipsis,
+      ),
+      findsWidgets,
+    );
   });
 }
 

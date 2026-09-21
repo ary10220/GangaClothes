@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/routes.dart';
@@ -15,6 +17,7 @@ import 'catalog_detail_service.dart';
 import 'catalog_detail_sheet.dart';
 import 'catalog_models.dart';
 import 'catalog_service.dart';
+import '../ai/ai_service.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({
@@ -25,6 +28,7 @@ class CatalogScreen extends StatefulWidget {
     this.preferenceStore,
     this.session,
     this.onLogout,
+    this.aiEventSink,
     super.key,
   });
 
@@ -35,6 +39,7 @@ class CatalogScreen extends StatefulWidget {
   final BranchPreferenceStore? preferenceStore;
   final Session? session;
   final VoidCallback? onLogout;
+  final AiEventSink? aiEventSink;
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -56,7 +61,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
         widget.preferenceStore ??
         widget.preferencesStorage ??
         (throw StateError('Catalog preferences are required'));
-    _controller = CatalogController(api: source, preferences: preferences);
+    _controller = CatalogController(
+      api: source,
+      preferences: preferences,
+      aiEventSink: widget.aiEventSink == null
+          ? null
+          : BestEffortAiEventSink(widget.aiEventSink!),
+    );
     _searchController = TextEditingController();
     _controller.addListener(_onControllerChanged);
     _controller.load();
@@ -372,6 +383,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   void _showDetail(BuildContext context, Product product) {
+    final eventSink = widget.aiEventSink;
+    if (eventSink != null) {
+      unawaited(
+        _bestEffortEvent(eventSink, productId: product.id, eventType: 'vista'),
+      );
+    }
     final actionService =
         widget.detailService ??
         (widget.apiClient == null
@@ -391,9 +408,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
         actionService: actionService,
         preferredBranchId: _controller.filters.branchId,
         session: widget.session,
+        aiEventSink: widget.aiEventSink,
         onAvailabilityChanged: _controller.retry,
       ),
     );
+  }
+
+  Future<void> _bestEffortEvent(
+    AiEventSink sink, {
+    required int productId,
+    required String eventType,
+  }) async {
+    try {
+      await sink.reportProductEvent(productId: productId, eventType: eventType);
+    } catch (_) {
+      // Analytics failures must not affect catalog interactions.
+    }
   }
 }
 

@@ -7,6 +7,8 @@ import '../features/auth/login/login_screen.dart';
 import '../features/auth/recovery/recovery_screen.dart';
 import '../features/auth/register/register_screen.dart';
 import '../features/auth/session_model.dart';
+import '../features/ai/ai_service.dart';
+import '../features/ai/assistant_modal_overlay.dart';
 import '../features/catalog/catalog_screen.dart';
 import '../features/cart/cart_screen.dart';
 import '../features/purchase_history/purchase_history_screen.dart';
@@ -40,7 +42,6 @@ abstract final class AppRoutes {
   static const shipmentTracking = 'shipment-tracking';
   static const cart = 'cart';
   static const cartPayment = 'cart/payment';
-
   static const _known = {
     login,
     register,
@@ -112,6 +113,11 @@ abstract final class AppRoutes {
     return _known.contains(route) ? route : catalog;
   }
 
+  static bool shouldShowAssistant(String route, Session? session) {
+    if ({login, register, recovery}.contains(route)) return false;
+    return session == null || session.user.roles.contains('cliente');
+  }
+
   static Route<dynamic> onGenerateRoute(
     RouteSettings settings,
     Session? session, {
@@ -162,6 +168,7 @@ abstract final class AppRoutes {
           apiClient: apiClient,
           preferencesStorage: preferencesStorage,
           session: session,
+          aiEventSink: BestEffortAiEventSink(AiService(apiClient)),
           onLogout: onLogout,
         );
       case reservations:
@@ -225,7 +232,14 @@ abstract final class AppRoutes {
 
     return MaterialPageRoute<void>(
       settings: RouteSettings(name: destination, arguments: settings.arguments),
-      builder: (_) => page,
+      builder: (_) => AssistantModalOverlay(
+        apiClient: apiClient,
+        preferencesStorage: preferencesStorage,
+        session: session,
+        loginArguments: AuthRouteArguments(returnTo: destination),
+        showAssistant: shouldShowAssistant(destination, session),
+        child: page,
+      ),
     );
   }
 
