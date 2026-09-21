@@ -1,5 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_error.dart';
+import '../delivery/delivery_models.dart';
+import '../delivery/delivery_service.dart';
 import 'cart_models.dart';
 
 abstract interface class CartDataSource {
@@ -15,17 +17,25 @@ abstract interface class CartDataSource {
 
   Future<Cart> confirmCart();
 
+  Future<List<PaymentMethod>> fetchPaymentMethods();
+
   Future<PaymentResult> pay({
     required int saleId,
     required double amount,
-    required bool simulateFailure,
+    required String cardNumber,
   });
+
+  Future<QrPayment> createQr({required int saleId});
+
+  Future<QrPayment> pollQr({required int saleId, required String qrId});
 }
 
-class CartService implements CartDataSource {
+class CartService implements CartDataSource, DeliveryDataSource {
   const CartService(this.apiClient);
 
   final ApiClient apiClient;
+
+  DeliveryService get _deliveryService => DeliveryService(apiClient);
 
   @override
   Future<Cart?> fetchCart() async {
@@ -79,23 +89,74 @@ class CartService implements CartDataSource {
   );
 
   @override
+  Future<List<PaymentMethod>> fetchPaymentMethods() async {
+    final response = await apiClient.request<Object?>(
+      '/pagos/metodos',
+      queryParameters: const {'canal': 'movil'},
+    );
+    final data = _map(response.data)['metodos'];
+    if (data is! List) {
+      throw const FormatException('Payment method response is not a list');
+    }
+    return data
+        .whereType<Map>()
+        .map((item) => PaymentMethod.fromJson(Map<String, dynamic>.from(item)))
+        .toList(growable: false);
+  }
+
+  @override
   Future<PaymentResult> pay({
     required int saleId,
     required double amount,
-    required bool simulateFailure,
+    required String cardNumber,
   }) async {
     final response = await apiClient.request<Object?>(
       '/pagos',
       method: 'POST',
       data: {
         'venta_id': saleId,
-        'metodo': 'pasarela',
+        'metodo': 'tarjeta',
         'monto': amount,
-        'simular_fallo': simulateFailure,
+        'numero_tarjeta': cardNumber,
       },
     );
     return PaymentResult.fromJson(_map(response.data));
   }
+
+  @override
+  Future<QrPayment> createQr({required int saleId}) async {
+    final response = await apiClient.request<Object?>(
+      '/pagos/qr',
+      method: 'POST',
+      data: {'venta_id': saleId},
+    );
+    return QrPayment.fromJson(_map(response.data));
+  }
+
+  @override
+  Future<QrPayment> pollQr({required int saleId, required String qrId}) async {
+    final response = await apiClient.request<Object?>(
+      '/pagos/qr/$qrId',
+      queryParameters: {'venta_id': saleId},
+    );
+    return QrPayment.fromJson(_map(response.data));
+  }
+
+  @override
+  Future<DeliveryTariff> fetchDeliveryTariff() =>
+      _deliveryService.fetchDeliveryTariff();
+
+  @override
+  Future<DeliveryQuote> quoteDelivery(DeliveryQuoteInput input) =>
+      _deliveryService.quoteDelivery(input);
+
+  @override
+  Future<DeliveryResponse> createDelivery(DeliveryInput input) =>
+      _deliveryService.createDelivery(input);
+
+  @override
+  Future<Cart> removeDelivery(int shipmentId) =>
+      _deliveryService.removeDelivery(shipmentId);
 
   Future<Cart> _cartRequest(
     String path, {

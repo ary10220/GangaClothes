@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/routes.dart';
@@ -15,6 +17,7 @@ import 'catalog_detail_service.dart';
 import 'catalog_detail_sheet.dart';
 import 'catalog_models.dart';
 import 'catalog_service.dart';
+import '../ai/ai_service.dart';
 
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({
@@ -25,6 +28,7 @@ class CatalogScreen extends StatefulWidget {
     this.preferenceStore,
     this.session,
     this.onLogout,
+    this.aiEventSink,
     super.key,
   });
 
@@ -35,6 +39,7 @@ class CatalogScreen extends StatefulWidget {
   final BranchPreferenceStore? preferenceStore;
   final Session? session;
   final VoidCallback? onLogout;
+  final AiEventSink? aiEventSink;
 
   @override
   State<CatalogScreen> createState() => _CatalogScreenState();
@@ -56,7 +61,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
         widget.preferenceStore ??
         widget.preferencesStorage ??
         (throw StateError('Catalog preferences are required'));
-    _controller = CatalogController(api: source, preferences: preferences);
+    _controller = CatalogController(
+      api: source,
+      preferences: preferences,
+      aiEventSink: widget.aiEventSink == null
+          ? null
+          : BestEffortAiEventSink(widget.aiEventSink!),
+    );
     _searchController = TextEditingController();
     _controller.addListener(_onControllerChanged);
     _controller.load();
@@ -116,6 +127,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
           label: 'Mis compras',
           onPressed: () =>
               Navigator.of(context).pushNamed(AppRoutes.purchaseHistory),
+        ),
+      if (isCustomer)
+        GcAppBarDestination(
+          label: 'Seguimiento',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.shipmentTracking),
         ),
       if (isCustomer)
         GcAppBarDestination(
@@ -366,6 +383,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   void _showDetail(BuildContext context, Product product) {
+    final eventSink = widget.aiEventSink;
+    if (eventSink != null) {
+      unawaited(
+        _bestEffortEvent(eventSink, productId: product.id, eventType: 'vista'),
+      );
+    }
     final actionService =
         widget.detailService ??
         (widget.apiClient == null
@@ -385,9 +408,22 @@ class _CatalogScreenState extends State<CatalogScreen> {
         actionService: actionService,
         preferredBranchId: _controller.filters.branchId,
         session: widget.session,
+        aiEventSink: widget.aiEventSink,
         onAvailabilityChanged: _controller.retry,
       ),
     );
+  }
+
+  Future<void> _bestEffortEvent(
+    AiEventSink sink, {
+    required int productId,
+    required String eventType,
+  }) async {
+    try {
+      await sink.reportProductEvent(productId: productId, eventType: eventType);
+    } catch (_) {
+      // Analytics failures must not affect catalog interactions.
+    }
   }
 }
 
@@ -439,10 +475,7 @@ class CatalogProductCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 3),
-                  Text(
-                    'Bs ${formatBolivianos(product.salePrice)}',
-                    style: GangaTextStyles.money,
-                  ),
+                  _CatalogPrice(product),
                   const SizedBox(height: 2),
                   Text(
                     availabilityText(product, branchName: branchName),
@@ -492,28 +525,104 @@ class _ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final image = product.imageUrl?.trim();
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFECECE5),
-      child: image == null || image.isEmpty
-          ? const Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                size: 52,
-                color: GangaColors.missingImage,
-              ),
-            )
-          : Image.network(
-              image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const Center(
-                child: Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 52,
-                  color: GangaColors.missingImage,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          width: double.infinity,
+          color: const Color(0xFFECECE5),
+          child: image == null || image.isEmpty
+              ? const Center(
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 52,
+                    color: GangaColors.missingImage,
+                  ),
+                )
+              : Image.network(
+                  image,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 52,
+                      color: GangaColors.missingImage,
+                    ),
+                  ),
                 ),
-              ),
+        ),
+        if (product.promotion != null)
+          Positioned(
+            top: 9,
+            left: 9,
+            child: _PromotionBadge(product.promotion!),
+          ),
+      ],
+    );
+  }
+}
+
+class _CatalogPrice extends StatelessWidget {
+  const _CatalogPrice(this.product);
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final promotion = product.promotion;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Bs ${formatBolivianos(product.finalPrice)}',
+          style: GangaTextStyles.money.copyWith(
+            color: promotion == null ? null : GangaColors.success,
+          ),
+        ),
+        if (promotion != null)
+          Text(
+            'Bs ${formatBolivianos(product.salePrice)}',
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: GangaColors.gray,
+              decoration: TextDecoration.lineThrough,
             ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PromotionBadge extends StatelessWidget {
+  const _PromotionBadge(this.promotion);
+
+  final CatalogPromotion promotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = promotion.label?.trim();
+    final name = promotion.name?.trim();
+    final text = label?.isNotEmpty == true
+        ? label!
+        : name?.isNotEmpty == true
+        ? name!
+        : 'Oferta';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GangaColors.alert,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: GangaColors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
     );
   }
 }

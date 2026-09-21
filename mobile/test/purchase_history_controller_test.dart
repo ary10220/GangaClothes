@@ -26,6 +26,35 @@ void main() {
     expect(controller.error?.message, 'No se pudo cargar el historial.');
     expect(controller.purchases, isEmpty);
   });
+
+  test('loads a JSON receipt through the existing controller', () async {
+    final controller = PurchaseHistoryController(
+      api: _FakePurchaseSource(),
+      receiptApi: _FakeReceiptSource(),
+    );
+
+    final receipt = await controller.loadReceipt(1);
+
+    expect(receipt?.receiptNumber, 'FAC-1');
+    expect(controller.receiptError, isNull);
+    expect(controller.receiptPurchaseId, 1);
+  });
+
+  test('normalizes a receipt error for the customer action', () async {
+    final controller = PurchaseHistoryController(
+      api: _FakePurchaseSource(),
+      receiptApi: _FakeReceiptSource()..failure = true,
+    );
+
+    final receipt = await controller.loadReceipt(1);
+
+    expect(receipt, isNull);
+    expect(
+      controller.receiptError?.message,
+      'No se pudo cargar el comprobante.',
+    );
+    expect(controller.receiptLoading, isFalse);
+  });
 }
 
 class _FakePurchaseSource implements PurchaseHistoryDataSource {
@@ -59,5 +88,26 @@ class _FakePurchaseSource implements PurchaseHistoryDataSource {
         payments: const [],
       ),
     ];
+  }
+}
+
+class _FakeReceiptSource implements PurchaseReceiptDataSource {
+  bool failure = false;
+
+  @override
+  Future<PurchaseReceipt> fetchReceipt(int purchaseId) async {
+    if (failure) throw StateError('receipt failed');
+    return const PurchaseReceipt(
+      receiptNumber: 'FAC-1',
+      dateRaw: null,
+      items: [],
+      subtotal: 80,
+      discount: 0,
+      shippingCost: 0,
+      delivery: null,
+      total: 80,
+      currency: 'BOB',
+      payment: null,
+    );
   }
 }

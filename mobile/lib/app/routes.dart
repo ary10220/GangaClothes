@@ -7,10 +7,13 @@ import '../features/auth/login/login_screen.dart';
 import '../features/auth/recovery/recovery_screen.dart';
 import '../features/auth/register/register_screen.dart';
 import '../features/auth/session_model.dart';
+import '../features/ai/ai_service.dart';
+import '../features/ai/assistant_modal_overlay.dart';
 import '../features/catalog/catalog_screen.dart';
 import '../features/cart/cart_screen.dart';
 import '../features/purchase_history/purchase_history_screen.dart';
 import '../features/reservations/reservations_screen.dart';
+import '../features/shipment_tracking/shipment_tracking_screen.dart';
 import '../features/showcase/theme_showcase_screen.dart';
 
 typedef SessionChanged = void Function(Session? session);
@@ -22,6 +25,12 @@ class AuthRouteArguments {
   final String? email;
 }
 
+class ShipmentTrackingRouteArguments {
+  const ShipmentTrackingRouteArguments({this.shipmentId});
+
+  final int? shipmentId;
+}
+
 abstract final class AppRoutes {
   static const login = 'login';
   static const register = 'register';
@@ -30,9 +39,9 @@ abstract final class AppRoutes {
   static const catalogDetail = 'catalog/detail';
   static const reservations = 'reservations';
   static const purchaseHistory = 'purchase-history';
+  static const shipmentTracking = 'shipment-tracking';
   static const cart = 'cart';
   static const cartPayment = 'cart/payment';
-
   static const _known = {
     login,
     register,
@@ -41,6 +50,7 @@ abstract final class AppRoutes {
     catalogDetail,
     reservations,
     purchaseHistory,
+    shipmentTracking,
     cart,
     cartPayment,
   };
@@ -49,6 +59,7 @@ abstract final class AppRoutes {
     catalogDetail,
     reservations,
     purchaseHistory,
+    shipmentTracking,
     cart,
     cartPayment,
   };
@@ -81,11 +92,18 @@ abstract final class AppRoutes {
 
   static String destinationFor(String requested, Session? session) {
     final route = _normalize(requested) ?? catalog;
-    const protected = {reservations, purchaseHistory, cart, cartPayment};
+    const protected = {
+      reservations,
+      purchaseHistory,
+      shipmentTracking,
+      cart,
+      cartPayment,
+    };
     const guestOnly = {login, register, recovery};
     if (protected.contains(route) && session == null) return login;
     if ((route == reservations ||
             route == purchaseHistory ||
+            route == shipmentTracking ||
             route == cart ||
             route == cartPayment) &&
         !(session?.user.roles.contains('cliente') ?? false)) {
@@ -93,6 +111,11 @@ abstract final class AppRoutes {
     }
     if (guestOnly.contains(route) && session != null) return catalog;
     return _known.contains(route) ? route : catalog;
+  }
+
+  static bool shouldShowAssistant(String route, Session? session) {
+    if ({login, register, recovery}.contains(route)) return false;
+    return session == null || session.user.roles.contains('cliente');
   }
 
   static Route<dynamic> onGenerateRoute(
@@ -145,6 +168,7 @@ abstract final class AppRoutes {
           apiClient: apiClient,
           preferencesStorage: preferencesStorage,
           session: session,
+          aiEventSink: BestEffortAiEventSink(AiService(apiClient)),
           onLogout: onLogout,
         );
       case reservations:
@@ -165,6 +189,21 @@ abstract final class AppRoutes {
         page = PurchaseHistoryScreen(
           apiClient: apiClient,
           session: session,
+          onLogout: onLogout,
+        );
+      case shipmentTracking:
+        if (apiClient == null) {
+          throw StateError(
+            'Shipment tracking routes require the app ApiClient.',
+          );
+        }
+        final trackingArguments = arguments is ShipmentTrackingRouteArguments
+            ? arguments
+            : null;
+        page = ShipmentTrackingScreen(
+          apiClient: apiClient,
+          session: session,
+          shipmentId: trackingArguments?.shipmentId,
           onLogout: onLogout,
         );
       case cart:
@@ -193,7 +232,14 @@ abstract final class AppRoutes {
 
     return MaterialPageRoute<void>(
       settings: RouteSettings(name: destination, arguments: settings.arguments),
-      builder: (_) => page,
+      builder: (_) => AssistantModalOverlay(
+        apiClient: apiClient,
+        preferencesStorage: preferencesStorage,
+        session: session,
+        loginArguments: AuthRouteArguments(returnTo: destination),
+        showAssistant: shouldShowAssistant(destination, session),
+        child: page,
+      ),
     );
   }
 

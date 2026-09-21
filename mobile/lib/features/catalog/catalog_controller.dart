@@ -6,6 +6,7 @@ import '../../core/network/api_error.dart';
 import '../../core/storage/preferences_storage.dart';
 import 'catalog_models.dart';
 import 'catalog_service.dart';
+import '../ai/ai_service.dart';
 
 class CatalogFilterState {
   const CatalogFilterState({
@@ -62,10 +63,15 @@ class CatalogFilterState {
 const _keep = Object();
 
 class CatalogController extends ChangeNotifier {
-  CatalogController({required this.api, required this.preferences});
+  CatalogController({
+    required this.api,
+    required this.preferences,
+    this.aiEventSink,
+  });
 
   final CatalogDataSource api;
   final BranchPreferenceStore preferences;
+  final AiEventSink? aiEventSink;
 
   CatalogFilterState _filters = const CatalogFilterState();
   CatalogFilterState get filters => _filters;
@@ -84,6 +90,7 @@ class CatalogController extends ChangeNotifier {
   int _requestVersion = 0;
   int _loadVersion = 0;
   bool _disposed = false;
+  final Set<String> _reportedSearchEvents = <String>{};
 
   bool get hasFilters => _filters.hasFilters;
 
@@ -196,6 +203,7 @@ class CatalogController extends ChangeNotifier {
       final result = await api.fetchCatalog(_filters.toFilters());
       if (_disposed || version != _requestVersion) return;
       products = result;
+      _reportSearchEvents(result);
       loaded = true;
       loading = false;
       _notify();
@@ -213,6 +221,32 @@ class CatalogController extends ChangeNotifier {
       loading = false;
       error = ApiError(statusCode: 0, message: '$caught', cause: caught);
       _notify();
+    }
+  }
+
+  void _reportSearchEvents(List<Product> result) {
+    final sink = aiEventSink;
+    final search = _filters.search.trim();
+    if (sink == null || search.isEmpty) return;
+    for (final product in result) {
+      final key = '$search:${product.id}';
+      if (_reportedSearchEvents.add(key)) {
+        unawaited(
+          _bestEffortEvent(sink, productId: product.id, eventType: 'busqueda'),
+        );
+      }
+    }
+  }
+
+  Future<void> _bestEffortEvent(
+    AiEventSink sink, {
+    required int productId,
+    required String eventType,
+  }) async {
+    try {
+      await sink.reportProductEvent(productId: productId, eventType: eventType);
+    } catch (_) {
+      // Analytics failures must not affect catalog loading.
     }
   }
 

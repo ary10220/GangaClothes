@@ -36,7 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.11.1
   flutter_secure_storage: ^11.2.0
+  printing: ^5.15.0
   shared_preferences: ^2.5.5
+  camera: ^0.12.1
+  google_mlkit_pose_detection: ^0.16.1
 
 dev_dependencies:
   flutter_test:

@@ -9,9 +9,12 @@ class CartLine {
     required this.quantity,
     required this.unitPrice,
     required this.subtotal,
+    double? finalPrice,
+    this.discount,
+    this.promotion,
     this.available,
     this.reaches = true,
-  });
+  }) : finalPrice = finalPrice ?? unitPrice;
 
   final int id;
   final int variantId;
@@ -21,11 +24,15 @@ class CartLine {
   final String color;
   final int quantity;
   final double unitPrice;
+  final double finalPrice;
+  final double? discount;
+  final CartPromotion? promotion;
   final double subtotal;
   final int? available;
   final bool reaches;
 
   bool get hasInsufficientStock => reaches == false;
+  bool get hasPromotion => promotion != null;
 
   factory CartLine.fromJson(Map<String, dynamic> json) => CartLine(
     id: _intValue(json['id']),
@@ -36,9 +43,67 @@ class CartLine {
     color: _stringValue(json['color']),
     quantity: _intValue(json['cantidad']),
     unitPrice: _doubleValue(json['precio_unitario']),
+    finalPrice: _doubleValue(json['precio_final'] ?? json['precio_unitario']),
+    discount: _nullableDouble(json['descuento']),
+    promotion: _nullablePromotion(json['promocion']),
     subtotal: _doubleValue(json['subtotal']),
     available: _nullableInt(json['disponible']),
     reaches: json['alcanza'] != false,
+  );
+}
+
+class CartPromotion {
+  const CartPromotion({this.id, this.name, this.label});
+
+  final int? id;
+  final String? name;
+  final String? label;
+
+  String? get displayName => label ?? name;
+
+  factory CartPromotion.fromJson(Map<String, dynamic> json) => CartPromotion(
+    id: _nullableInt(json['id']),
+    name: _nullableString(json['nombre']),
+    label: _nullableString(json['etiqueta']),
+  );
+}
+
+class CartShipment {
+  const CartShipment({
+    this.id,
+    this.state,
+    this.address,
+    this.reference,
+    this.contactPhone,
+    this.latitude,
+    this.longitude,
+    this.express,
+    this.distanceKm,
+    this.estimatedAt,
+  });
+
+  final int? id;
+  final String? state;
+  final String? address;
+  final String? reference;
+  final String? contactPhone;
+  final double? latitude;
+  final double? longitude;
+  final bool? express;
+  final double? distanceKm;
+  final String? estimatedAt;
+
+  factory CartShipment.fromJson(Map<String, dynamic> json) => CartShipment(
+    id: _nullableInt(json['id']),
+    state: _nullableString(json['estado']),
+    address: _nullableString(json['direccion']),
+    reference: _nullableString(json['referencia']),
+    contactPhone: _nullableString(json['telefono_contacto']),
+    latitude: _nullableDouble(json['latitud']),
+    longitude: _nullableDouble(json['longitud']),
+    express: json['express'] is bool ? json['express'] as bool : null,
+    distanceKm: _nullableDouble(json['distancia_km']),
+    estimatedAt: _nullableString(json['fecha_estimada']),
   );
 }
 
@@ -54,6 +119,9 @@ class Cart {
     required this.total,
     required this.receiptNumber,
     required this.lines,
+    this.deliveryType = 'sucursal',
+    this.shippingCost,
+    this.shipment,
   });
 
   final int id;
@@ -66,6 +134,9 @@ class Cart {
   final double total;
   final String? receiptNumber;
   final List<CartLine> lines;
+  final String deliveryType;
+  final double? shippingCost;
+  final CartShipment? shipment;
 
   bool get isEmpty => lines.isEmpty;
   bool get hasInsufficientStock =>
@@ -79,6 +150,9 @@ class Cart {
     units: _intValue(json['unidades']),
     subtotal: _doubleValue(json['subtotal']),
     discount: _doubleValue(json['descuento']),
+    deliveryType: _stringValue(json['tipo_entrega'], fallback: 'sucursal'),
+    shippingCost: _nullableDouble(json['costo_envio']),
+    shipment: _nullableShipment(json['envio']),
     total: _doubleValue(json['total']),
     receiptNumber: _nullableString(json['nro_comprobante']),
     lines: _lines(json['detalle']),
@@ -106,6 +180,98 @@ class CartBranch {
   );
 }
 
+class PaymentMethod {
+  const PaymentMethod({
+    required this.value,
+    required this.label,
+    required this.available,
+    this.gateway,
+    this.detail,
+    this.mode,
+    this.publicKey,
+  });
+
+  final String value;
+  final String label;
+  final bool available;
+  final String? gateway;
+  final String? detail;
+  final String? mode;
+  final String? publicKey;
+
+  factory PaymentMethod.fromJson(Map<String, dynamic> json) => PaymentMethod(
+    value: _stringValue(json['valor']),
+    label: _stringValue(json['etiqueta']),
+    available: json['disponible'] == true,
+    gateway: _nullableString(json['pasarela']),
+    detail: _nullableString(json['detalle']),
+    mode: _nullableString(json['modo']),
+    publicKey: _nullableString(json['clave_publica']),
+  );
+}
+
+enum QrPaymentState { pending, approved, expired, annulled }
+
+class QrPayment {
+  const QrPayment({
+    required this.saleId,
+    required this.qrId,
+    required this.state,
+    this.paymentId,
+    this.description,
+    this.imageBase64,
+    this.amount,
+    this.currency,
+    this.expiresAt,
+    this.operationNumber,
+    this.paymentResult,
+  });
+
+  final int saleId;
+  final String qrId;
+  final QrPaymentState state;
+  final int? paymentId;
+  final String? description;
+  final String? imageBase64;
+  final double? amount;
+  final String? currency;
+  final String? expiresAt;
+  final String? operationNumber;
+  final PaymentResult? paymentResult;
+
+  bool get isPending => state == QrPaymentState.pending;
+  bool get isTerminal => !isPending;
+
+  factory QrPayment.fromJson(Map<String, dynamic> json) {
+    final backendState = _stringValue(json['estado']).toUpperCase();
+    final state = switch (backendState) {
+      'P' || 'U' => QrPaymentState.approved,
+      'V' => QrPaymentState.expired,
+      'A' => QrPaymentState.annulled,
+      _ when json['aprobado'] == true => QrPaymentState.approved,
+      _ => QrPaymentState.pending,
+    };
+    final sale = json['venta'];
+    final payment = json['pago'];
+    final result = sale is Map && payment is Map
+        ? PaymentResult.fromJson(json)
+        : null;
+    return QrPayment(
+      saleId: _intValue(json['venta_id']),
+      qrId: _stringValue(json['qr_id']),
+      state: state,
+      paymentId: _nullableInt(json['pago_id']),
+      description: _nullableString(json['descripcion']),
+      imageBase64: _nullableString(json['imagen_base64']),
+      amount: _nullableDouble(json['monto']),
+      currency: _nullableString(json['moneda']),
+      expiresAt: _nullableString(json['expira']),
+      operationNumber: _nullableString(json['numero_operacion']),
+      paymentResult: result,
+    );
+  }
+}
+
 class PaymentResult {
   const PaymentResult({
     required this.approved,
@@ -113,6 +279,8 @@ class PaymentResult {
     this.reason,
     this.receiptNumber,
     this.externalReference,
+    this.paymentLabel,
+    this.paymentGateway,
   });
 
   final bool approved;
@@ -120,6 +288,8 @@ class PaymentResult {
   final String? reason;
   final String? receiptNumber;
   final String? externalReference;
+  final String? paymentLabel;
+  final String? paymentGateway;
 
   factory PaymentResult.fromJson(Map<String, dynamic> json) {
     final payment = _map(json['pago']);
@@ -131,6 +301,8 @@ class PaymentResult {
       receiptNumber:
           _nullableString(json['nro_comprobante']) ?? sale.receiptNumber,
       externalReference: _nullableString(payment['referencia_externa']),
+      paymentLabel: _nullableString(payment['etiqueta']),
+      paymentGateway: _nullableString(payment['pasarela']),
     );
   }
 }
@@ -179,7 +351,23 @@ double _doubleValue(Object? value) {
   return double.tryParse('$value') ?? 0;
 }
 
+double? _nullableDouble(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
+}
+
 String _stringValue(Object? value, {String fallback = ''}) =>
     value is String ? value : fallback;
 
 String? _nullableString(Object? value) => value is String ? value : null;
+
+CartPromotion? _nullablePromotion(Object? value) {
+  if (value is! Map) return null;
+  return CartPromotion.fromJson(Map<String, dynamic>.from(value));
+}
+
+CartShipment? _nullableShipment(Object? value) {
+  if (value is! Map) return null;
+  return CartShipment.fromJson(Map<String, dynamic>.from(value));
+}

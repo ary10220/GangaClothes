@@ -9,6 +9,8 @@ import 'catalog_detail_controller.dart';
 import 'catalog_detail_models.dart';
 import 'catalog_detail_service.dart';
 import 'catalog_models.dart';
+import '../ai/ai_service.dart';
+import '../virtual_fitting/virtual_fitting_sheet.dart';
 
 class CatalogDetailSheet extends StatefulWidget {
   const CatalogDetailSheet({
@@ -18,6 +20,8 @@ class CatalogDetailSheet extends StatefulWidget {
     this.preferredBranchId,
     this.session,
     this.onAvailabilityChanged,
+    this.aiEventSink,
+    this.cameraEnumerator,
     super.key,
   });
 
@@ -27,6 +31,8 @@ class CatalogDetailSheet extends StatefulWidget {
   final int? preferredBranchId;
   final Session? session;
   final VoidCallback? onAvailabilityChanged;
+  final AiEventSink? aiEventSink;
+  final CameraEnumerator? cameraEnumerator;
 
   @override
   State<CatalogDetailSheet> createState() => _CatalogDetailSheetState();
@@ -43,6 +49,7 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
       branches: widget.branches,
       api: widget.actionService,
       preferredBranchId: widget.preferredBranchId,
+      aiEventSink: widget.aiEventSink,
     )..addListener(_onChanged);
   }
 
@@ -115,17 +122,39 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _DetailImage(imageUrl: image, name: widget.product.name),
+        _DetailImage(
+          imageUrl: image,
+          name: widget.product.name,
+          promotion: widget.product.promotion,
+        ),
         const SizedBox(height: 14),
         if (widget.product.brand != null)
           Text(widget.product.brand!, style: GangaTextStyles.eyebrow),
         const SizedBox(height: 4),
         Text(widget.product.name, style: GangaTextStyles.subheading),
         const SizedBox(height: 5),
-        Text(
-          'Bs ${formatBolivianos(widget.product.salePrice)}',
-          style: GangaTextStyles.money.copyWith(fontSize: 17),
-        ),
+        _DetailPrice(product: widget.product),
+        if (widget.product.promotion != null) ...[
+          const SizedBox(height: 8),
+          if (widget.product.promotion!.name?.trim().isNotEmpty == true)
+            Text(
+              widget.product.promotion!.name!,
+              style: GangaTextStyles.label.copyWith(color: GangaColors.alert),
+            ),
+          if (widget.product.promotion!.label?.trim().isNotEmpty == true)
+            Text(
+              widget.product.promotion!.label!,
+              style: const TextStyle(
+                color: GangaColors.success,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          if (widget.product.discount != null)
+            Text(
+              'Ahorro: Bs ${formatBolivianos(widget.product.discount)}',
+              style: const TextStyle(color: GangaColors.success),
+            ),
+        ],
         if (widget.product.description?.trim().isNotEmpty == true) ...[
           const SizedBox(height: 8),
           Text(
@@ -279,17 +308,42 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
 
   Widget _buildActions() {
     final isCustomer = widget.session?.user.roles.contains('cliente') ?? false;
-    if (widget.session == null) return _buildGuestActions();
+    final virtualFittingAction = _buildVirtualFittingAction();
+    if (widget.session == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (virtualFittingAction != null) ...[
+            virtualFittingAction,
+            const SizedBox(height: 12),
+          ],
+          _buildGuestActions(),
+        ],
+      );
+    }
     if (!isCustomer) {
-      return const Text(
-        'Las reservas y compras en línea son para cuentas de cliente. El personal vende desde Caja.',
-        style: TextStyle(color: GangaColors.gray, height: 1.5),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (virtualFittingAction != null) ...[
+            virtualFittingAction,
+            const SizedBox(height: 12),
+          ],
+          const Text(
+            'Las reservas y compras en línea son para cuentas de cliente. El personal vende desde Caja.',
+            style: TextStyle(color: GangaColors.gray, height: 1.5),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (virtualFittingAction != null) ...[
+          virtualFittingAction,
+          const SizedBox(height: 12),
+        ],
         if (_controller.mode == CatalogDetailMode.reserve)
           _buildReservationForm()
         else ...[
@@ -307,6 +361,39 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
         const SizedBox(height: 12),
         _buildActionButtons(),
       ],
+    );
+  }
+
+  Widget? _buildVirtualFittingAction() {
+    final variantImage = _controller.selectedVariant?.imageUrl?.trim();
+    final imageUrl = variantImage?.isNotEmpty == true
+        ? variantImage
+        : widget.product.imageUrl?.trim();
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+    return GcButton(
+      expand: true,
+      label: 'Vestidor virtual',
+      variant: GcButtonVariant.outlined,
+      icon: const Icon(Icons.checkroom_outlined, size: 18),
+      onPressed: () => _openVirtualFitting(imageUrl),
+    );
+  }
+
+  void _openVirtualFitting(String imageUrl) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      useSafeArea: false,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .96,
+        child: VirtualFittingSheet(
+          productName: widget.product.name,
+          variant: _controller.selectedVariant!,
+          imageUrl: imageUrl,
+          cameraEnumerator: widget.cameraEnumerator,
+        ),
+      ),
     );
   }
 
@@ -348,13 +435,15 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
                 key: ValueKey(_controller.branchId),
                 initialValue: _controller.branchId,
                 decoration: const InputDecoration(labelText: 'Sucursal'),
+                isExpanded: true,
+                selectedItemBuilder: (context) => _controller.branchesWithStock
+                    .map(_buildBranchLabel)
+                    .toList(),
                 items: _controller.branchesWithStock
                     .map(
-                      (row) => DropdownMenuItem(
+                      (row) => DropdownMenuItem<int>(
                         value: row.branchId,
-                        child: Text(
-                          '${row.branchName} (${row.available} disp.)',
-                        ),
+                        child: _buildBranchLabel(row),
                       ),
                     )
                     .toList(),
@@ -372,6 +461,12 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
           ],
         ),
     ],
+  );
+
+  Widget _buildBranchLabel(Availability row) => Text(
+    '${row.branchName} (${row.available} disp.)',
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
   );
 
   Widget _buildReservationForm() => Column(
@@ -601,41 +696,121 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
 }
 
 class _DetailImage extends StatelessWidget {
-  const _DetailImage({required this.imageUrl, required this.name});
+  const _DetailImage({
+    required this.imageUrl,
+    required this.name,
+    this.promotion,
+  });
 
   final String? imageUrl;
   final String name;
+  final CatalogPromotion? promotion;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    height: 220,
-    decoration: BoxDecoration(
-      color: const Color(0xFFECECE5),
-      borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: BorderRadius.circular(12),
+    child: Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          height: 220,
+          color: const Color(0xFFECECE5),
+          child: imageUrl == null || imageUrl!.isEmpty
+              ? const Center(
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 70,
+                    color: GangaColors.missingImage,
+                  ),
+                )
+              : Image.network(
+                  imageUrl!,
+                  fit: BoxFit.cover,
+                  semanticLabel: name,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 70,
+                      color: GangaColors.missingImage,
+                    ),
+                  ),
+                ),
+        ),
+        if (promotion != null)
+          Positioned(
+            top: 10,
+            left: 10,
+            child: _DetailPromotionBadge(promotion!),
+          ),
+      ],
     ),
-    clipBehavior: Clip.antiAlias,
-    child: imageUrl == null || imageUrl!.isEmpty
-        ? const Center(
-            child: Icon(
-              Icons.image_not_supported_outlined,
-              size: 70,
-              color: GangaColors.missingImage,
-            ),
-          )
-        : Image.network(
-            imageUrl!,
-            fit: BoxFit.cover,
-            semanticLabel: name,
-            errorBuilder: (_, _, _) => const Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                size: 70,
-                color: GangaColors.missingImage,
-              ),
+  );
+}
+
+class _DetailPrice extends StatelessWidget {
+  const _DetailPrice({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final promotion = product.promotion;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
+      children: [
+        Text(
+          'Bs ${formatBolivianos(product.finalPrice)}',
+          style: GangaTextStyles.money.copyWith(
+            fontSize: 17,
+            color: promotion == null ? null : GangaColors.success,
+          ),
+        ),
+        if (promotion != null) ...[
+          const SizedBox(width: 8),
+          Text(
+            'Bs ${formatBolivianos(product.salePrice)}',
+            style: const TextStyle(
+              color: GangaColors.gray,
+              fontSize: 12,
+              decoration: TextDecoration.lineThrough,
             ),
           ),
-  );
+        ],
+      ],
+    );
+  }
+}
+
+class _DetailPromotionBadge extends StatelessWidget {
+  const _DetailPromotionBadge(this.promotion);
+
+  final CatalogPromotion promotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = promotion.label?.trim().isNotEmpty == true
+        ? promotion.label!
+        : promotion.name?.trim().isNotEmpty == true
+        ? promotion.name!
+        : 'Oferta';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GangaColors.alert,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: GangaColors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _QuantityControl extends StatelessWidget {

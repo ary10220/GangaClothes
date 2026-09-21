@@ -7,9 +7,11 @@ import 'package:mobile/core/storage/preferences_storage.dart';
 import 'package:mobile/features/auth/session_model.dart';
 import 'package:mobile/features/catalog/catalog_detail_models.dart';
 import 'package:mobile/features/catalog/catalog_detail_service.dart';
+import 'package:mobile/features/catalog/catalog_detail_sheet.dart';
 import 'package:mobile/features/catalog/catalog_models.dart';
 import 'package:mobile/features/catalog/catalog_screen.dart';
 import 'package:mobile/features/catalog/catalog_service.dart';
+import 'package:mobile/features/virtual_fitting/virtual_fitting_sheet.dart';
 
 void main() {
   testWidgets('renders loading and retryable error states', (tester) async {
@@ -56,6 +58,105 @@ void main() {
     expect(find.text('Ver detalle'), findsOneWidget);
   });
 
+  testWidgets('renders backend promotion values in card and detail', (
+    tester,
+  ) async {
+    final product = _product(
+      available: 2,
+      salePrice: 1000,
+      promotion: const CatalogPromotion(
+        id: 4,
+        name: 'Oferta de temporada',
+        discountType: 'porcentaje',
+        value: 15,
+        label: '-15%',
+        endDate: '2030-12-31',
+      ),
+      finalPrice: 850,
+      discount: 150,
+    );
+    await tester.pumpWidget(
+      _host(
+        CatalogScreen(
+          catalogService: _FakeCatalogApi(products: [product]),
+          detailService: _FakeDetailApi(),
+          preferenceStore: _Prefs(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('-15%'), findsOneWidget);
+    expect(find.text('Bs 850,00'), findsOneWidget);
+    expect(find.text('Bs 1.000,00'), findsOneWidget);
+    expect(find.text('M · L'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -420));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver detalle'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oferta de temporada'), findsOneWidget);
+    expect(find.text('Ahorro: Bs 150,00'), findsOneWidget);
+    expect(find.text('Bs 850,00'), findsNWidgets(2));
+    expect(find.text('Bs 1.000,00'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'keeps the no-promotion card appearance and backend final price',
+    (tester) async {
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 320,
+            height: 420,
+            child: CatalogProductCard(
+              product: _product(
+                available: 2,
+                salePrice: 500,
+                finalPrice: 321,
+                discount: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Bs 321,00'), findsOneWidget);
+      expect(find.text('Bs 500,00'), findsNothing);
+      expect(find.text('Oferta'), findsNothing);
+      expect(find.textContaining('Ahorro:'), findsNothing);
+    },
+  );
+
+  testWidgets('renders zero discount and missing promotion fields safely', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              salePrice: 900,
+              finalPrice: 875.25,
+              discount: 0,
+              promotion: const CatalogPromotion(id: 8),
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oferta'), findsOneWidget);
+    expect(find.text('Bs 875,25'), findsOneWidget);
+    expect(find.text('Bs 900,00'), findsOneWidget);
+    expect(find.text('Ahorro: Bs 0,00'), findsOneWidget);
+  });
+
   testWidgets(
     'renders no-stock branch state and guest/authenticated app bars',
     (tester) async {
@@ -95,6 +196,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Mis reservas'), findsOneWidget);
       expect(find.text('Carrito'), findsOneWidget);
+      expect(find.text('Asistente'), findsNothing);
       expect(find.text('Iniciar sesión'), findsNothing);
     },
   );
@@ -128,6 +230,164 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Iniciar sesión'), findsNWidgets(2));
+  });
+
+  testWidgets('shows virtual fitting only when a selected image exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(available: 2),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vestidor virtual'), findsNothing);
+
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              productImageUrl: 'https://cdn.example.com/product.jpg',
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+            cameraEnumerator: () async => const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vestidor virtual'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Vestidor virtual'),
+      -240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Vestidor virtual'));
+    await tester.pumpAndSettle();
+    expect(find.text('VESTIDOR VIRTUAL'), findsOneWidget);
+    expect(
+      tester
+          .widget<VirtualFittingSheet>(find.byType(VirtualFittingSheet))
+          .imageUrl,
+      'https://cdn.example.com/product.jpg',
+    );
+  });
+
+  testWidgets('selected variant image takes precedence over product image', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              productImageUrl: 'https://cdn.example.com/product.jpg',
+              variantImageUrl: 'https://cdn.example.com/variant.jpg',
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+            cameraEnumerator: () async => const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Vestidor virtual'),
+      -240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Vestidor virtual'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<VirtualFittingSheet>(find.byType(VirtualFittingSheet))
+          .imageUrl,
+      'https://cdn.example.com/variant.jpg',
+    );
+  });
+
+  testWidgets('ellipsizes long branch labels on a narrow detail sheet', (
+    tester,
+  ) async {
+    const longBranchName =
+        'Sucursal con un nombre suficientemente largo para desbordar';
+    final product = Product(
+      id: 1,
+      name: 'Camisa Oxford',
+      description: null,
+      brand: 'Ganga',
+      salePrice: 100,
+      finalPrice: 100,
+      imageUrl: null,
+      categoryId: 1,
+      collectionId: null,
+      availableTotal: 3,
+      variants: const [
+        Variant(
+          id: 1,
+          sku: 'SKU-1',
+          sizeId: 1,
+          sizeName: 'M',
+          colorId: 1,
+          colorName: 'Azul',
+          colorHex: '#112233',
+          imageUrl: null,
+          availableTotal: 3,
+          availability: [
+            Availability(branchId: 1, branchName: longBranchName, available: 3),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MediaQuery(
+        data: const MediaQueryData(size: Size(280, 700)),
+        child: _host(
+          Scaffold(
+            body: CatalogDetailSheet(
+              product: product,
+              branches: const [],
+              actionService: _FakeDetailApi(),
+              session: const Session(
+                accessToken: 'token',
+                user: User(
+                  id: 1,
+                  name: 'Ada',
+                  email: 'ada@example.com',
+                  roles: ['cliente'],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            widget.maxLines == 1 &&
+            widget.overflow == TextOverflow.ellipsis,
+      ),
+      findsWidgets,
+    );
   });
 }
 
@@ -204,17 +464,28 @@ class _FakeDetailApi implements CatalogActionDataSource {
   );
 }
 
-Product _product({required int available}) => Product(
+Product _product({
+  required int available,
+  double salePrice = 1234.5,
+  double finalPrice = 1234.5,
+  double? discount,
+  CatalogPromotion? promotion,
+  String? productImageUrl,
+  String? variantImageUrl,
+}) => Product(
   id: 1,
   name: 'Camisa Oxford',
   description: null,
   brand: 'Ganga',
-  salePrice: 1234.5,
-  imageUrl: null,
+  salePrice: salePrice,
+  finalPrice: finalPrice,
+  discount: discount,
+  promotion: promotion,
+  imageUrl: productImageUrl,
   categoryId: 1,
   collectionId: null,
   availableTotal: available,
-  variants: const [
+  variants: [
     Variant(
       id: 1,
       sku: 'SKU-1',
@@ -223,7 +494,7 @@ Product _product({required int available}) => Product(
       colorId: 1,
       colorName: 'Azul',
       colorHex: '#112233',
-      imageUrl: null,
+      imageUrl: variantImageUrl,
       availableTotal: 1,
       availability: [],
     ),

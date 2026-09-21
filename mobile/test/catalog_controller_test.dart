@@ -138,6 +138,7 @@ Product _product(String name) => Product(
   description: null,
   brand: null,
   salePrice: 10,
+  finalPrice: 10,
   imageUrl: null,
   categoryId: 2,
   collectionId: null,
