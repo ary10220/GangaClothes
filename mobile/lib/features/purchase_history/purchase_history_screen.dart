@@ -16,6 +16,7 @@ class PurchaseHistoryScreen extends StatefulWidget {
   const PurchaseHistoryScreen({
     this.apiClient,
     this.purchaseHistoryService,
+    this.purchaseReceiptService,
     required this.session,
     this.onLogout,
     super.key,
@@ -23,6 +24,7 @@ class PurchaseHistoryScreen extends StatefulWidget {
 
   final ApiClient? apiClient;
   final PurchaseHistoryDataSource? purchaseHistoryService;
+  final PurchaseReceiptDataSource? purchaseReceiptService;
   final Session? session;
   final VoidCallback? onLogout;
 
@@ -36,19 +38,45 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    final source =
+    final PurchaseHistoryDataSource source =
         widget.purchaseHistoryService ??
         PurchaseHistoryService(
           widget.apiClient ??
               (throw StateError('Purchase history API is required')),
         );
-    _controller = PurchaseHistoryController(api: source)
-      ..addListener(_onChanged);
+    PurchaseReceiptDataSource? receiptSource = widget.purchaseReceiptService;
+    if (receiptSource == null && source is PurchaseReceiptDataSource) {
+      receiptSource = source as PurchaseReceiptDataSource;
+    }
+    _controller = PurchaseHistoryController(
+      api: source,
+      receiptApi: receiptSource,
+    )..addListener(_onChanged);
     _controller.load();
   }
 
   void _onChanged() {
     if (mounted) setState(() {});
+  }
+
+  Future<void> _showReceipt(Purchase purchase) async {
+    final receipt = await _controller.loadReceipt(purchase.id);
+    if (!mounted) return;
+    if (receipt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _controller.receiptError?.message ??
+                'No se pudo cargar el comprobante.',
+          ),
+        ),
+      );
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _PurchaseReceiptDialog(receipt: receipt),
+    );
   }
 
   @override
@@ -163,7 +191,15 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
             for (final purchase in _controller.purchases)
               SizedBox(
                 width: cardWidth,
-                child: _PurchaseCard(purchase: purchase),
+                child: _PurchaseCard(
+                  purchase: purchase,
+                  onReceiptPressed: _controller.receiptApi == null
+                      ? null
+                      : () => _showReceipt(purchase),
+                  receiptLoading:
+                      _controller.receiptLoading &&
+                      _controller.receiptPurchaseId == purchase.id,
+                ),
               ),
           ],
         );
@@ -173,16 +209,20 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
 }
 
 class _PurchaseCard extends StatelessWidget {
-  const _PurchaseCard({required this.purchase});
+  const _PurchaseCard({
+    required this.purchase,
+    this.onReceiptPressed,
+    this.receiptLoading = false,
+  });
 
   final Purchase purchase;
+  final VoidCallback? onReceiptPressed;
+  final bool receiptLoading;
 
   @override
   Widget build(BuildContext context) {
     final payment = purchase.successfulPayment;
-    final receipt = purchase.receiptNumber?.trim().isNotEmpty == true
-        ? purchase.receiptNumber!
-        : '#V-${purchase.id}';
+    final receipt = purchase.displayReceiptNumber;
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 13, 14, 14),
@@ -224,11 +264,35 @@ class _PurchaseCard extends StatelessWidget {
                 value: purchase.branchName ?? 'No informada',
               ),
               const SizedBox(height: 7),
+              _InfoText(
+                label: 'Entrega',
+                value: purchase.isDelivery ? 'Delivery' : 'Retiro en sucursal',
+              ),
+              if (purchase.shippingCost != null)
+                _InfoText(
+                  label: 'Envío',
+                  value: 'Bs ${formatPurchaseMoney(purchase.shippingCost)}',
+                ),
+              if (purchase.shipment?.address?.trim().isNotEmpty == true)
+                _InfoText(
+                  label: 'Dirección',
+                  value: purchase.shipment!.address!,
+                ),
+              if (purchase.shipment?.status?.trim().isNotEmpty == true)
+                _InfoText(
+                  label: 'Estado del envío',
+                  value: purchase.shipment!.status!,
+                ),
               Text(
                 'Pago: ${purchasePaymentMethod(payment?.method)} · '
                 '${purchasePaymentStatus(payment?.status)}',
                 style: const TextStyle(color: GangaColors.gray, fontSize: 12),
               ),
+              if (payment?.externalReference?.trim().isNotEmpty == true)
+                _InfoText(
+                  label: 'Referencia',
+                  value: payment!.externalReference!,
+                ),
               const SizedBox(height: 10),
               const Divider(),
               for (final detail in purchase.details) _DetailRow(detail: detail),
@@ -243,16 +307,36 @@ class _PurchaseCard extends StatelessWidget {
                 label: 'Subtotal',
                 value: 'Bs ${formatPurchaseMoney(purchase.subtotal)}',
               ),
-              if (purchase.discount > 0)
-                _TotalRow(
-                  label: 'Descuento',
-                  value: '−Bs ${formatPurchaseMoney(purchase.discount)}',
-                ),
+              _TotalRow(
+                label: 'Descuento',
+                value: '−Bs ${formatPurchaseMoney(purchase.discount)}',
+              ),
               _TotalRow(
                 label: 'Total',
                 value: 'Bs ${formatPurchaseMoney(purchase.total)}',
                 strong: true,
               ),
+              if (onReceiptPressed != null) ...[
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: receiptLoading ? null : onReceiptPressed,
+                    icon: receiptLoading
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.receipt_long_outlined),
+                    label: Text(
+                      receiptLoading
+                          ? 'Cargando comprobante...'
+                          : 'Ver comprobante',
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -307,7 +391,26 @@ class _DetailRow extends StatelessWidget {
               Text('${detail.garment} · ${detail.size} · ${detail.color}'),
               const SizedBox(height: 2),
               Text(
-                'Bs ${formatPurchaseMoney(detail.subtotal)}',
+                'Precio final: Bs ${formatPurchaseMoney(detail.finalPrice)} · '
+                'lista: Bs ${formatPurchaseMoney(detail.unitPrice)}',
+                style: GangaTextStyles.metadata,
+              ),
+              if (detail.discount != null)
+                Text(
+                  'Descuento: Bs ${formatPurchaseMoney(detail.discount)}',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (detail.promotion?.displayName?.trim().isNotEmpty == true)
+                Text(
+                  detail.promotion!.displayName!,
+                  style: const TextStyle(
+                    color: GangaColors.success,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              Text(
+                'Subtotal: Bs ${formatPurchaseMoney(detail.subtotal)}',
                 style: GangaTextStyles.metadata,
               ),
             ],
@@ -354,6 +457,124 @@ class _TotalRow extends StatelessWidget {
                 ? const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)
                 : const TextStyle(color: GangaColors.gray, fontSize: 11.5),
           ),
+      ],
+    ),
+  );
+}
+
+class _PurchaseReceiptDialog extends StatelessWidget {
+  const _PurchaseReceiptDialog({required this.receipt});
+
+  final PurchaseReceipt receipt;
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = receipt.currency?.trim().isNotEmpty == true
+        ? receipt.currency!
+        : 'Bs';
+    final receiptNumber = receipt.receiptNumber?.trim().isNotEmpty == true
+        ? receipt.receiptNumber!
+        : 'Comprobante';
+    final payment = receipt.payment;
+    final delivery = receipt.delivery;
+    return AlertDialog(
+      title: Text(receiptNumber),
+      content: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _InfoText(
+              label: 'Fecha',
+              value: formatPurchaseDate(receipt.dateRaw),
+            ),
+            if (delivery != null) ...[
+              _InfoText(label: 'Entrega', value: delivery.displayType),
+              if (delivery.address?.trim().isNotEmpty == true)
+                _InfoText(label: 'Dirección', value: delivery.address!),
+              if (delivery.branch?.trim().isNotEmpty == true)
+                _InfoText(label: 'Sucursal', value: delivery.branch!),
+            ],
+            if (payment != null)
+              _InfoText(
+                label: 'Pago',
+                value:
+                    '${purchasePaymentMethod(payment.method)} · '
+                    '${purchasePaymentStatus(payment.status)}',
+              ),
+            if (payment?.externalReference?.trim().isNotEmpty == true)
+              _InfoText(
+                label: 'Referencia',
+                value: payment!.externalReference!,
+              ),
+            const SizedBox(height: 10),
+            for (final item in receipt.items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '${item.garment} · ${item.quantity} · '
+                  '$currency ${formatPurchaseMoney(item.subtotal)}',
+                ),
+              ),
+            const Divider(),
+            _ReceiptMoneyRow(
+              label: 'Subtotal',
+              value: '$currency ${formatPurchaseMoney(receipt.subtotal)}',
+            ),
+            _ReceiptMoneyRow(
+              label: 'Descuento',
+              value: '$currency ${formatPurchaseMoney(receipt.discount)}',
+            ),
+            _ReceiptMoneyRow(
+              label: 'Envío',
+              value: '$currency ${formatPurchaseMoney(receipt.shippingCost)}',
+            ),
+            _ReceiptMoneyRow(
+              label: 'Total',
+              value: '$currency ${formatPurchaseMoney(receipt.total)}',
+              strong: true,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cerrar'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReceiptMoneyRow extends StatelessWidget {
+  const _ReceiptMoneyRow({
+    required this.label,
+    required this.value,
+    this.strong = false,
+  });
+
+  final String label;
+  final String value;
+  final bool strong;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: strong ? FontWeight.w800 : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(fontWeight: strong ? FontWeight.w800 : null),
+        ),
       ],
     ),
   );
