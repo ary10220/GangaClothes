@@ -1,6 +1,6 @@
 # ODD Tasks: Phase 11 Promotions and Purchase History
 
-**Status:** WU-1 implemented and focused-verified; WU-2 through WU-4 pending
+**Status:** WU-1 and WU-2 implemented and focused-verified; WU-3 through WU-4 pending
 **Task count:** 12 implementation tasks (`P11-01` through `P11-12`)
 **Route declaration:** delegated direct
 **Mapping trigger:** fired — the work spans catalog, catalog detail, cart, purchase history, web parity references, backend response contracts, and tests.
@@ -59,8 +59,8 @@ The following work is not authorized in Phase 11:
 - [x] **P11-02 — Define the fixture matrix before model changes.** Add a written implementation fixture matrix covering active promotion, no promotion, zero discount, pickup, delivery with `envio`, payment reference, missing payment reference, missing delivery object, and missing optional promotion fields; map every fixture field to its backend key. WU-1 verifies the catalog/detail promotion subset; the remaining Phase 11 fixtures are pending in later work units.
 - [x] **P11-03 — Extend catalog and detail models without financial derivation.** Update the existing catalog/detail model and parsing boundaries to retain backend final/list/previous amounts, discount, promotion label, saving, and optional metadata exactly as supplied; preserve compatibility with responses that omit optional fields. WU-1 implements the catalog boundary.
 - [x] **P11-04 — Render catalog and detail promotion parity.** Update the existing catalog cards and detail presentation to show the backend promotion state, previous/list amount, final amount, saving, and discount when present; preserve existing stock, variant, reservation, and cart-entry behavior. WU-1 verifies this with focused widget tests.
-- [ ] **P11-05 — Extend cart response/state mapping.** Update the existing cart models, service, and state/controller paths to retain line-level promotion data and backend subtotal, discount, shipping, and total values without recalculation or rounding drift.
-- [ ] **P11-06 — Render cart promotion and total parity.** Update the existing cart screen to display backend-sourced promotion context and totals, including optional values and zero-discount states, while keeping existing stock warnings, branch behavior, confirmation, and Phase 8 test-mode payment boundary unchanged.
+- [x] **P11-05 — Extend cart response/state mapping.** Update the existing cart models, service, and state/controller paths to retain line-level promotion data and backend subtotal, discount, shipping, and total values without recalculation or rounding drift.
+- [x] **P11-06 — Render cart promotion and total parity.** Update the existing cart screen to display backend-sourced promotion context and totals, including optional values and zero-discount states, while keeping existing stock warnings, branch behavior, confirmation, and Phase 8 test-mode payment boundary unchanged.
 - [ ] **P11-07 — Extend purchase-history domain models for `GET /ventas/mias`.** Add parsing for promotion/discount fields, `tipo_entrega`, `costo_envio`, `envio`, payment method/status/reference, comprobante number, item detail, and totals; model absent optional objects safely.
 - [ ] **P11-08 — Extend purchase-history service, controller, and screen in place.** Keep the existing route and feature files, load the backend purchase list, expose delivery and payment summaries, preserve loading/empty/error/retry states, and avoid creating a parallel history flow or second receipt screen.
 - [ ] **P11-09 — Add conditional authenticated comprobante actions.** If the existing `ApiClient` supports authenticated JSON and PDF response handling, connect customer-authorized JSON/PDF actions to the purchase record and preserve session/error behavior. If PDF handling is not supported, record the exact capability gap as evidence and do not add a new transport dependency or implement unrelated payment behavior.
@@ -104,7 +104,9 @@ The `flutter run` command is for the manual visual-parity pass and requires an e
 - [x] **P11-02 — Define the fixture matrix before model changes.** Implemented focused fixtures for active promotion, no promotion with legacy missing `precio_final`, zero discount, a promotion object with missing optional fields, and intentionally non-derived backend amounts; each maps to the backend keys `precio_venta`, `precio_final`, `descuento`, and `promocion.{id,nombre,tipo_descuento,valor,etiqueta,fecha_fin}`.
 - [x] **P11-03 — Extend catalog and detail models without financial derivation.** `Product` now retains backend list/final prices, discount, and optional promotion metadata. Missing `precio_final` falls back only to `precio_venta`; no discount or final-price calculation is performed locally.
 - [x] **P11-04 — Render catalog and detail promotion parity.** Catalog cards and detail sheets now render the backend final price, list price struck through only when `promocion` is present, promotion badge/label/name, and backend discount as savings while preserving stock, variants, reservation, cart, and existing loading/error/empty behavior. Focused widgets also cover no promotion, zero discount, and missing promotion metadata.
-- [ ] **P11-05 through P11-12 — Remaining implementation and verification.** Pending; no unverified task is claimed here.
+- [x] **P11-05 — Extend cart response/state mapping.** Cart models now retain backend list/final unit prices, line discount, promotion metadata, subtotal, total discount, delivery type, optional shipping cost, and optional shipment address/reference. Missing `precio_final` falls back only to `precio_unitario`; no financial values are recalculated. Existing service, controller, stock, branch, confirmation, and payment boundaries remain unchanged.
+- [x] **P11-06 — Render cart promotion and total parity.** The cart screen now shows promotion context, final/list prices, supplied line savings, backend discount, pickup/delivery label, optional shipping cost/address summary, subtotal, and total while preserving existing stock and payment behavior.
+- [ ] **P11-07 through P11-12 — Remaining implementation and verification.** Pending; no unverified task is claimed here.
 
 ## Verification evidence placeholder
 
@@ -119,6 +121,9 @@ Automated evidence:
 - Format command/result: `fvm dart format lib/features/catalog/catalog_models.dart lib/features/catalog/catalog_screen.dart lib/features/catalog/catalog_detail_sheet.dart test/catalog_service_test.dart test/catalog_widget_test.dart test/catalog_controller_test.dart test/catalog_detail_controller_test.dart` followed by the same command with `--output=none --set-exit-if-changed` — passed; 7 files checked, 0 changes required on the final check.
 - Analyze command/result: `fvm flutter analyze lib/features/catalog/catalog_models.dart lib/features/catalog/catalog_screen.dart lib/features/catalog/catalog_detail_sheet.dart test/catalog_service_test.dart test/catalog_widget_test.dart test/catalog_controller_test.dart test/catalog_detail_controller_test.dart` — passed, no issues.
 - Focused test command/result: `fvm flutter test test/catalog_service_test.dart test/catalog_detail_service_test.dart test/catalog_detail_controller_test.dart test/catalog_controller_test.dart test/catalog_widget_test.dart` — passed, 22 tests.
+- WU-2 format command/result: `fvm dart format lib/features/cart/cart_models.dart lib/features/cart/cart_screen.dart test/cart_models_test.dart test/cart_service_test.dart test/cart_controller_test.dart test/cart_widget_test.dart` — passed; 4 files changed by formatting. Final check with `fvm dart format --output=none --set-exit-if-changed` over the same 6 files — passed; 0 changes required.
+- WU-2 analyze command/result: `fvm flutter analyze --no-pub lib/features/cart/cart_models.dart lib/features/cart/cart_screen.dart lib/features/cart/cart_controller.dart lib/features/cart/cart_service.dart test/cart_models_test.dart test/cart_service_test.dart test/cart_controller_test.dart test/cart_widget_test.dart` — passed; no issues found. The initial pub-enabled attempt was blocked by Flutter's ephemeral iOS `.packages` deletion/read-only-volume error; the focused `--no-pub` rerun passed.
+- WU-2 focused test command/result: `fvm flutter test test/cart_models_test.dart test/cart_service_test.dart test/cart_controller_test.dart test/cart_widget_test.dart` — passed, 15 tests.
 - Full test command/result: [pending]
 - Coverage command/result: [pending]
 
@@ -129,17 +134,19 @@ Parity evidence:
 - Responsive states checked: [pending]
 
 Delivery evidence:
-- Changed files: `mobile/lib/features/catalog/catalog_models.dart`, `mobile/lib/features/catalog/catalog_screen.dart`, `mobile/lib/features/catalog/catalog_detail_sheet.dart`, `mobile/test/catalog_service_test.dart`, `mobile/test/catalog_widget_test.dart`, `mobile/test/catalog_controller_test.dart`, `mobile/test/catalog_detail_controller_test.dart`, and this task document.
-- Authored changed-line count: approximately 455 implementation/test additions and deletions in the pre-existing WU-1 boundary, plus approximately 75 focused test lines and the evidence update in this worktree; no generated files or dependencies. This exceeds the advisory 400-line review budget but remains one cohesive catalog/detail work unit as requested.
-- Work-unit commit IDs: pre-existing `4d00d99` (`feat(mobile): preserve backend promotions in catalog`); no commit, staging, push, or remote operation was performed in this execution.
-- Rollback verification: revert only the catalog/detail model, presentation, and related test changes listed above; catalog browsing, stock, variant selection, reservation, and cart entry remain otherwise intact.
+- WU-1 changed files: `mobile/lib/features/catalog/catalog_models.dart`, `mobile/lib/features/catalog/catalog_screen.dart`, `mobile/lib/features/catalog/catalog_detail_sheet.dart`, `mobile/test/catalog_service_test.dart`, `mobile/test/catalog_widget_test.dart`, `mobile/test/catalog_controller_test.dart`, `mobile/test/catalog_detail_controller_test.dart`, and this task document.
+- WU-2 changed files: `mobile/lib/features/cart/cart_models.dart`, `mobile/lib/features/cart/cart_screen.dart`, `mobile/test/cart_models_test.dart`, `mobile/test/cart_service_test.dart`, `mobile/test/cart_controller_test.dart`, `mobile/test/cart_widget_test.dart`, and this task document. No cart service/controller source change was necessary: the existing request and state/payment paths already preserve the backend `Cart` object and Phase 8 contract.
+- Authored changed-line count: approximately 401 lines (379 additions, 22 deletions) for the WU-2 cart implementation/tests and task evidence in this worktree; no generated files or dependencies. This is slightly above the advisory 400-line review budget and remains one cohesive cart work unit.
+- Work-unit commit IDs: pre-existing `4d00d99` (`feat(mobile): preserve backend promotions in catalog`); WU-2 has no commit. No commit, staging, push, or remote operation was performed in this execution.
+- Rollback verification: revert only the WU-2 cart model, screen, and related test changes listed above; catalog and purchase-history work remains untouched, and existing cart stock, branch, confirmation, and payment behavior is restored.
 - Runtime harness: N/A — no device/simulator run was authorized or needed; focused widget tests exercised catalog/detail rendering.
-- Out-of-scope review: no cart, purchase-history, backend, web, plan, dependency, or unrelated application files were edited.
+- WU-2 runtime harness: N/A — no device/simulator run was authorized; focused cart widget tests exercised the rendered pickup/delivery and promotion states.
+- Out-of-scope review: no purchase-history, backend, web, plan, dependency, Phase 12 Stripe/QR, Phase 13 delivery selection/quotation, Phase 14 tracking, or Phase 15 AI/recommendation files were edited.
 ```
 
 ## Next step
 
-WU-1 remains represented by the pre-existing `4d00d99`; review the uncommitted focused test/evidence changes, then begin WU-2 with **P11-05**. Keep cart, purchase-history, backend, web, and plan changes out of the WU-1 rollback boundary.
+WU-1 remains represented by the pre-existing `4d00d99`, and WU-2 is implemented and focused-verified without a new commit. Review the uncommitted cart/test/evidence changes, then begin WU-3 with **P11-07**. Keep purchase-history, backend, web, plan, and Phase 12–15 behavior out of the WU-2 rollback boundary.
 
 ## Advisory changed-line forecast
 

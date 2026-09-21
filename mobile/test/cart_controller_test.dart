@@ -56,6 +56,29 @@ void main() {
     expect(controller.paymentError, contains('Card declined (simulado).'));
     expect(api.fetchCartCalls, greaterThan(1));
   });
+
+  test(
+    'keeps delivery totals and payment eligibility from the cart response',
+    () async {
+      final controller = CartController(
+        api: _FakeCartApi(
+          cart: _cart(
+            deliveryType: 'delivery',
+            shippingCost: 6.5,
+            shipment: const CartShipment(address: 'Calle 10 #45'),
+          ),
+        ),
+      );
+
+      await controller.load();
+
+      expect(controller.cart?.deliveryType, 'delivery');
+      expect(controller.cart?.shippingCost, 6.5);
+      expect(controller.cart?.shipment?.address, 'Calle 10 #45');
+      expect(controller.cart?.branchName, 'Centro');
+      expect(controller.canPay, isTrue);
+    },
+  );
 }
 
 class _FakeCartApi implements CartDataSource {
@@ -113,7 +136,13 @@ class _FakeCartApi implements CartDataSource {
   }
 }
 
-Cart _cart({bool reaches = true, String status = 'carrito'}) => Cart(
+Cart _cart({
+  bool reaches = true,
+  String status = 'carrito',
+  String deliveryType = 'sucursal',
+  double? shippingCost,
+  CartShipment? shipment,
+}) => Cart(
   id: 4,
   status: status,
   branchId: 2,
@@ -123,6 +152,9 @@ Cart _cart({bool reaches = true, String status = 'carrito'}) => Cart(
   discount: 0,
   total: 80,
   receiptNumber: null,
+  deliveryType: deliveryType,
+  shippingCost: shippingCost,
+  shipment: shipment,
   lines: [
     CartLine(
       id: 8,

@@ -41,6 +41,24 @@ void main() {
     final service = CartService(_FakeApi(absentCart: true));
     expect(await service.fetchCart(), isNull);
   });
+
+  test(
+    'maps backend cart prices and delivery summary without recalculation',
+    () async {
+      final cart = await CartService(_FakeApi()).fetchCart();
+
+      expect(cart?.subtotal, 91.25);
+      expect(cart?.discount, 8.75);
+      expect(cart?.shippingCost, 6.5);
+      expect(cart?.total, 89.0);
+      expect(cart?.deliveryType, 'delivery');
+      expect(cart?.shipment?.address, 'Calle 10 #45');
+      expect(cart?.lines.single.unitPrice, 50.0);
+      expect(cart?.lines.single.finalPrice, 41.25);
+      expect(cart?.lines.single.discount, 8.75);
+      expect(cart?.lines.single.promotion?.displayName, 'Oferta web');
+    },
+  );
 }
 
 class _FakeApi extends ApiClient {
@@ -85,8 +103,26 @@ Map<String, dynamic> _sale(String status) => {
   'sucursal_id': 2,
   'sucursal': 'Centro',
   'unidades': 1,
-  'subtotal': 80,
-  'descuento': 0,
-  'total': 80,
-  'detalle': [],
+  'subtotal': 91.25,
+  'descuento': 8.75,
+  'tipo_entrega': 'delivery',
+  'costo_envio': 6.5,
+  'envio': {'direccion': 'Calle 10 #45'},
+  'total': 89,
+  'detalle': [
+    {
+      'id': 8,
+      'variante_id': 9,
+      'sku': 'GC-09',
+      'prenda': 'Camisa',
+      'talla': 'M',
+      'color': 'Azul',
+      'cantidad': 1,
+      'precio_unitario': 50,
+      'precio_final': 41.25,
+      'descuento': 8.75,
+      'promocion': {'id': 2, 'nombre': 'Oferta', 'etiqueta': 'Oferta web'},
+      'subtotal': 41.25,
+    },
+  ],
 };

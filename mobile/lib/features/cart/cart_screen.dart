@@ -203,6 +203,43 @@ class _CartScreenState extends State<CartScreen> {
               '${line.size} · ${line.color} · ${line.sku}',
               style: GangaTextStyles.metadata,
             ),
+            const SizedBox(height: 8),
+            if (line.hasPromotion) ...[
+              Text(
+                line.promotion?.displayName ?? 'Promoción aplicada',
+                style: const TextStyle(
+                  color: GangaColors.success,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+            ],
+            Row(
+              children: [
+                Text(
+                  'Precio unitario · Bs ${formatCartMoney(line.finalPrice)}',
+                  style: GangaTextStyles.metadata,
+                ),
+                if (line.hasPromotion) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Bs ${formatCartMoney(line.unitPrice)}',
+                    style: GangaTextStyles.metadata.copyWith(
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (line.hasPromotion && line.discount != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                'Ahorrás Bs ${formatCartMoney(line.discount)}',
+                style: GangaTextStyles.metadata.copyWith(
+                  color: GangaColors.success,
+                ),
+              ),
+            ],
             if (insufficient) ...[
               const SizedBox(height: 8),
               GcStatusBadge(
@@ -322,6 +359,27 @@ class _CartScreenState extends State<CartScreen> {
                 'Sucursal de despacho: ${cart.branchName ?? 'No disponible'}',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+            const SizedBox(height: 8),
+            Text(
+              cart.deliveryType == 'delivery'
+                  ? 'Entrega a domicilio'
+                  : 'Retiro en sucursal',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (cart.shippingCost != null)
+              _totalRow('Envío', cart.shippingCost!),
+            if (cart.shipment?.address != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                'Dirección: ${cart.shipment!.address}',
+                style: GangaTextStyles.metadata,
+              ),
+              if (cart.shipment?.reference != null)
+                Text(
+                  'Referencia: ${cart.shipment!.reference}',
+                  style: GangaTextStyles.metadata,
+                ),
+            ],
             const SizedBox(height: 5),
             const Text(
               'El stock se toma de esta sucursal.',
@@ -332,6 +390,7 @@ class _CartScreenState extends State<CartScreen> {
               '${cart.units} ${cart.units == 1 ? 'prenda' : 'prendas'}',
               cart.subtotal,
             ),
+            _totalRow('Descuento', cart.discount),
             _totalRow('Total', cart.total, strong: true),
             if (cart.hasInsufficientStock) ...[
               const SizedBox(height: 8),

@@ -9,9 +9,12 @@ class CartLine {
     required this.quantity,
     required this.unitPrice,
     required this.subtotal,
+    double? finalPrice,
+    this.discount,
+    this.promotion,
     this.available,
     this.reaches = true,
-  });
+  }) : finalPrice = finalPrice ?? unitPrice;
 
   final int id;
   final int variantId;
@@ -21,11 +24,15 @@ class CartLine {
   final String color;
   final int quantity;
   final double unitPrice;
+  final double finalPrice;
+  final double? discount;
+  final CartPromotion? promotion;
   final double subtotal;
   final int? available;
   final bool reaches;
 
   bool get hasInsufficientStock => reaches == false;
+  bool get hasPromotion => promotion != null;
 
   factory CartLine.fromJson(Map<String, dynamic> json) => CartLine(
     id: _intValue(json['id']),
@@ -36,9 +43,40 @@ class CartLine {
     color: _stringValue(json['color']),
     quantity: _intValue(json['cantidad']),
     unitPrice: _doubleValue(json['precio_unitario']),
+    finalPrice: _doubleValue(json['precio_final'] ?? json['precio_unitario']),
+    discount: _nullableDouble(json['descuento']),
+    promotion: _nullablePromotion(json['promocion']),
     subtotal: _doubleValue(json['subtotal']),
     available: _nullableInt(json['disponible']),
     reaches: json['alcanza'] != false,
+  );
+}
+
+class CartPromotion {
+  const CartPromotion({this.id, this.name, this.label});
+
+  final int? id;
+  final String? name;
+  final String? label;
+
+  String? get displayName => label ?? name;
+
+  factory CartPromotion.fromJson(Map<String, dynamic> json) => CartPromotion(
+    id: _nullableInt(json['id']),
+    name: _nullableString(json['nombre']),
+    label: _nullableString(json['etiqueta']),
+  );
+}
+
+class CartShipment {
+  const CartShipment({this.address, this.reference});
+
+  final String? address;
+  final String? reference;
+
+  factory CartShipment.fromJson(Map<String, dynamic> json) => CartShipment(
+    address: _nullableString(json['direccion']),
+    reference: _nullableString(json['referencia']),
   );
 }
 
@@ -54,6 +92,9 @@ class Cart {
     required this.total,
     required this.receiptNumber,
     required this.lines,
+    this.deliveryType = 'sucursal',
+    this.shippingCost,
+    this.shipment,
   });
 
   final int id;
@@ -66,6 +107,9 @@ class Cart {
   final double total;
   final String? receiptNumber;
   final List<CartLine> lines;
+  final String deliveryType;
+  final double? shippingCost;
+  final CartShipment? shipment;
 
   bool get isEmpty => lines.isEmpty;
   bool get hasInsufficientStock =>
@@ -79,6 +123,9 @@ class Cart {
     units: _intValue(json['unidades']),
     subtotal: _doubleValue(json['subtotal']),
     discount: _doubleValue(json['descuento']),
+    deliveryType: _stringValue(json['tipo_entrega'], fallback: 'sucursal'),
+    shippingCost: _nullableDouble(json['costo_envio']),
+    shipment: _nullableShipment(json['envio']),
     total: _doubleValue(json['total']),
     receiptNumber: _nullableString(json['nro_comprobante']),
     lines: _lines(json['detalle']),
@@ -179,7 +226,23 @@ double _doubleValue(Object? value) {
   return double.tryParse('$value') ?? 0;
 }
 
+double? _nullableDouble(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse('$value');
+}
+
 String _stringValue(Object? value, {String fallback = ''}) =>
     value is String ? value : fallback;
 
 String? _nullableString(Object? value) => value is String ? value : null;
+
+CartPromotion? _nullablePromotion(Object? value) {
+  if (value is! Map) return null;
+  return CartPromotion.fromJson(Map<String, dynamic>.from(value));
+}
+
+CartShipment? _nullableShipment(Object? value) {
+  if (value is! Map) return null;
+  return CartShipment.fromJson(Map<String, dynamic>.from(value));
+}
