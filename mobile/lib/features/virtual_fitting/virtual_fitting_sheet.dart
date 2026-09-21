@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -398,7 +399,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
       // Dibujamos únicamente puntos visibles dentro del preview.
       if (x < 0 || x > 1 || y < 0 || y > 1) continue;
 
-      result[entry.key] = PosePoint(x, y);
+      result[entry.key] = PosePoint(x, y, landmark.z / math.max(width, height));
     }
 
     for (final type in const [
@@ -548,17 +549,24 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
               width: placement.width * constraints.maxWidth,
               height: placement.height * constraints.maxHeight,
               child: IgnorePointer(
-                child: Opacity(
-                  opacity: 1.0,
-                  child: Image.network(
-                    widget.imageUrl,
-                    fit: BoxFit.contain,
+                child: Transform.rotate(
+                  angle: placement.rotation,
+                  alignment: Alignment.topCenter,
+                  child: Transform(
                     alignment: Alignment.topCenter,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.white,
-                        size: 40,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.0012)
+                      ..rotateX(placement.pitch),
+                    child: Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.contain,
+                      alignment: Alignment.topCenter,
+                      errorBuilder: (_, _, _) => const Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white,
+                          size: 40,
+                        ),
                       ),
                     ),
                   ),
