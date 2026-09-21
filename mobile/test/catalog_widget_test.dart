@@ -7,6 +7,7 @@ import 'package:mobile/core/storage/preferences_storage.dart';
 import 'package:mobile/features/auth/session_model.dart';
 import 'package:mobile/features/catalog/catalog_detail_models.dart';
 import 'package:mobile/features/catalog/catalog_detail_service.dart';
+import 'package:mobile/features/catalog/catalog_detail_sheet.dart';
 import 'package:mobile/features/catalog/catalog_models.dart';
 import 'package:mobile/features/catalog/catalog_screen.dart';
 import 'package:mobile/features/catalog/catalog_service.dart';
@@ -98,6 +99,61 @@ void main() {
     expect(find.text('Ahorro: Bs 150,00'), findsOneWidget);
     expect(find.text('Bs 850,00'), findsNWidgets(2));
     expect(find.text('Bs 1.000,00'), findsNWidgets(2));
+  });
+
+  testWidgets(
+    'keeps the no-promotion card appearance and backend final price',
+    (tester) async {
+      await tester.pumpWidget(
+        _host(
+          SizedBox(
+            width: 320,
+            height: 420,
+            child: CatalogProductCard(
+              product: _product(
+                available: 2,
+                salePrice: 500,
+                finalPrice: 321,
+                discount: 13,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Bs 321,00'), findsOneWidget);
+      expect(find.text('Bs 500,00'), findsNothing);
+      expect(find.text('Oferta'), findsNothing);
+      expect(find.textContaining('Ahorro:'), findsNothing);
+    },
+  );
+
+  testWidgets('renders zero discount and missing promotion fields safely', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              salePrice: 900,
+              finalPrice: 875.25,
+              discount: 0,
+              promotion: const CatalogPromotion(id: 8),
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oferta'), findsOneWidget);
+    expect(find.text('Bs 875,25'), findsOneWidget);
+    expect(find.text('Bs 900,00'), findsOneWidget);
+    expect(find.text('Ahorro: Bs 0,00'), findsOneWidget);
   });
 
   testWidgets(

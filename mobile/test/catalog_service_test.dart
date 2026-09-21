@@ -129,6 +129,8 @@ void main() {
       expect(products.first.salePrice, 1234.5);
       expect(products.first.finalPrice, 987.75);
       expect(products.first.discount, 246.75);
+      expect(products.first.promotion?.id, 7);
+      expect(products.first.promotion?.name, 'Liquidación Oxford');
       expect(products.first.promotion?.label, '-Bs 246,75');
       expect(products.first.promotion?.discountType, 'monto');
       expect(products.first.promotion?.value, 246.75);
@@ -150,6 +152,25 @@ void main() {
       expect(api.queries['/catalogo'], isEmpty);
     },
   );
+
+  test('keeps backend prices and discounts without local derivation', () {
+    final product = Product.fromJson({
+      'id': 20,
+      'nombre': 'Precio definido por backend',
+      'precio_venta': 100,
+      'precio_final': 81.25,
+      'descuento': 2.5,
+      'promocion': {'id': 9, 'tipo_descuento': 'porcentaje', 'valor': 40},
+      'categoria_id': 2,
+      'disponible_total': 1,
+      'variantes': [],
+    });
+
+    expect(product.salePrice, 100);
+    expect(product.finalPrice, 81.25);
+    expect(product.discount, 2.5);
+    expect(product.promotion?.value, 40);
+  });
 }
 
 class _FakeApi extends ApiClient {

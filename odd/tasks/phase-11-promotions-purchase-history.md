@@ -101,9 +101,9 @@ The `flutter run` command is for the manual visual-parity pass and requires an e
 
 - [x] **P11-00 — Create this ODD task document.** The authorized scope, exclusions, verification mode, checklist, acceptance criteria, commands, evidence placeholders, and delivery boundaries are recorded.
 - [x] **P11-01 — Freeze the implementation baseline and confirm contracts.** Verified the public catalog contract in `backend/app/modules/prendas/service.py` and `router.py`: `precio_venta` is the list price and the backend supplies `precio_final`, `descuento`, and nullable `promocion`; the generic authenticated `ApiClient.request` has no JSON/PDF-specific comprobante handling relevant to WU-1.
-- [x] **P11-02 — Define the fixture matrix before model changes.** Implemented focused fixtures for active promotion, no promotion with legacy missing `precio_final`, zero discount, and a promotion object with missing optional fields; each maps to the backend keys `precio_venta`, `precio_final`, `descuento`, and `promocion.{id,nombre,tipo_descuento,valor,etiqueta,fecha_fin}`.
+- [x] **P11-02 — Define the fixture matrix before model changes.** Implemented focused fixtures for active promotion, no promotion with legacy missing `precio_final`, zero discount, a promotion object with missing optional fields, and intentionally non-derived backend amounts; each maps to the backend keys `precio_venta`, `precio_final`, `descuento`, and `promocion.{id,nombre,tipo_descuento,valor,etiqueta,fecha_fin}`.
 - [x] **P11-03 — Extend catalog and detail models without financial derivation.** `Product` now retains backend list/final prices, discount, and optional promotion metadata. Missing `precio_final` falls back only to `precio_venta`; no discount or final-price calculation is performed locally.
-- [x] **P11-04 — Render catalog and detail promotion parity.** Catalog cards and detail sheets now render the backend final price, list price struck through only when `promocion` is present, promotion badge/label/name, and backend discount as savings while preserving stock, variants, reservation, cart, and existing loading/error/empty behavior.
+- [x] **P11-04 — Render catalog and detail promotion parity.** Catalog cards and detail sheets now render the backend final price, list price struck through only when `promocion` is present, promotion badge/label/name, and backend discount as savings while preserving stock, variants, reservation, cart, and existing loading/error/empty behavior. Focused widgets also cover no promotion, zero discount, and missing promotion metadata.
 - [ ] **P11-05 through P11-12 — Remaining implementation and verification.** Pending; no unverified task is claimed here.
 
 ## Verification evidence placeholder
@@ -116,9 +116,9 @@ Baseline contract evidence:
 - Existing ApiClient JSON/PDF capability: generic authenticated `ApiClient.request` only; comprobante handling is outside WU-1.
 
 Automated evidence:
-- Format command/result: `fvm dart format lib/features/catalog/catalog_models.dart lib/features/catalog/catalog_screen.dart lib/features/catalog/catalog_detail_sheet.dart test/catalog_service_test.dart test/catalog_widget_test.dart test/catalog_controller_test.dart test/catalog_detail_controller_test.dart` — passed; no changes required on final run.
+- Format command/result: `fvm dart format lib/features/catalog/catalog_models.dart lib/features/catalog/catalog_screen.dart lib/features/catalog/catalog_detail_sheet.dart test/catalog_service_test.dart test/catalog_widget_test.dart test/catalog_controller_test.dart test/catalog_detail_controller_test.dart` followed by the same command with `--output=none --set-exit-if-changed` — passed; 7 files checked, 0 changes required on the final check.
 - Analyze command/result: `fvm flutter analyze lib/features/catalog/catalog_models.dart lib/features/catalog/catalog_screen.dart lib/features/catalog/catalog_detail_sheet.dart test/catalog_service_test.dart test/catalog_widget_test.dart test/catalog_controller_test.dart test/catalog_detail_controller_test.dart` — passed, no issues.
-- Focused test command/result: `fvm flutter test test/catalog_service_test.dart test/catalog_detail_service_test.dart test/catalog_detail_controller_test.dart test/catalog_controller_test.dart test/catalog_widget_test.dart` — passed, 19 tests.
+- Focused test command/result: `fvm flutter test test/catalog_service_test.dart test/catalog_detail_service_test.dart test/catalog_detail_controller_test.dart test/catalog_controller_test.dart test/catalog_widget_test.dart` — passed, 22 tests.
 - Full test command/result: [pending]
 - Coverage command/result: [pending]
 
@@ -130,8 +130,8 @@ Parity evidence:
 
 Delivery evidence:
 - Changed files: `mobile/lib/features/catalog/catalog_models.dart`, `mobile/lib/features/catalog/catalog_screen.dart`, `mobile/lib/features/catalog/catalog_detail_sheet.dart`, `mobile/test/catalog_service_test.dart`, `mobile/test/catalog_widget_test.dart`, `mobile/test/catalog_controller_test.dart`, `mobile/test/catalog_detail_controller_test.dart`, and this task document.
-- Authored changed-line count: approximately 455 implementation/test additions and deletions, plus the focused evidence update; no generated files or dependencies. This exceeds the advisory 400-line review budget but remains one cohesive catalog/detail work unit as requested.
-- Work-unit commit IDs: recorded after the WU-1 commit is created.
+- Authored changed-line count: approximately 455 implementation/test additions and deletions in the pre-existing WU-1 boundary, plus approximately 75 focused test lines and the evidence update in this worktree; no generated files or dependencies. This exceeds the advisory 400-line review budget but remains one cohesive catalog/detail work unit as requested.
+- Work-unit commit IDs: pre-existing `4d00d99` (`feat(mobile): preserve backend promotions in catalog`); no commit, staging, push, or remote operation was performed in this execution.
 - Rollback verification: revert only the catalog/detail model, presentation, and related test changes listed above; catalog browsing, stock, variant selection, reservation, and cart entry remain otherwise intact.
 - Runtime harness: N/A — no device/simulator run was authorized or needed; focused widget tests exercised catalog/detail rendering.
 - Out-of-scope review: no cart, purchase-history, backend, web, plan, dependency, or unrelated application files were edited.
@@ -139,7 +139,7 @@ Delivery evidence:
 
 ## Next step
 
-Create the WU-1 commit with the focused evidence above, then begin WU-2 with **P11-05**. Keep cart, purchase-history, backend, web, and plan changes out of the WU-1 rollback boundary.
+WU-1 remains represented by the pre-existing `4d00d99`; review the uncommitted focused test/evidence changes, then begin WU-2 with **P11-05**. Keep cart, purchase-history, backend, web, and plan changes out of the WU-1 rollback boundary.
 
 ## Advisory changed-line forecast
 
