@@ -38,6 +38,16 @@ void main() {
             'descripcion': null,
             'marca': 'Ganga',
             'precio_venta': 1234.5,
+            'precio_final': 987.75,
+            'descuento': 246.75,
+            'promocion': {
+              'id': 7,
+              'nombre': 'Liquidación Oxford',
+              'tipo_descuento': 'monto',
+              'valor': 246.75,
+              'etiqueta': '-Bs 246,75',
+              'fecha_fin': '2030-12-31',
+            },
             'imagen_url': null,
             'categoria_id': 2,
             'coleccion_id': 3,
@@ -58,6 +68,39 @@ void main() {
                 ],
               },
             ],
+          },
+          {
+            'id': 11,
+            'nombre': 'Polo clásico',
+            'precio_venta': 80,
+            'imagen_url': null,
+            'categoria_id': 2,
+            'disponible_total': 0,
+            'variantes': [],
+          },
+          {
+            'id': 12,
+            'nombre': 'Buzo con descuento cero',
+            'precio_venta': 120,
+            'precio_final': 120,
+            'descuento': 0,
+            'promocion': {'id': 8, 'nombre': 'Beneficio informativo'},
+            'imagen_url': null,
+            'categoria_id': 2,
+            'disponible_total': 0,
+            'variantes': [],
+          },
+          {
+            'id': 13,
+            'nombre': 'Oferta incompleta',
+            'precio_venta': 50,
+            'precio_final': 45,
+            'descuento': 5,
+            'promocion': {},
+            'imagen_url': null,
+            'categoria_id': 2,
+            'disponible_total': 0,
+            'variantes': [],
           },
         ],
         '/admin/temporadas': [
@@ -82,10 +125,23 @@ void main() {
       final products = await service.fetchCatalog(const CatalogFilters());
       final options = await service.fetchOptions();
 
-      expect(products.single.name, 'Camisa Oxford');
-      expect(products.single.salePrice, 1234.5);
-      expect(products.single.variants.single.availability.single.available, 4);
-      expect(products.single.variants.single.colorHex, '#112233');
+      expect(products.first.name, 'Camisa Oxford');
+      expect(products.first.salePrice, 1234.5);
+      expect(products.first.finalPrice, 987.75);
+      expect(products.first.discount, 246.75);
+      expect(products.first.promotion?.label, '-Bs 246,75');
+      expect(products.first.promotion?.discountType, 'monto');
+      expect(products.first.promotion?.value, 246.75);
+      expect(products.first.promotion?.endDate, '2030-12-31');
+      expect(products.first.variants.single.availability.single.available, 4);
+      expect(products.first.variants.single.colorHex, '#112233');
+      expect(products[1].promotion, isNull);
+      expect(products[1].finalPrice, 80);
+      expect(products[2].discount, 0);
+      expect(products[2].promotion?.name, 'Beneficio informativo');
+      expect(products[3].promotion, isNotNull);
+      expect(products[3].promotion?.label, isNull);
+      expect(products[3].finalPrice, 45);
       expect(options.seasons.single.active, isFalse);
       expect(options.colors.single.colorHex, '#112233');
       expect(options.branches.last.active, isFalse);

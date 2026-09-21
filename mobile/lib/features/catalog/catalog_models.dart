@@ -65,6 +65,9 @@ class Product {
     required this.description,
     required this.brand,
     required this.salePrice,
+    required this.finalPrice,
+    this.discount,
+    this.promotion,
     required this.imageUrl,
     required this.categoryId,
     required this.collectionId,
@@ -77,6 +80,9 @@ class Product {
   final String? description;
   final String? brand;
   final double salePrice;
+  final double finalPrice;
+  final double? discount;
+  final CatalogPromotion? promotion;
   final String? imageUrl;
   final int categoryId;
   final int? collectionId;
@@ -89,6 +95,11 @@ class Product {
     description: _nullableString(json['descripcion']),
     brand: _nullableString(json['marca']),
     salePrice: _requiredDouble(json, 'precio_venta'),
+    finalPrice:
+        _nullableDouble(json['precio_final']) ??
+        _requiredDouble(json, 'precio_venta'),
+    discount: _nullableDouble(json['descuento']),
+    promotion: CatalogPromotion.fromJson(json['promocion']),
     imageUrl: _nullableString(json['imagen_url']),
     categoryId: _requiredInt(json, 'categoria_id'),
     collectionId: _nullableInt(json['coleccion_id']),
@@ -97,6 +108,37 @@ class Product {
       json['variantes'],
     ).map(Variant.fromJson).toList(growable: false),
   );
+}
+
+class CatalogPromotion {
+  const CatalogPromotion({
+    this.id,
+    this.name,
+    this.discountType,
+    this.value,
+    this.label,
+    this.endDate,
+  });
+
+  final int? id;
+  final String? name;
+  final String? discountType;
+  final double? value;
+  final String? label;
+  final String? endDate;
+
+  static CatalogPromotion? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = Map<String, dynamic>.from(value);
+    return CatalogPromotion(
+      id: _nullableInt(json['id']),
+      name: _nullableString(json['nombre']),
+      discountType: _nullableString(json['tipo_descuento']),
+      value: _nullableDouble(json['valor']),
+      label: _nullableString(json['etiqueta']),
+      endDate: _nullableString(json['fecha_fin']),
+    );
+  }
 }
 
 /// A record returned by the existing catalog option endpoints.
@@ -211,6 +253,11 @@ double _requiredDouble(Map<String, dynamic> json, String key) {
   final number = value is num ? value.toDouble() : double.tryParse('$value');
   if (number == null) throw FormatException('Missing number field: $key');
   return number;
+}
+
+double? _nullableDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  return value is String ? double.tryParse(value) : null;
 }
 
 String _requiredString(Map<String, dynamic> json, String key) {

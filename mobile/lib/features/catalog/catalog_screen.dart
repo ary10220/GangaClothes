@@ -439,10 +439,7 @@ class CatalogProductCard extends StatelessWidget {
                       ),
                     ),
                   const SizedBox(height: 3),
-                  Text(
-                    'Bs ${formatBolivianos(product.salePrice)}',
-                    style: GangaTextStyles.money,
-                  ),
+                  _CatalogPrice(product),
                   const SizedBox(height: 2),
                   Text(
                     availabilityText(product, branchName: branchName),
@@ -492,28 +489,104 @@ class _ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final image = product.imageUrl?.trim();
-    return Container(
-      width: double.infinity,
-      color: const Color(0xFFECECE5),
-      child: image == null || image.isEmpty
-          ? const Center(
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                size: 52,
-                color: GangaColors.missingImage,
-              ),
-            )
-          : Image.network(
-              image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => const Center(
-                child: Icon(
-                  Icons.image_not_supported_outlined,
-                  size: 52,
-                  color: GangaColors.missingImage,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Container(
+          width: double.infinity,
+          color: const Color(0xFFECECE5),
+          child: image == null || image.isEmpty
+              ? const Center(
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 52,
+                    color: GangaColors.missingImage,
+                  ),
+                )
+              : Image.network(
+                  image,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Icon(
+                      Icons.image_not_supported_outlined,
+                      size: 52,
+                      color: GangaColors.missingImage,
+                    ),
+                  ),
                 ),
-              ),
+        ),
+        if (product.promotion != null)
+          Positioned(
+            top: 9,
+            left: 9,
+            child: _PromotionBadge(product.promotion!),
+          ),
+      ],
+    );
+  }
+}
+
+class _CatalogPrice extends StatelessWidget {
+  const _CatalogPrice(this.product);
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    final promotion = product.promotion;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Bs ${formatBolivianos(product.finalPrice)}',
+          style: GangaTextStyles.money.copyWith(
+            color: promotion == null ? null : GangaColors.success,
+          ),
+        ),
+        if (promotion != null)
+          Text(
+            'Bs ${formatBolivianos(product.salePrice)}',
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: GangaColors.gray,
+              decoration: TextDecoration.lineThrough,
             ),
+          ),
+      ],
+    );
+  }
+}
+
+class _PromotionBadge extends StatelessWidget {
+  const _PromotionBadge(this.promotion);
+
+  final CatalogPromotion promotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = promotion.label?.trim();
+    final name = promotion.name?.trim();
+    final text = label?.isNotEmpty == true
+        ? label!
+        : name?.isNotEmpty == true
+        ? name!
+        : 'Oferta';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: GangaColors.alert,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: GangaColors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
     );
   }
 }

@@ -56,6 +56,50 @@ void main() {
     expect(find.text('Ver detalle'), findsOneWidget);
   });
 
+  testWidgets('renders backend promotion values in card and detail', (
+    tester,
+  ) async {
+    final product = _product(
+      available: 2,
+      salePrice: 1000,
+      promotion: const CatalogPromotion(
+        id: 4,
+        name: 'Oferta de temporada',
+        discountType: 'porcentaje',
+        value: 15,
+        label: '-15%',
+        endDate: '2030-12-31',
+      ),
+      finalPrice: 850,
+      discount: 150,
+    );
+    await tester.pumpWidget(
+      _host(
+        CatalogScreen(
+          catalogService: _FakeCatalogApi(products: [product]),
+          detailService: _FakeDetailApi(),
+          preferenceStore: _Prefs(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('-15%'), findsOneWidget);
+    expect(find.text('Bs 850,00'), findsOneWidget);
+    expect(find.text('Bs 1.000,00'), findsOneWidget);
+    expect(find.text('M · L'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView), const Offset(0, -420));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver detalle'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oferta de temporada'), findsOneWidget);
+    expect(find.text('Ahorro: Bs 150,00'), findsOneWidget);
+    expect(find.text('Bs 850,00'), findsNWidgets(2));
+    expect(find.text('Bs 1.000,00'), findsNWidgets(2));
+  });
+
   testWidgets(
     'renders no-stock branch state and guest/authenticated app bars',
     (tester) async {
@@ -204,12 +248,21 @@ class _FakeDetailApi implements CatalogActionDataSource {
   );
 }
 
-Product _product({required int available}) => Product(
+Product _product({
+  required int available,
+  double salePrice = 1234.5,
+  double finalPrice = 1234.5,
+  double? discount,
+  CatalogPromotion? promotion,
+}) => Product(
   id: 1,
   name: 'Camisa Oxford',
   description: null,
   brand: 'Ganga',
-  salePrice: 1234.5,
+  salePrice: salePrice,
+  finalPrice: finalPrice,
+  discount: discount,
+  promotion: promotion,
   imageUrl: null,
   categoryId: 1,
   collectionId: null,
