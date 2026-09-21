@@ -549,7 +549,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
               height: placement.height * constraints.maxHeight,
               child: IgnorePointer(
                 child: Opacity(
-                  opacity: .72,
+                  opacity: 1.0,
                   child: Image.network(
                     widget.imageUrl,
                     fit: BoxFit.contain,
@@ -568,9 +568,9 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
           if (_visibleLandmarks.isNotEmpty)
             Positioned.fill(
               child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _PoseLandmarksPainter(_visibleLandmarks),
-                ),
+                // child: CustomPaint(
+                //   painter: _PoseLandmarksPainter(_visibleLandmarks),
+                // ),
               ),
             ),
           if (placement == null)
