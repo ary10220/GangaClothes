@@ -32,6 +32,26 @@ void main() {
     expect(find.text('Descuento'), findsOneWidget);
     expect(find.text('Total'), findsOneWidget);
     expect(find.text('Bs 170,50'), findsOneWidget);
+    expect(find.text('Seguir envío'), findsOneWidget);
+  });
+
+  testWidgets('does not offer tracking for unpaid or non-delivery purchases', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: gangaTheme(),
+        home: PurchaseHistoryScreen(
+          purchaseHistoryService: _FakePurchaseSource(
+            items: [_nonDeliveryPurchase, _unpaidDeliveryPurchase],
+          ),
+          session: _session,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Seguir envío'), findsNothing);
   });
 
   testWidgets('opens the authenticated JSON receipt in an in-app dialog', (
@@ -243,6 +263,7 @@ final _purchase = Purchase(
     id: 30,
     status: 'en preparación',
     address: 'Av. Siempre Viva 123',
+    reference: 'Portón azul',
     total: 12.5,
     receiptNumber: 'ENV-30',
     details: const [],
@@ -271,6 +292,73 @@ final _purchase = Purchase(
       amount: 170.5,
       status: 'exitoso',
       externalReference: 'ref-2',
+      gateway: 'stripe',
+      label: 'Tarjeta (Stripe)',
+    ),
+  ],
+);
+
+final _nonDeliveryPurchase = Purchase(
+  id: 13,
+  status: 'pagada',
+  channel: 'movil',
+  dateRaw: null,
+  branchId: 2,
+  branchName: 'Centro',
+  customer: null,
+  cashier: null,
+  reservationId: null,
+  units: 1,
+  subtotal: 80,
+  discount: 0,
+  total: 80,
+  receiptNumber: 'FAC-13',
+  details: const [],
+  payments: const [
+    PurchasePayment(
+      id: 13,
+      method: 'tarjeta',
+      amount: 80,
+      status: 'exitoso',
+      externalReference: null,
+    ),
+  ],
+);
+
+final _unpaidDeliveryPurchase = Purchase(
+  id: 14,
+  status: 'pendiente',
+  channel: 'movil',
+  dateRaw: null,
+  branchId: 2,
+  branchName: 'Centro',
+  customer: null,
+  cashier: null,
+  reservationId: null,
+  units: 1,
+  subtotal: 80,
+  discount: 0,
+  total: 92.5,
+  receiptNumber: 'FAC-14',
+  deliveryType: 'delivery',
+  shippingCost: 12.5,
+  shipment: const PurchaseShipment(
+    id: 31,
+    status: 'pendiente',
+    address: 'Calle 2',
+    total: 12.5,
+    receiptNumber: null,
+    details: [],
+    payments: [],
+  ),
+  details: const [],
+  payments: const [
+    PurchasePayment(
+      id: 14,
+      method: 'tarjeta',
+      amount: 92.5,
+      status: 'pendiente',
+      externalReference: null,
     ),
   ],
 );

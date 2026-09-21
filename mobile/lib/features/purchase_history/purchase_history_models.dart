@@ -83,6 +83,10 @@ class PurchasePayment {
     required this.amount,
     required this.status,
     required this.externalReference,
+    this.gateway,
+    this.label,
+    this.currency,
+    this.dateRaw,
   });
 
   final int id;
@@ -90,6 +94,10 @@ class PurchasePayment {
   final double amount;
   final String status;
   final String? externalReference;
+  final String? gateway;
+  final String? label;
+  final String? currency;
+  final String? dateRaw;
 
   factory PurchasePayment.fromJson(Map<String, dynamic> json) =>
       PurchasePayment(
@@ -98,6 +106,10 @@ class PurchasePayment {
         amount: _doubleValue(json['monto']),
         status: _stringValue(json['estado']),
         externalReference: _nullableString(json['referencia_externa']),
+        gateway: _nullableString(json['pasarela']),
+        label: _nullableString(json['etiqueta']),
+        currency: _nullableString(json['moneda']),
+        dateRaw: _nullableString(json['fecha']),
       );
 }
 
@@ -108,6 +120,7 @@ class PurchaseShipment {
     required this.address,
     required this.total,
     required this.receiptNumber,
+    this.reference,
     required this.details,
     required this.payments,
   });
@@ -117,6 +130,7 @@ class PurchaseShipment {
   final String? address;
   final double total;
   final String? receiptNumber;
+  final String? reference;
   final List<PurchaseDetail> details;
   final List<PurchasePayment> payments;
 
@@ -127,6 +141,7 @@ class PurchaseShipment {
         address: _nullableString(json['direccion']),
         total: _doubleValue(json['total']),
         receiptNumber: _nullableString(json['nro_comprobante']),
+        reference: _nullableString(json['referencia']),
         details: _details(json['detalle']),
         payments: _payments(json['pagos']),
       );
@@ -267,6 +282,13 @@ class Purchase {
       receiptNumber?.trim().isNotEmpty == true ? receiptNumber! : '#V-$id';
 
   bool get isDelivery => deliveryType == 'delivery';
+
+  bool get canTrackShipment =>
+      status == 'pagada' &&
+      isDelivery &&
+      shipment != null &&
+      shipment!.id > 0 &&
+      successfulPayment?.status == 'exitoso';
 
   factory Purchase.fromJson(Map<String, dynamic> json) => Purchase(
     id: _intValue(json['id']),

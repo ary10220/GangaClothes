@@ -26,6 +26,7 @@ void main() {
           'id': 30,
           'estado': 'en preparación',
           'direccion': 'Av. Siempre Viva 123',
+          'referencia': 'Portón azul',
           'total': 12.5,
           'nro_comprobante': 'ENV-30',
           'detalle': <Object?>[],
@@ -61,6 +62,8 @@ void main() {
             'monto': '170.50',
             'estado': 'exitoso',
             'referencia_externa': 'ref-2',
+            'pasarela': 'stripe',
+            'etiqueta': 'Tarjeta (Stripe)',
           },
         ],
       });
@@ -75,8 +78,11 @@ void main() {
       expect(purchase.deliveryType, 'delivery');
       expect(purchase.shippingCost, 12.5);
       expect(purchase.shipment?.address, 'Av. Siempre Viva 123');
+      expect(purchase.shipment?.reference, 'Portón azul');
       expect(purchase.displayReceiptNumber, 'FAC-12');
       expect(purchase.successfulPayment?.method, 'tarjeta');
+      expect(purchase.successfulPayment?.label, 'Tarjeta (Stripe)');
+      expect(purchase.successfulPayment?.gateway, 'stripe');
       expect(formatPurchaseDate('2030-04-05T09:07:06'), contains('05/04/2030'));
       expect(formatPurchaseMoney(1234.5), '1.234,50');
     },

@@ -119,6 +119,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
         ),
       if (isCustomer)
         GcAppBarDestination(
+          label: 'Seguimiento',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.shipmentTracking),
+        ),
+      if (isCustomer)
+        GcAppBarDestination(
           label: 'Carrito',
           onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
         ),

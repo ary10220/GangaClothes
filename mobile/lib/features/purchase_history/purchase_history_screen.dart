@@ -158,6 +158,12 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
           ),
         if (customer)
           GcAppBarDestination(
+            label: 'Seguimiento',
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.shipmentTracking),
+          ),
+        if (customer)
+          GcAppBarDestination(
             label: 'Carrito',
             onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
           ),
@@ -222,6 +228,14 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
                   receiptLoading:
                       _controller.receiptLoading &&
                       _controller.receiptPurchaseId == purchase.id,
+                  onTrackingPressed: purchase.canTrackShipment
+                      ? () => Navigator.of(context).pushNamed(
+                          AppRoutes.shipmentTracking,
+                          arguments: ShipmentTrackingRouteArguments(
+                            shipmentId: purchase.shipment!.id,
+                          ),
+                        )
+                      : null,
                 ),
               ),
           ],
@@ -235,11 +249,13 @@ class _PurchaseCard extends StatelessWidget {
   const _PurchaseCard({
     required this.purchase,
     this.onReceiptPressed,
+    this.onTrackingPressed,
     this.receiptLoading = false,
   });
 
   final Purchase purchase;
   final VoidCallback? onReceiptPressed;
+  final VoidCallback? onTrackingPressed;
   final bool receiptLoading;
 
   @override
@@ -306,6 +322,11 @@ class _PurchaseCard extends StatelessWidget {
                   label: 'Estado del envío',
                   value: purchase.shipment!.status!,
                 ),
+              if (purchase.shipment?.reference?.trim().isNotEmpty == true)
+                _InfoText(
+                  label: 'Referencia de envío',
+                  value: purchase.shipment!.reference!,
+                ),
               Text(
                 'Pago: ${purchasePaymentMethod(payment?.method)} · '
                 '${purchasePaymentStatus(payment?.status)}',
@@ -316,6 +337,10 @@ class _PurchaseCard extends StatelessWidget {
                   label: 'Referencia',
                   value: payment!.externalReference!,
                 ),
+              if (payment?.label?.trim().isNotEmpty == true)
+                _InfoText(label: 'Detalle de pago', value: payment!.label!),
+              if (payment?.gateway?.trim().isNotEmpty == true)
+                _InfoText(label: 'Pasarela', value: payment!.gateway!),
               const SizedBox(height: 10),
               const Divider(),
               for (final detail in purchase.details) _DetailRow(detail: detail),
@@ -357,6 +382,17 @@ class _PurchaseCard extends StatelessWidget {
                           ? 'Cargando comprobante...'
                           : 'Ver comprobante',
                     ),
+                  ),
+                ),
+              ],
+              if (onTrackingPressed != null) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: onTrackingPressed,
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: const Text('Seguir envío'),
                   ),
                 ),
               ],

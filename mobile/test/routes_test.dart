@@ -36,6 +36,10 @@ void main() {
       AppRoutes.reservations,
     );
     expect(
+      AppRoutes.destinationFor(AppRoutes.shipmentTracking, session),
+      AppRoutes.shipmentTracking,
+    );
+    expect(
       AppRoutes.destinationFor(AppRoutes.purchaseHistory, session),
       AppRoutes.purchaseHistory,
     );
@@ -55,6 +59,10 @@ void main() {
     expect(AppRoutes.destinationFor(AppRoutes.cart, staff), AppRoutes.catalog);
     expect(
       AppRoutes.destinationFor(AppRoutes.purchaseHistory, staff),
+      AppRoutes.catalog,
+    );
+    expect(
+      AppRoutes.destinationFor(AppRoutes.shipmentTracking, staff),
       AppRoutes.catalog,
     );
     expect(
