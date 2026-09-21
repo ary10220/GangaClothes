@@ -15,6 +15,7 @@ import '../../shared/widgets/gc_status_badge.dart';
 import 'cart_controller.dart';
 import 'cart_models.dart';
 import 'cart_service.dart';
+import '../delivery/delivery_sheet.dart';
 import 'payment_sheet.dart';
 
 class CartScreen extends StatefulWidget {
@@ -95,6 +96,17 @@ class _CartScreenState extends State<CartScreen> {
         controller: _controller,
         initialHolder: widget.session?.user.fullName ?? '',
       ),
+    );
+  }
+
+  void _openDelivery() {
+    if (!_controller.canEditDelivery || !mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: GangaColors.white,
+      builder: (_) => DeliverySheet(controller: _controller),
     );
   }
 
@@ -384,6 +396,32 @@ class _CartScreenState extends State<CartScreen> {
                   : 'Retiro en sucursal',
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            const SizedBox(height: 8),
+            if (cart.deliveryType == 'delivery' && cart.shipment != null) ...[
+              if (cart.shipment?.contactPhone != null)
+                Text(
+                  'Teléfono: ${cart.shipment!.contactPhone}',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.latitude != null &&
+                  cart.shipment?.longitude != null)
+                Text(
+                  'Coordenadas: ${cart.shipment!.latitude}, ${cart.shipment!.longitude}',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.express == true)
+                const Text('Entrega express', style: GangaTextStyles.metadata),
+              if (cart.shipment?.distanceKm != null)
+                Text(
+                  'Distancia backend: ${cart.shipment!.distanceKm} km',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.estimatedAt != null)
+                Text(
+                  'Tiempo estimado backend: ${cart.shipment!.estimatedAt}',
+                  style: GangaTextStyles.metadata,
+                ),
+            ],
             if (cart.shippingCost != null)
               _totalRow('Envío', cart.shippingCost!),
             if (cart.shipment?.address != null) ...[
@@ -402,6 +440,15 @@ class _CartScreenState extends State<CartScreen> {
             const Text(
               'El stock se toma de esta sucursal.',
               style: TextStyle(color: GangaColors.gray, fontSize: 11.5),
+            ),
+            const SizedBox(height: 10),
+            GcButton(
+              label: cart.deliveryType == 'delivery'
+                  ? 'Editar entrega'
+                  : 'Elegir entrega a domicilio',
+              expand: true,
+              variant: GcButtonVariant.outlined,
+              onPressed: _controller.canEditDelivery ? _openDelivery : null,
             ),
             const Divider(height: 22),
             _totalRow(

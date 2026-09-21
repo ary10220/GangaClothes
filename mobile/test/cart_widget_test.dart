@@ -10,6 +10,8 @@ import 'package:mobile/features/cart/cart_models.dart';
 import 'package:mobile/features/cart/cart_screen.dart';
 import 'package:mobile/features/cart/cart_service.dart';
 import 'package:mobile/features/cart/payment_sheet.dart';
+import 'package:mobile/features/delivery/delivery_models.dart';
+import 'package:mobile/features/delivery/delivery_service.dart';
 import 'package:mobile/features/purchase_history/purchase_history_models.dart';
 import 'package:mobile/features/purchase_history/purchase_history_service.dart';
 
@@ -75,6 +77,39 @@ void main() {
       TextDecoration.lineThrough,
     );
   });
+
+  testWidgets(
+    'delivery sheet exposes explicit fields and backend quote without a map',
+    (tester) async {
+      final controller = CartController(api: _FakeCartApi(cart: _deliveryCart));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: GangaTheme.light(),
+          home: CartScreen(
+            apiClient: ApiClient(),
+            session: null,
+            controller: controller,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Editar entrega'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Dirección'), findsOneWidget);
+      expect(find.text('Referencia (opcional)'), findsOneWidget);
+      expect(find.text('Teléfono de contacto'), findsOneWidget);
+      expect(find.text('Latitud'), findsOneWidget);
+      expect(find.text('Longitud'), findsOneWidget);
+      expect(find.text('Entrega express'), findsOneWidget);
+      expect(find.text('COTIZACIÓN DEL BACKEND'), findsOneWidget);
+      expect(find.textContaining('No hay mapa ni permisos'), findsOneWidget);
+      expect(find.textContaining('Simular'), findsNothing);
+      expect(find.byIcon(Icons.map), findsNothing);
+    },
+  );
 
   testWidgets('validates test payment fields without sending card data', (
     tester,
@@ -161,7 +196,7 @@ void main() {
   });
 }
 
-class _FakeCartApi implements CartDataSource {
+class _FakeCartApi implements CartDataSource, DeliveryDataSource {
   _FakeCartApi({Cart? cart}) : cart = cart ?? _cart;
 
   final Cart cart;
@@ -222,6 +257,49 @@ class _FakeCartApi implements CartDataSource {
   @override
   Future<QrPayment> pollQr({required int saleId, required String qrId}) async =>
       throw UnimplementedError();
+
+  @override
+  Future<DeliveryTariff> fetchDeliveryTariff() async =>
+      const DeliveryTariff(coverageKilometers: 25);
+
+  @override
+  Future<DeliveryQuote> quoteDelivery(DeliveryQuoteInput input) async =>
+      DeliveryQuote.fromJson({
+        'dentro_de_cobertura': true,
+        'desglose': [
+          {'concepto': 'Costo de prueba', 'importe': 6.5},
+        ],
+        'costo_envio': 6.5,
+        'distancia_km': 2.5,
+        'minutos_estimados': 55,
+        'entrega_estimada': '2026-09-21T10:00:00',
+        'express': input.express,
+        'sucursal': {
+          'id': input.branchId,
+          'nombre': 'Centro',
+          'latitud': 0,
+          'longitud': 0,
+        },
+        'destino': {'latitud': input.latitude, 'longitud': input.longitude},
+        'total_a_pagar': 78.85,
+      });
+
+  @override
+  Future<DeliveryResponse> createDelivery(DeliveryInput input) async =>
+      DeliveryResponse(
+        sale: cart,
+        quote: await quoteDelivery(
+          DeliveryQuoteInput(
+            branchId: cart.branchId,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            express: input.express,
+          ),
+        ),
+      );
+
+  @override
+  Future<Cart> removeDelivery(int shipmentId) async => cart;
 }
 
 final _cart = Cart(
@@ -264,8 +342,12 @@ final _deliveryCart = Cart(
   deliveryType: 'delivery',
   shippingCost: 6.5,
   shipment: const CartShipment(
+    id: 15,
     address: 'Av. Siempre Viva 123',
     reference: 'Portón azul',
+    latitude: -17.78,
+    longitude: -63.18,
+    express: false,
   ),
   lines: [
     CartLine(

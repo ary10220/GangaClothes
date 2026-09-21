@@ -3,6 +3,8 @@ import 'package:mobile/core/network/api_error.dart';
 import 'package:mobile/features/cart/cart_controller.dart';
 import 'package:mobile/features/cart/cart_models.dart';
 import 'package:mobile/features/cart/cart_service.dart';
+import 'package:mobile/features/delivery/delivery_models.dart';
+import 'package:mobile/features/delivery/delivery_service.dart';
 
 void main() {
   test('blocks payment when a line does not reach stock', () async {
@@ -65,7 +67,13 @@ void main() {
           cart: _cart(
             deliveryType: 'delivery',
             shippingCost: 6.5,
-            shipment: const CartShipment(address: 'Calle 10 #45'),
+            shipment: const CartShipment(
+              id: 12,
+              address: 'Calle 10 #45',
+              latitude: -17.78,
+              longitude: -63.18,
+              express: false,
+            ),
           ),
         ),
       );
@@ -153,7 +161,7 @@ void main() {
   );
 }
 
-class _FakeCartApi implements CartDataSource {
+class _FakeCartApi implements CartDataSource, DeliveryDataSource {
   _FakeCartApi({this.cart, this.paymentError, List<QrPayment>? qrPollResults})
     : qrPollResults = [...?qrPollResults];
 
@@ -242,6 +250,49 @@ class _FakeCartApi implements CartDataSource {
       sale: _cart(status: 'pagada'),
     );
   }
+
+  @override
+  Future<DeliveryTariff> fetchDeliveryTariff() async =>
+      const DeliveryTariff(coverageKilometers: 25);
+
+  @override
+  Future<DeliveryQuote> quoteDelivery(DeliveryQuoteInput input) async =>
+      DeliveryQuote.fromJson({
+        'dentro_de_cobertura': true,
+        'desglose': [
+          {'concepto': 'Costo de prueba', 'importe': 6.5},
+        ],
+        'costo_envio': 6.5,
+        'distancia_km': 2.5,
+        'minutos_estimados': 55,
+        'entrega_estimada': '2026-09-21T10:00:00',
+        'express': input.express,
+        'sucursal': {
+          'id': input.branchId,
+          'nombre': 'Centro',
+          'latitud': 0,
+          'longitud': 0,
+        },
+        'destino': {'latitud': input.latitude, 'longitud': input.longitude},
+        'total_a_pagar': 86.5,
+      });
+
+  @override
+  Future<DeliveryResponse> createDelivery(DeliveryInput input) async =>
+      DeliveryResponse(
+        sale: cart!,
+        quote: await quoteDelivery(
+          DeliveryQuoteInput(
+            branchId: cart!.branchId,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            express: input.express,
+          ),
+        ),
+      );
+
+  @override
+  Future<Cart> removeDelivery(int shipmentId) async => cart!;
 }
 
 QrPayment _qr({required QrPaymentState state, bool withResult = false}) =>

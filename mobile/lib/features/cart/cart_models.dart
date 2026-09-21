@@ -69,14 +69,41 @@ class CartPromotion {
 }
 
 class CartShipment {
-  const CartShipment({this.address, this.reference});
+  const CartShipment({
+    this.id,
+    this.state,
+    this.address,
+    this.reference,
+    this.contactPhone,
+    this.latitude,
+    this.longitude,
+    this.express,
+    this.distanceKm,
+    this.estimatedAt,
+  });
 
+  final int? id;
+  final String? state;
   final String? address;
   final String? reference;
+  final String? contactPhone;
+  final double? latitude;
+  final double? longitude;
+  final bool? express;
+  final double? distanceKm;
+  final String? estimatedAt;
 
   factory CartShipment.fromJson(Map<String, dynamic> json) => CartShipment(
+    id: _nullableInt(json['id']),
+    state: _nullableString(json['estado']),
     address: _nullableString(json['direccion']),
     reference: _nullableString(json['referencia']),
+    contactPhone: _nullableString(json['telefono_contacto']),
+    latitude: _nullableDouble(json['latitud']),
+    longitude: _nullableDouble(json['longitud']),
+    express: json['express'] is bool ? json['express'] as bool : null,
+    distanceKm: _nullableDouble(json['distancia_km']),
+    estimatedAt: _nullableString(json['fecha_estimada']),
   );
 }
 

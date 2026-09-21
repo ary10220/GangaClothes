@@ -1,5 +1,7 @@
 import '../../core/network/api_client.dart';
 import '../../core/network/api_error.dart';
+import '../delivery/delivery_models.dart';
+import '../delivery/delivery_service.dart';
 import 'cart_models.dart';
 
 abstract interface class CartDataSource {
@@ -28,10 +30,12 @@ abstract interface class CartDataSource {
   Future<QrPayment> pollQr({required int saleId, required String qrId});
 }
 
-class CartService implements CartDataSource {
+class CartService implements CartDataSource, DeliveryDataSource {
   const CartService(this.apiClient);
 
   final ApiClient apiClient;
+
+  DeliveryService get _deliveryService => DeliveryService(apiClient);
 
   @override
   Future<Cart?> fetchCart() async {
@@ -137,6 +141,22 @@ class CartService implements CartDataSource {
     );
     return QrPayment.fromJson(_map(response.data));
   }
+
+  @override
+  Future<DeliveryTariff> fetchDeliveryTariff() =>
+      _deliveryService.fetchDeliveryTariff();
+
+  @override
+  Future<DeliveryQuote> quoteDelivery(DeliveryQuoteInput input) =>
+      _deliveryService.quoteDelivery(input);
+
+  @override
+  Future<DeliveryResponse> createDelivery(DeliveryInput input) =>
+      _deliveryService.createDelivery(input);
+
+  @override
+  Future<Cart> removeDelivery(int shipmentId) =>
+      _deliveryService.removeDelivery(shipmentId);
 
   Future<Cart> _cartRequest(
     String path, {
