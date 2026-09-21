@@ -4,6 +4,9 @@ import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../features/auth/session_model.dart';
+import '../../features/purchase_history/purchase_history_screen.dart';
+import '../../features/purchase_history/purchase_receipt_pdf.dart';
+import '../../features/purchase_history/purchase_history_service.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gc_button.dart';
 import '../../shared/widgets/gc_feedback.dart';
@@ -19,6 +22,9 @@ class CartScreen extends StatefulWidget {
     required this.apiClient,
     required this.session,
     this.controller,
+    this.purchaseReceiptService,
+    this.purchaseReceiptPdfService,
+    this.receiptPdfPrinter,
     this.openPayment = false,
     this.onLogout,
     super.key,
@@ -27,6 +33,9 @@ class CartScreen extends StatefulWidget {
   final ApiClient apiClient;
   final Session? session;
   final CartController? controller;
+  final PurchaseReceiptDataSource? purchaseReceiptService;
+  final PurchaseReceiptPdfDataSource? purchaseReceiptPdfService;
+  final ReceiptPdfPrinter? receiptPdfPrinter;
   final bool openPayment;
   final VoidCallback? onLogout;
 
@@ -36,13 +45,22 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   late final CartController _controller;
+  late final PurchaseReceiptDataSource _receiptService;
+  late final PurchaseReceiptPdfDataSource? _receiptPdfService;
   bool _autoPaymentOpened = false;
+  bool _receiptLoading = false;
 
   @override
   void initState() {
     super.initState();
     _controller =
         widget.controller ?? CartController(api: CartService(widget.apiClient));
+    _receiptService =
+        widget.purchaseReceiptService ??
+        PurchaseHistoryService(widget.apiClient);
+    _receiptPdfService =
+        widget.purchaseReceiptPdfService ??
+        PurchaseHistoryService(widget.apiClient);
     _controller.addListener(_onChanged);
     _controller.load();
   }
@@ -485,7 +503,24 @@ class _CartScreenState extends State<CartScreen> {
             'Referencia de la pasarela · ${result.externalReference ?? '—'}',
             style: GangaTextStyles.eyebrow,
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Método de pago · ${result.paymentLabel ?? 'Tarjeta'}',
+            style: GangaTextStyles.eyebrow,
+          ),
           const SizedBox(height: 14),
+          GcButton(
+            label: _receiptLoading
+                ? 'Cargando comprobante…'
+                : 'Ver comprobante autenticado',
+            expand: true,
+            variant: GcButtonVariant.outlined,
+            loading: _receiptLoading,
+            onPressed: _receiptLoading
+                ? null
+                : () => _openAuthenticatedReceipt(result.sale.id),
+          ),
+          const SizedBox(height: 8),
           GcButton(
             label: 'Seguir comprando',
             expand: true,
@@ -498,4 +533,36 @@ class _CartScreenState extends State<CartScreen> {
       ),
     ),
   );
+
+  Future<void> _openAuthenticatedReceipt(int saleId) async {
+    setState(() => _receiptLoading = true);
+    try {
+      final receipt = await _receiptService.fetchReceipt(saleId);
+      if (!mounted) return;
+      setState(() => _receiptLoading = false);
+      await showDialog<void>(
+        context: context,
+        builder: (_) => PurchaseReceiptDialog(
+          receipt: receipt,
+          onPdfPressed: _receiptPdfService == null
+              ? null
+              : () => _printReceiptPdf(saleId),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cargar el comprobante: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _receiptLoading = false);
+    }
+  }
+
+  Future<void> _printReceiptPdf(int saleId) async {
+    final source = _receiptPdfService;
+    if (source == null) return;
+    final bytes = await source.fetchReceiptPdf(saleId);
+    await printReceiptPdf(bytes, printer: widget.receiptPdfPrinter);
+  }
 }

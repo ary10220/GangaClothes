@@ -139,4 +139,23 @@ void main() {
     expect(result.receiptNumber, 'C-000001');
     expect(result.externalReference, 'pi_test_123');
   });
+
+  test('maps BCP QR states without exposing card data', () {
+    expect(
+      QrPayment.fromJson({'venta_id': 4, 'qr_id': 'q1', 'estado': 'C'}).state,
+      QrPaymentState.pending,
+    );
+    expect(
+      QrPayment.fromJson({'venta_id': 4, 'qr_id': 'q1', 'estado': 'P'}).state,
+      QrPaymentState.approved,
+    );
+    expect(
+      QrPayment.fromJson({'venta_id': 4, 'qr_id': 'q1', 'estado': 'V'}).state,
+      QrPaymentState.expired,
+    );
+    expect(
+      QrPayment.fromJson({'venta_id': 4, 'qr_id': 'q1', 'estado': 'A'}).state,
+      QrPaymentState.annulled,
+    );
+  });
 }

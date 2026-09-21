@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/network/api_client.dart';
@@ -44,24 +46,33 @@ void main() {
     );
   });
 
-  test('documents that PDF bytes cannot become a customer action yet', () {
-    expect(PurchaseHistoryService.supportsPdfReceiptAction, isFalse);
-    expect(
-      PurchaseHistoryService.pdfCapabilityGap,
-      allOf(contains('PDF bytes'), contains('file-opening capability')),
-    );
+  test('fetches authenticated PDF bytes with a byte response type', () async {
+    final api = _FakePurchaseApi(pdfData: Uint8List.fromList([37, 80, 68, 70]));
+
+    final bytes = await PurchaseHistoryService(api).fetchReceiptPdf(7);
+
+    expect(bytes, orderedEquals([37, 80, 68, 70]));
+    expect(api.path, '/ventas/7/comprobante.pdf');
+    expect(api.method, 'GET');
+    expect(api.responseType, ResponseType.bytes);
   });
 }
 
 class _FakePurchaseApi extends ApiClient {
-  _FakePurchaseApi({this.data, this.receiptData, this.receiptFailure = false})
-    : super(dio: Dio());
+  _FakePurchaseApi({
+    this.data,
+    this.receiptData,
+    this.pdfData,
+    this.receiptFailure = false,
+  }) : super(dio: Dio());
 
   final Object? data;
   final Object? receiptData;
+  final Uint8List? pdfData;
   final bool receiptFailure;
   String? path;
   String? method;
+  ResponseType? responseType;
 
   @override
   Future<Response<T>> request<T>(
@@ -74,6 +85,14 @@ class _FakePurchaseApi extends ApiClient {
   }) async {
     path = requestPath;
     this.method = method;
+    responseType = options?.responseType;
+    if (requestPath.endsWith('.pdf')) {
+      return Response<T>(
+        requestOptions: RequestOptions(path: requestPath),
+        data: (pdfData ?? Uint8List.fromList(const [37, 80, 68, 70])) as T,
+        statusCode: 200,
+      );
+    }
     if (requestPath.contains('/comprobante')) {
       if (receiptFailure) {
         throw const ApiError(statusCode: 503, message: 'Receipt unavailable');

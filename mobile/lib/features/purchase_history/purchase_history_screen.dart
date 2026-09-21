@@ -11,12 +11,15 @@ import '../../shared/widgets/gc_status_badge.dart';
 import 'purchase_history_controller.dart';
 import 'purchase_history_models.dart';
 import 'purchase_history_service.dart';
+import 'purchase_receipt_pdf.dart';
 
 class PurchaseHistoryScreen extends StatefulWidget {
   const PurchaseHistoryScreen({
     this.apiClient,
     this.purchaseHistoryService,
     this.purchaseReceiptService,
+    this.purchaseReceiptPdfService,
+    this.receiptPdfPrinter,
     required this.session,
     this.onLogout,
     super.key,
@@ -25,6 +28,8 @@ class PurchaseHistoryScreen extends StatefulWidget {
   final ApiClient? apiClient;
   final PurchaseHistoryDataSource? purchaseHistoryService;
   final PurchaseReceiptDataSource? purchaseReceiptService;
+  final PurchaseReceiptPdfDataSource? purchaseReceiptPdfService;
+  final ReceiptPdfPrinter? receiptPdfPrinter;
   final Session? session;
   final VoidCallback? onLogout;
 
@@ -48,9 +53,15 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     if (receiptSource == null && source is PurchaseReceiptDataSource) {
       receiptSource = source as PurchaseReceiptDataSource;
     }
+    PurchaseReceiptPdfDataSource? pdfReceiptSource =
+        widget.purchaseReceiptPdfService;
+    if (pdfReceiptSource == null && source is PurchaseReceiptPdfDataSource) {
+      pdfReceiptSource = source as PurchaseReceiptPdfDataSource;
+    }
     _controller = PurchaseHistoryController(
       api: source,
       receiptApi: receiptSource,
+      pdfReceiptApi: pdfReceiptSource,
     )..addListener(_onChanged);
     _controller.load();
   }
@@ -75,8 +86,20 @@ class _PurchaseHistoryScreenState extends State<PurchaseHistoryScreen> {
     }
     await showDialog<void>(
       context: context,
-      builder: (_) => _PurchaseReceiptDialog(receipt: receipt),
+      builder: (_) => PurchaseReceiptDialog(
+        receipt: receipt,
+        onPdfPressed: _controller.pdfReceiptApi == null
+            ? null
+            : () => _printReceiptPdf(purchase.id),
+      ),
     );
+  }
+
+  Future<void> _printReceiptPdf(int purchaseId) async {
+    final source = _controller.pdfReceiptApi;
+    if (source == null) return;
+    final bytes = await source.fetchReceiptPdf(purchaseId);
+    await printReceiptPdf(bytes, printer: widget.receiptPdfPrinter);
   }
 
   @override
@@ -462,13 +485,45 @@ class _TotalRow extends StatelessWidget {
   );
 }
 
-class _PurchaseReceiptDialog extends StatelessWidget {
-  const _PurchaseReceiptDialog({required this.receipt});
+class PurchaseReceiptDialog extends StatefulWidget {
+  const PurchaseReceiptDialog({
+    required this.receipt,
+    this.onPdfPressed,
+    super.key,
+  });
 
   final PurchaseReceipt receipt;
+  final Future<void> Function()? onPdfPressed;
+
+  @override
+  State<PurchaseReceiptDialog> createState() => _PurchaseReceiptDialogState();
+}
+
+class _PurchaseReceiptDialogState extends State<PurchaseReceiptDialog> {
+  bool _pdfLoading = false;
+  String? _pdfError;
+
+  Future<void> _handlePdfPressed() async {
+    final callback = widget.onPdfPressed;
+    if (callback == null || _pdfLoading) return;
+    setState(() {
+      _pdfLoading = true;
+      _pdfError = null;
+    });
+    try {
+      await callback();
+    } catch (error) {
+      if (mounted) {
+        setState(() => _pdfError = 'No se pudo abrir el PDF: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _pdfLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final receipt = widget.receipt;
     final currency = receipt.currency?.trim().isNotEmpty == true
         ? receipt.currency!
         : 'Bs';
@@ -534,6 +589,31 @@ class _PurchaseReceiptDialog extends StatelessWidget {
               value: '$currency ${formatPurchaseMoney(receipt.total)}',
               strong: true,
             ),
+            const SizedBox(height: 12),
+            if (widget.onPdfPressed != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _pdfLoading ? null : _handlePdfPressed,
+                  icon: _pdfLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.picture_as_pdf_outlined),
+                  label: Text(_pdfLoading ? 'Abriendo PDF...' : 'Abrir PDF'),
+                ),
+              ),
+              if (_pdfError != null) ...[
+                const SizedBox(height: 6),
+                Text(_pdfError!, style: const TextStyle(fontSize: 11.5)),
+              ],
+            ] else
+              const Text(
+                'La acción de PDF autenticado no está disponible en este momento.',
+                style: TextStyle(fontSize: 11.5),
+              ),
           ],
         ),
       ),

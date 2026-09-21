@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_error.dart';
@@ -11,22 +13,34 @@ class CartController extends ChangeNotifier {
 
   Cart? cart;
   List<CartBranch> branches = const [];
+  List<PaymentMethod> paymentMethods = const [];
   PaymentResult? receipt;
   Cart? pendingSale;
+  QrPayment? qrPayment;
   ApiError? error;
+  ApiError? paymentMethodsError;
   String? feedback;
   bool feedbackIsError = false;
   String? paymentError;
   bool loading = false;
   bool branchChanging = false;
+  bool paymentMethodsLoading = false;
+  bool qrPolling = false;
   final Set<int> busyLineIds = <int>{};
   bool paymentProcessing = false;
+  Timer? _qrTimer;
+  bool _qrRequestInFlight = false;
+  bool _disposed = false;
 
   bool get hasBusyLines => busyLineIds.isNotEmpty;
 
   bool isLineBusy(int lineId) => busyLineIds.contains(lineId);
 
   int? get busyLineId => busyLineIds.firstOrNull;
+
+  List<PaymentMethod> get availablePaymentMethods => paymentMethods
+      .where((method) => method.available && method.value.isNotEmpty)
+      .toList(growable: false);
 
   bool get canPay =>
       cart != null &&
@@ -48,6 +62,7 @@ class CartController extends ChangeNotifier {
         // The cart remains usable when the optional branch list is unavailable.
         branches = const [];
       }
+      await loadPaymentMethods();
       loading = false;
       notifyListeners();
     } on ApiError catch (caught) {
@@ -58,6 +73,24 @@ class CartController extends ChangeNotifier {
       loading = false;
       error = _asApiError(caught);
       notifyListeners();
+    }
+  }
+
+  Future<void> loadPaymentMethods() async {
+    paymentMethodsLoading = true;
+    paymentMethodsError = null;
+    notifyListeners();
+    try {
+      paymentMethods = await api.fetchPaymentMethods();
+    } on ApiError catch (caught) {
+      paymentMethodsError = caught;
+      paymentMethods = const [];
+    } catch (caught) {
+      paymentMethodsError = _asApiError(caught);
+      paymentMethods = const [];
+    } finally {
+      paymentMethodsLoading = false;
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -119,7 +152,7 @@ class CartController extends ChangeNotifier {
     }
   }
 
-  Future<PaymentResult?> checkout({required bool simulateFailure}) async {
+  Future<PaymentResult?> checkout({required String cardNumber}) async {
     if (paymentProcessing) return null;
     if (pendingSale == null && !canPay) return null;
 
@@ -132,11 +165,12 @@ class CartController extends ChangeNotifier {
       final result = await api.pay(
         saleId: sale.id,
         amount: sale.total,
-        simulateFailure: simulateFailure,
+        cardNumber: cardNumber,
       );
       receipt = result;
       pendingSale = null;
       cart = null;
+      qrPayment = null;
       paymentProcessing = false;
       notifyListeners();
       return result;
@@ -148,12 +182,151 @@ class CartController extends ChangeNotifier {
     return null;
   }
 
+  Future<void> startQrPayment() async {
+    if (paymentProcessing || _disposed) return;
+    if (pendingSale == null && !canPay) return;
+    if (qrPayment?.isPending == true && pendingSale != null) {
+      _startQrPolling();
+      return;
+    }
+
+    paymentProcessing = true;
+    paymentError = null;
+    notifyListeners();
+    try {
+      pendingSale ??= await api.confirmCart();
+      final sale = pendingSale!;
+      final qr = await api.createQr(saleId: sale.id);
+      if (_disposed) return;
+      qrPayment = qr;
+      paymentProcessing = false;
+      notifyListeners();
+      if (qr.isPending) _startQrPolling();
+    } on ApiError catch (caught) {
+      await _qrFailure(caught);
+    } catch (caught) {
+      await _qrFailure(_asApiError(caught));
+    }
+  }
+
+  Future<void> pollQr() async {
+    if (_disposed || _qrRequestInFlight || pendingSale == null) return;
+    final qr = qrPayment;
+    if (qr == null || !qr.isPending) {
+      _stopQrPolling();
+      return;
+    }
+
+    _qrRequestInFlight = true;
+    try {
+      final updated = await api.pollQr(saleId: pendingSale!.id, qrId: qr.qrId);
+      if (_disposed) return;
+      qrPayment = updated;
+      if (updated.state == QrPaymentState.approved &&
+          updated.paymentResult != null) {
+        _stopQrPolling();
+        receipt = updated.paymentResult;
+        pendingSale = null;
+        cart = null;
+        paymentProcessing = false;
+        notifyListeners();
+      } else if (updated.isTerminal) {
+        await _qrTerminal(updated);
+      } else {
+        notifyListeners();
+      }
+    } on ApiError catch (caught) {
+      if (_disposed) return;
+      if (caught.statusCode == 402) {
+        final details = caught.details;
+        if (details is Map) {
+          final terminal = QrPayment.fromJson(
+            Map<String, dynamic>.from(details),
+          );
+          if (terminal.qrId.isNotEmpty && terminal.qrId == qr.qrId) {
+            qrPayment = terminal;
+            await _qrTerminal(terminal);
+            return;
+          }
+        }
+        await _paymentFailure(caught);
+      } else if (caught.statusCode >= 500 || caught.statusCode == 0) {
+        // A transient gateway failure must not lose the confirmed sale or stop
+        // asking the bank about the same QR.
+        paymentError = '${caught.message} Reintentando la consulta…';
+        notifyListeners();
+      } else {
+        _stopQrPolling();
+        paymentProcessing = false;
+        paymentError = caught.message;
+        notifyListeners();
+      }
+    } catch (caught) {
+      if (!_disposed) {
+        paymentError = '$caught Reintentando la consulta…';
+        notifyListeners();
+      }
+    } finally {
+      _qrRequestInFlight = false;
+    }
+  }
+
+  void _startQrPolling() {
+    if (_disposed || qrPayment?.isPending != true || qrPolling) return;
+    qrPolling = true;
+    _qrTimer = Timer.periodic(
+      const Duration(seconds: 3),
+      (_) => unawaited(pollQr()),
+    );
+    unawaited(pollQr());
+    notifyListeners();
+  }
+
+  void _stopQrPolling() {
+    _qrTimer?.cancel();
+    _qrTimer = null;
+    qrPolling = false;
+  }
+
+  Future<void> _qrTerminal(QrPayment qr) async {
+    _stopQrPolling();
+    paymentProcessing = false;
+    pendingSale = null;
+    paymentError = switch (qr.state) {
+      QrPaymentState.expired =>
+        'El QR venció antes de que se pagara. Tu carrito sigue intacto: puedes intentar de nuevo.',
+      QrPaymentState.annulled =>
+        'El QR fue anulado. Tu carrito sigue intacto: puedes intentar de nuevo.',
+      _ => null,
+    };
+    notifyListeners();
+    await _refreshCart();
+  }
+
+  Future<void> _qrFailure(ApiError caught) async {
+    paymentProcessing = false;
+    if (caught.statusCode == 402) {
+      await _paymentFailure(caught);
+      return;
+    }
+    if (pendingSale != null) {
+      paymentError =
+          '${caught.message} Tu compra quedó confirmada y pendiente de pago: puedes reintentar.';
+      notifyListeners();
+      return;
+    }
+    paymentError = 'No se pudo confirmar el carrito: ${caught.message}';
+    notifyListeners();
+    await _refreshCart();
+  }
+
   void clearReceiptAndReload() {
     receipt = null;
     load();
   }
 
   Future<void> _paymentFailure(ApiError caught) async {
+    _stopQrPolling();
     paymentProcessing = false;
     if (caught.statusCode == 402) {
       pendingSale = null;
@@ -208,5 +381,12 @@ class CartController extends ChangeNotifier {
   static ApiError _asApiError(Object caught, {String? fallback}) {
     if (caught is ApiError) return caught;
     return ApiError(statusCode: 0, message: '$fallback $caught'.trim());
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _stopQrPolling();
+    super.dispose();
   }
 }

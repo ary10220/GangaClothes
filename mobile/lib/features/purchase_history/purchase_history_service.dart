@@ -1,3 +1,7 @@
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
+
 import '../../core/network/api_client.dart';
 import 'purchase_history_models.dart';
 
@@ -9,15 +13,16 @@ abstract interface class PurchaseReceiptDataSource {
   Future<PurchaseReceipt> fetchReceipt(int purchaseId);
 }
 
-class PurchaseHistoryService
-    implements PurchaseHistoryDataSource, PurchaseReceiptDataSource {
-  const PurchaseHistoryService(this.apiClient);
+abstract interface class PurchaseReceiptPdfDataSource {
+  Future<Uint8List> fetchReceiptPdf(int purchaseId);
+}
 
-  static const bool supportsPdfReceiptAction = false;
-  static const pdfCapabilityGap =
-      'ApiClient can receive authenticated PDF bytes with Dio options, but '
-      'the app has no existing PDF viewer, file storage, or file-opening '
-      'capability; the PDF endpoint remains outside the UI.';
+class PurchaseHistoryService
+    implements
+        PurchaseHistoryDataSource,
+        PurchaseReceiptDataSource,
+        PurchaseReceiptPdfDataSource {
+  const PurchaseHistoryService(this.apiClient);
 
   final ApiClient apiClient;
 
@@ -44,5 +49,17 @@ class PurchaseHistoryService
     return PurchaseReceipt.fromJson(
       Map<String, dynamic>.from(response.data as Map),
     );
+  }
+
+  @override
+  Future<Uint8List> fetchReceiptPdf(int purchaseId) async {
+    final response = await apiClient.request<Object?>(
+      '/ventas/$purchaseId/comprobante.pdf',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    final data = response.data;
+    if (data is Uint8List) return data;
+    if (data is List<int>) return Uint8List.fromList(data);
+    throw const FormatException('Purchase receipt PDF response is not bytes');
   }
 }

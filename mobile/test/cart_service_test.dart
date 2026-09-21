@@ -2,11 +2,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/network/api_client.dart';
 import 'package:mobile/core/network/api_error.dart';
+import 'package:mobile/features/cart/cart_models.dart';
 import 'package:mobile/features/cart/cart_service.dart';
 
 void main() {
   test(
-    'sends cart mutation and payment contracts without card fields',
+    'sends the Stripe test-card contract without simulation or CVC fields',
     () async {
       final api = _FakeApi();
       final service = CartService(api);
@@ -15,7 +16,7 @@ void main() {
       await service.updateQuantity(lineId: 8, quantity: 2);
       await service.removeLine(8);
       await service.confirmCart();
-      await service.pay(saleId: 4, amount: 80, simulateFailure: false);
+      await service.pay(saleId: 4, amount: 80, cardNumber: '4242424242424242');
 
       expect(api.requests.map((request) => request['path']), [
         '/ventas/carrito',
@@ -29,13 +30,58 @@ void main() {
       expect(api.requests[2]['data'], isNull);
       expect(api.requests[4]['data'], {
         'venta_id': 4,
-        'metodo': 'pasarela',
+        'metodo': 'tarjeta',
         'monto': 80.0,
-        'simular_fallo': false,
+        'numero_tarjeta': '4242424242424242',
       });
-      expect(api.requests[4]['data'].toString(), isNot(contains('4242')));
+      expect(api.requests[4]['data'].toString(), contains('4242'));
+      expect(
+        api.requests[4]['data'].toString(),
+        isNot(contains('simular_fallo')),
+      );
+      expect(
+        api.requests[4]['data'].toString().toLowerCase(),
+        isNot(contains('cvc')),
+      );
     },
   );
+
+  test(
+    'discovers mobile methods and preserves availability metadata',
+    () async {
+      final api = _FakeApi();
+      final methods = await CartService(api).fetchPaymentMethods();
+
+      expect(api.requests.last, {
+        'path': '/pagos/metodos',
+        'method': 'GET',
+        'data': null,
+        'queryParameters': const {'canal': 'movil'},
+      });
+      expect(methods.map((method) => method.value), ['tarjeta', 'qr']);
+      expect(methods.first.available, isTrue);
+      expect(methods.first.gateway, 'stripe');
+      expect(methods.first.mode, 'simulado');
+      expect(methods.last.available, isFalse);
+      expect(methods.last.detail, contains('BCP'));
+    },
+  );
+
+  test('creates and polls a QR through the live mobile contracts', () async {
+    final api = _FakeApi();
+    final service = CartService(api);
+
+    final created = await service.createQr(saleId: 4);
+    final polled = await service.pollQr(saleId: 4, qrId: created.qrId);
+
+    expect(api.requests[0]['path'], '/pagos/qr');
+    expect(api.requests[0]['data'], {'venta_id': 4});
+    expect(api.requests[1]['path'], '/pagos/qr/qr-4');
+    expect(api.requests[1]['queryParameters'], {'venta_id': 4});
+    expect(created.state, QrPaymentState.pending);
+    expect(polled.state, QrPaymentState.approved);
+    expect(polled.paymentResult?.paymentLabel, 'QR (BCP)');
+  });
 
   test('maps a missing cart response to null', () async {
     final service = CartService(_FakeApi(absentCart: true));
@@ -79,8 +125,58 @@ class _FakeApi extends ApiClient {
     if (path == '/ventas/carrito' && method == 'GET' && absentCart) {
       throw const ApiError(statusCode: 404, message: 'No hay carrito');
     }
-    requests.add({'path': path, 'method': method, 'data': data});
+    requests.add({
+      'path': path,
+      'method': method,
+      'data': data,
+      'queryParameters': queryParameters,
+    });
     final response = switch (path) {
+      '/pagos/metodos' => {
+        'canal': 'movil',
+        'metodos': [
+          {
+            'valor': 'tarjeta',
+            'etiqueta': 'Tarjeta',
+            'disponible': true,
+            'pasarela': 'stripe',
+            'detalle': 'Stripe listo',
+            'modo': 'simulado',
+          },
+          {
+            'valor': 'qr',
+            'etiqueta': 'QR BCP',
+            'disponible': false,
+            'pasarela': 'bcp_qr',
+            'detalle': 'BCP no configurado',
+            'modo': 'sandbox',
+          },
+        ],
+      },
+      '/pagos/qr' => {
+        'venta_id': 4,
+        'pago_id': 8,
+        'qr_id': 'qr-4',
+        'estado': 'C',
+        'descripcion': 'EN COLA',
+        'imagen_base64': 'cWk=',
+        'monto': 80,
+        'moneda': 'BOB',
+      },
+      '/pagos/qr/qr-4' => {
+        'venta_id': 4,
+        'pago_id': 8,
+        'qr_id': 'qr-4',
+        'estado': 'P',
+        'aprobado': true,
+        'nro_comprobante': 'C-000001',
+        'pago': {
+          'referencia_externa': 'qr-4',
+          'etiqueta': 'QR (BCP)',
+          'pasarela': 'bcp_qr',
+        },
+        'venta': _sale('pagada'),
+      },
       '/pagos' => {
         'aprobado': true,
         'nro_comprobante': 'C-000001',

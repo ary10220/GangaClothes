@@ -5,10 +5,15 @@ import 'purchase_history_models.dart';
 import 'purchase_history_service.dart';
 
 class PurchaseHistoryController extends ChangeNotifier {
-  PurchaseHistoryController({required this.api, this.receiptApi});
+  PurchaseHistoryController({
+    required this.api,
+    this.receiptApi,
+    this.pdfReceiptApi,
+  });
 
   final PurchaseHistoryDataSource api;
   final PurchaseReceiptDataSource? receiptApi;
+  final PurchaseReceiptPdfDataSource? pdfReceiptApi;
 
   List<Purchase> purchases = const [];
   ApiError? error;

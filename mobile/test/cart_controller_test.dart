@@ -25,13 +25,13 @@ void main() {
     final controller = CartController(api: api);
     await controller.load();
 
-    expect(await controller.checkout(simulateFailure: false), isNull);
+    expect(await controller.checkout(cardNumber: '4242424242424242'), isNull);
     expect(api.confirmCalls, 1);
     expect(controller.pendingSale, isNotNull);
     expect(controller.paymentError, contains('pendiente'));
 
     api.paymentError = null;
-    final receipt = await controller.checkout(simulateFailure: false);
+    final receipt = await controller.checkout(cardNumber: '4242424242424242');
     expect(receipt?.approved, isTrue);
     expect(api.confirmCalls, 1);
     expect(api.paymentCalls, 2);
@@ -50,7 +50,7 @@ void main() {
     final controller = CartController(api: api);
     await controller.load();
 
-    await controller.checkout(simulateFailure: true);
+    await controller.checkout(cardNumber: '4000000000000002');
 
     expect(controller.pendingSale, isNull);
     expect(controller.paymentError, contains('Card declined (simulado).'));
@@ -79,16 +79,92 @@ void main() {
       expect(controller.canPay, isTrue);
     },
   );
+
+  test('keeps only available discovered methods selectable', () async {
+    final controller = CartController(api: _FakeCartApi());
+
+    await controller.loadPaymentMethods();
+
+    expect(controller.paymentMethods, hasLength(2));
+    expect(controller.availablePaymentMethods.map((method) => method.value), [
+      'tarjeta',
+    ]);
+  });
+
+  test('approves a QR and protects against duplicate submits', () async {
+    final api = _FakeCartApi(
+      cart: _cart(),
+      qrPollResults: [_qr(state: QrPaymentState.approved, withResult: true)],
+    );
+    final controller = CartController(api: api);
+    await controller.load();
+
+    await Future.wait([
+      controller.startQrPayment(),
+      controller.startQrPayment(),
+    ]);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(api.confirmCalls, 1);
+    expect(api.createQrCalls, 1);
+    expect(api.pollQrCalls, 1);
+    expect(controller.receipt?.paymentLabel, 'QR (BCP)');
+    controller.dispose();
+  });
+
+  test('cancels QR polling on disposal', () async {
+    final api = _FakeCartApi(
+      cart: _cart(),
+      qrPollResults: [_qr(state: QrPaymentState.pending)],
+    );
+    final controller = CartController(api: api);
+    await controller.load();
+
+    await controller.startQrPayment();
+    final callsBeforeDispose = api.pollQrCalls;
+    controller.dispose();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(api.pollQrCalls, callsBeforeDispose);
+  });
+
+  test(
+    'returns expired and annulled QR payments to a retryable cart',
+    () async {
+      for (final terminalState in [
+        QrPaymentState.expired,
+        QrPaymentState.annulled,
+      ]) {
+        final api = _FakeCartApi(
+          cart: _cart(),
+          qrPollResults: [_qr(state: terminalState)],
+        );
+        final controller = CartController(api: api);
+        await controller.load();
+        await controller.startQrPayment();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(controller.pendingSale, isNull);
+        expect(controller.paymentError, isNotNull);
+        expect(controller.cart, isNotNull);
+        controller.dispose();
+      }
+    },
+  );
 }
 
 class _FakeCartApi implements CartDataSource {
-  _FakeCartApi({this.cart, this.paymentError});
+  _FakeCartApi({this.cart, this.paymentError, List<QrPayment>? qrPollResults})
+    : qrPollResults = [...?qrPollResults];
 
   Cart? cart;
   ApiError? paymentError;
   int fetchCartCalls = 0;
   int confirmCalls = 0;
   int paymentCalls = 0;
+  int createQrCalls = 0;
+  int pollQrCalls = 0;
+  final List<QrPayment> qrPollResults;
 
   @override
   Future<Cart?> fetchCart() async {
@@ -120,10 +196,42 @@ class _FakeCartApi implements CartDataSource {
   }
 
   @override
+  Future<List<PaymentMethod>> fetchPaymentMethods() async => const [
+    PaymentMethod(
+      value: 'tarjeta',
+      label: 'Tarjeta',
+      available: true,
+      gateway: 'stripe',
+      mode: 'simulado',
+    ),
+    PaymentMethod(
+      value: 'qr',
+      label: 'QR',
+      available: false,
+      gateway: 'bcp_qr',
+      mode: 'simulado',
+    ),
+  ];
+
+  @override
+  Future<QrPayment> createQr({required int saleId}) async {
+    createQrCalls++;
+    return _qr(state: QrPaymentState.pending);
+  }
+
+  @override
+  Future<QrPayment> pollQr({required int saleId, required String qrId}) async {
+    pollQrCalls++;
+    return qrPollResults.isEmpty
+        ? _qr(state: QrPaymentState.pending)
+        : qrPollResults.removeAt(0);
+  }
+
+  @override
   Future<PaymentResult> pay({
     required int saleId,
     required double amount,
-    required bool simulateFailure,
+    required String cardNumber,
   }) async {
     paymentCalls++;
     if (paymentError != null) throw paymentError!;
@@ -135,6 +243,22 @@ class _FakeCartApi implements CartDataSource {
     );
   }
 }
+
+QrPayment _qr({required QrPaymentState state, bool withResult = false}) =>
+    QrPayment(
+      saleId: 4,
+      qrId: 'qr-4',
+      state: state,
+      paymentResult: withResult
+          ? PaymentResult(
+              approved: true,
+              sale: _cart(status: 'pagada'),
+              receiptNumber: 'C-000002',
+              externalReference: 'qr-4',
+              paymentLabel: 'QR (BCP)',
+            )
+          : null,
+    );
 
 Cart _cart({
   bool reaches = true,

@@ -153,6 +153,98 @@ class CartBranch {
   );
 }
 
+class PaymentMethod {
+  const PaymentMethod({
+    required this.value,
+    required this.label,
+    required this.available,
+    this.gateway,
+    this.detail,
+    this.mode,
+    this.publicKey,
+  });
+
+  final String value;
+  final String label;
+  final bool available;
+  final String? gateway;
+  final String? detail;
+  final String? mode;
+  final String? publicKey;
+
+  factory PaymentMethod.fromJson(Map<String, dynamic> json) => PaymentMethod(
+    value: _stringValue(json['valor']),
+    label: _stringValue(json['etiqueta']),
+    available: json['disponible'] == true,
+    gateway: _nullableString(json['pasarela']),
+    detail: _nullableString(json['detalle']),
+    mode: _nullableString(json['modo']),
+    publicKey: _nullableString(json['clave_publica']),
+  );
+}
+
+enum QrPaymentState { pending, approved, expired, annulled }
+
+class QrPayment {
+  const QrPayment({
+    required this.saleId,
+    required this.qrId,
+    required this.state,
+    this.paymentId,
+    this.description,
+    this.imageBase64,
+    this.amount,
+    this.currency,
+    this.expiresAt,
+    this.operationNumber,
+    this.paymentResult,
+  });
+
+  final int saleId;
+  final String qrId;
+  final QrPaymentState state;
+  final int? paymentId;
+  final String? description;
+  final String? imageBase64;
+  final double? amount;
+  final String? currency;
+  final String? expiresAt;
+  final String? operationNumber;
+  final PaymentResult? paymentResult;
+
+  bool get isPending => state == QrPaymentState.pending;
+  bool get isTerminal => !isPending;
+
+  factory QrPayment.fromJson(Map<String, dynamic> json) {
+    final backendState = _stringValue(json['estado']).toUpperCase();
+    final state = switch (backendState) {
+      'P' || 'U' => QrPaymentState.approved,
+      'V' => QrPaymentState.expired,
+      'A' => QrPaymentState.annulled,
+      _ when json['aprobado'] == true => QrPaymentState.approved,
+      _ => QrPaymentState.pending,
+    };
+    final sale = json['venta'];
+    final payment = json['pago'];
+    final result = sale is Map && payment is Map
+        ? PaymentResult.fromJson(json)
+        : null;
+    return QrPayment(
+      saleId: _intValue(json['venta_id']),
+      qrId: _stringValue(json['qr_id']),
+      state: state,
+      paymentId: _nullableInt(json['pago_id']),
+      description: _nullableString(json['descripcion']),
+      imageBase64: _nullableString(json['imagen_base64']),
+      amount: _nullableDouble(json['monto']),
+      currency: _nullableString(json['moneda']),
+      expiresAt: _nullableString(json['expira']),
+      operationNumber: _nullableString(json['numero_operacion']),
+      paymentResult: result,
+    );
+  }
+}
+
 class PaymentResult {
   const PaymentResult({
     required this.approved,
@@ -160,6 +252,8 @@ class PaymentResult {
     this.reason,
     this.receiptNumber,
     this.externalReference,
+    this.paymentLabel,
+    this.paymentGateway,
   });
 
   final bool approved;
@@ -167,6 +261,8 @@ class PaymentResult {
   final String? reason;
   final String? receiptNumber;
   final String? externalReference;
+  final String? paymentLabel;
+  final String? paymentGateway;
 
   factory PaymentResult.fromJson(Map<String, dynamic> json) {
     final payment = _map(json['pago']);
@@ -178,6 +274,8 @@ class PaymentResult {
       receiptNumber:
           _nullableString(json['nro_comprobante']) ?? sale.receiptNumber,
       externalReference: _nullableString(payment['referencia_externa']),
+      paymentLabel: _nullableString(payment['etiqueta']),
+      paymentGateway: _nullableString(payment['pasarela']),
     );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/app/theme.dart';
@@ -54,6 +56,64 @@ void main() {
     expect(find.text('Comprobante JSON-12'), findsOneWidget);
     expect(find.text('BOB 170,50'), findsOneWidget);
     expect(find.text('Cerrar'), findsOneWidget);
+    expect(
+      find.text(
+        'La acción de PDF autenticado no está disponible en este momento.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('fetches and opens the authenticated receipt PDF', (
+    tester,
+  ) async {
+    final pdfSource = _FakePdfSource();
+    Uint8List? printedBytes;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: gangaTheme(),
+        home: PurchaseHistoryScreen(
+          purchaseHistoryService: _FakePurchaseSource(),
+          purchaseReceiptPdfService: pdfSource,
+          receiptPdfPrinter: (bytes) async {
+            printedBytes = bytes;
+            return true;
+          },
+          session: _session,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver comprobante'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Abrir PDF'));
+    await tester.pumpAndSettle();
+
+    expect(pdfSource.purchaseId, 12);
+    expect(printedBytes, orderedEquals([37, 80, 68, 70]));
+  });
+
+  testWidgets('shows an honest PDF error when the print action fails', (
+    tester,
+  ) async {
+    final receipt = await _FakePurchaseSource().fetchReceipt(12);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: gangaTheme(),
+        home: PurchaseReceiptDialog(
+          receipt: receipt,
+          onPdfPressed: () async => throw StateError('printer unavailable'),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Abrir PDF'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('No se pudo abrir el PDF'), findsOneWidget);
   });
 
   testWidgets('shows the empty state and the catalog action', (tester) async {
@@ -214,3 +274,13 @@ final _purchase = Purchase(
     ),
   ],
 );
+
+class _FakePdfSource implements PurchaseReceiptPdfDataSource {
+  int? purchaseId;
+
+  @override
+  Future<Uint8List> fetchReceiptPdf(int purchaseId) async {
+    this.purchaseId = purchaseId;
+    return Uint8List.fromList(const [37, 80, 68, 70]);
+  }
+}
