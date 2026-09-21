@@ -11,6 +11,7 @@ import 'package:mobile/features/catalog/catalog_detail_sheet.dart';
 import 'package:mobile/features/catalog/catalog_models.dart';
 import 'package:mobile/features/catalog/catalog_screen.dart';
 import 'package:mobile/features/catalog/catalog_service.dart';
+import 'package:mobile/features/virtual_fitting/virtual_fitting_sheet.dart';
 
 void main() {
   testWidgets('renders loading and retryable error states', (tester) async {
@@ -231,6 +232,93 @@ void main() {
     expect(find.text('Iniciar sesión'), findsNWidgets(2));
   });
 
+  testWidgets('shows virtual fitting only when a selected image exists', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(available: 2),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vestidor virtual'), findsNothing);
+
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              productImageUrl: 'https://cdn.example.com/product.jpg',
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+            cameraEnumerator: () async => const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Vestidor virtual'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Vestidor virtual'),
+      -240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Vestidor virtual'));
+    await tester.pumpAndSettle();
+    expect(find.text('VESTIDOR VIRTUAL'), findsOneWidget);
+    expect(
+      tester
+          .widget<VirtualFittingSheet>(find.byType(VirtualFittingSheet))
+          .imageUrl,
+      'https://cdn.example.com/product.jpg',
+    );
+  });
+
+  testWidgets('selected variant image takes precedence over product image', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              productImageUrl: 'https://cdn.example.com/product.jpg',
+              variantImageUrl: 'https://cdn.example.com/variant.jpg',
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+            cameraEnumerator: () async => const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Vestidor virtual'),
+      -240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Vestidor virtual'));
+    await tester.pumpAndSettle();
+
+    expect(
+      tester
+          .widget<VirtualFittingSheet>(find.byType(VirtualFittingSheet))
+          .imageUrl,
+      'https://cdn.example.com/variant.jpg',
+    );
+  });
+
   testWidgets('ellipsizes long branch labels on a narrow detail sheet', (
     tester,
   ) async {
@@ -382,6 +470,8 @@ Product _product({
   double finalPrice = 1234.5,
   double? discount,
   CatalogPromotion? promotion,
+  String? productImageUrl,
+  String? variantImageUrl,
 }) => Product(
   id: 1,
   name: 'Camisa Oxford',
@@ -391,11 +481,11 @@ Product _product({
   finalPrice: finalPrice,
   discount: discount,
   promotion: promotion,
-  imageUrl: null,
+  imageUrl: productImageUrl,
   categoryId: 1,
   collectionId: null,
   availableTotal: available,
-  variants: const [
+  variants: [
     Variant(
       id: 1,
       sku: 'SKU-1',
@@ -404,7 +494,7 @@ Product _product({
       colorId: 1,
       colorName: 'Azul',
       colorHex: '#112233',
-      imageUrl: null,
+      imageUrl: variantImageUrl,
       availableTotal: 1,
       availability: [],
     ),

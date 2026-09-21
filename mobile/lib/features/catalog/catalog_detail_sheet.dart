@@ -10,6 +10,7 @@ import 'catalog_detail_models.dart';
 import 'catalog_detail_service.dart';
 import 'catalog_models.dart';
 import '../ai/ai_service.dart';
+import '../virtual_fitting/virtual_fitting_sheet.dart';
 
 class CatalogDetailSheet extends StatefulWidget {
   const CatalogDetailSheet({
@@ -20,6 +21,7 @@ class CatalogDetailSheet extends StatefulWidget {
     this.session,
     this.onAvailabilityChanged,
     this.aiEventSink,
+    this.cameraEnumerator,
     super.key,
   });
 
@@ -30,6 +32,7 @@ class CatalogDetailSheet extends StatefulWidget {
   final Session? session;
   final VoidCallback? onAvailabilityChanged;
   final AiEventSink? aiEventSink;
+  final CameraEnumerator? cameraEnumerator;
 
   @override
   State<CatalogDetailSheet> createState() => _CatalogDetailSheetState();
@@ -305,17 +308,42 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
 
   Widget _buildActions() {
     final isCustomer = widget.session?.user.roles.contains('cliente') ?? false;
-    if (widget.session == null) return _buildGuestActions();
+    final virtualFittingAction = _buildVirtualFittingAction();
+    if (widget.session == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (virtualFittingAction != null) ...[
+            virtualFittingAction,
+            const SizedBox(height: 12),
+          ],
+          _buildGuestActions(),
+        ],
+      );
+    }
     if (!isCustomer) {
-      return const Text(
-        'Las reservas y compras en línea son para cuentas de cliente. El personal vende desde Caja.',
-        style: TextStyle(color: GangaColors.gray, height: 1.5),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (virtualFittingAction != null) ...[
+            virtualFittingAction,
+            const SizedBox(height: 12),
+          ],
+          const Text(
+            'Las reservas y compras en línea son para cuentas de cliente. El personal vende desde Caja.',
+            style: TextStyle(color: GangaColors.gray, height: 1.5),
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (virtualFittingAction != null) ...[
+          virtualFittingAction,
+          const SizedBox(height: 12),
+        ],
         if (_controller.mode == CatalogDetailMode.reserve)
           _buildReservationForm()
         else ...[
@@ -333,6 +361,39 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
         const SizedBox(height: 12),
         _buildActionButtons(),
       ],
+    );
+  }
+
+  Widget? _buildVirtualFittingAction() {
+    final variantImage = _controller.selectedVariant?.imageUrl?.trim();
+    final imageUrl = variantImage?.isNotEmpty == true
+        ? variantImage
+        : widget.product.imageUrl?.trim();
+    if (imageUrl == null || imageUrl.isEmpty) return null;
+    return GcButton(
+      expand: true,
+      label: 'Vestidor virtual',
+      variant: GcButtonVariant.outlined,
+      icon: const Icon(Icons.checkroom_outlined, size: 18),
+      onPressed: () => _openVirtualFitting(imageUrl),
+    );
+  }
+
+  void _openVirtualFitting(String imageUrl) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.black,
+      useSafeArea: false,
+      builder: (_) => FractionallySizedBox(
+        heightFactor: .96,
+        child: VirtualFittingSheet(
+          productName: widget.product.name,
+          variant: _controller.selectedVariant!,
+          imageUrl: imageUrl,
+          cameraEnumerator: widget.cameraEnumerator,
+        ),
+      ),
     );
   }
 
