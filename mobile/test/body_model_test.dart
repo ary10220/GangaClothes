@@ -177,6 +177,20 @@ void main() {
     });
   });
 
+  test('anchorFor cuelga pantalones y faldas de la cadera', () {
+    expect(anchorFor('Pantalon jean clasico'), GarmentAnchor.hips);
+    expect(anchorFor('Falda midi beige'), GarmentAnchor.hips);
+    expect(anchorFor('Vestido floral rojo'), GarmentAnchor.shoulders);
+    expect(anchorFor('Chamarra de cuero negra'), GarmentAnchor.shoulders);
+  });
+
+  test('GarmentGeometry expone caderas y su inclinación', () {
+    math.Point<double> map(BodyPoint p) => math.Point(p.x * 400, p.y * 800);
+    final g = GarmentGeometry.compute(_pose(), map);
+    expect(g.hipWidth, closeTo(100, .5));
+    expect(g.hipAngle, closeTo(0, .001));
+  });
+
   test('sleeveModeFor deduce la manga por el nombre', () {
     expect(sleeveModeFor('Polera basica algodon'), SleeveMode.short);
     expect(sleeveModeFor('Camisa denim estampada'), SleeveMode.long);

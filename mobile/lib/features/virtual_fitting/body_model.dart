@@ -246,6 +246,16 @@ class BodyTracker {
 
 enum SleeveMode { none, short, long }
 
+/// Dónde se cuelga la prenda: en los hombros (partes de arriba, vestidos) o
+/// en la cadera (pantalones, faldas).
+enum GarmentAnchor { shoulders, hips }
+
+GarmentAnchor anchorFor(String productName) {
+  final name = productName.toLowerCase();
+  const hips = ['jean', 'pantal', 'jogger', 'falda', 'short', 'bermuda'];
+  return hips.any(name.contains) ? GarmentAnchor.hips : GarmentAnchor.shoulders;
+}
+
 /// Deduce el largo de manga por el nombre del producto (el catálogo no manda
 /// el nombre de la categoría).
 SleeveMode sleeveModeFor(String productName) {
@@ -297,6 +307,8 @@ class GarmentGeometry {
     required this.angle,
     required this.leftShoulder,
     required this.rightShoulder,
+    required this.leftHip,
+    required this.rightHip,
     required this.leftArm,
     required this.rightArm,
   });
@@ -305,6 +317,21 @@ class GarmentGeometry {
   final math.Point<double> hipMid;
   final math.Point<double> leftShoulder;
   final math.Point<double> rightShoulder;
+  final math.Point<double> leftHip;
+  final math.Point<double> rightHip;
+
+  double get hipWidth => leftHip.distanceTo(rightHip);
+
+  /// Inclinación de la línea de cadera, en (-π/2, π/2).
+  double get hipAngle {
+    var dx = leftHip.x - rightHip.x;
+    var dy = leftHip.y - rightHip.y;
+    if (dx < 0) {
+      dx = -dx;
+      dy = -dy;
+    }
+    return math.atan2(dy, dx);
+  }
 
   /// Distancia entre hombros en píxeles: la única escala de la prenda.
   final double shoulderWidth;
@@ -355,6 +382,8 @@ class GarmentGeometry {
       angle: math.atan2(dy, dx),
       leftShoulder: ls,
       rightShoulder: rs,
+      leftHip: lh,
+      rightHip: rh,
       leftArm: _arm(
         pose,
         map,

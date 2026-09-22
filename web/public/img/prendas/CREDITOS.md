@@ -43,6 +43,7 @@ de cuerpo entero, prenda parcial) se usaron PNG de
 | camisa-blanca-formal.png | https://pngimg.com/image/8084 (dress shirt) |
 | jean-clasico.png | https://pngimg.com/image/5762 (jeans) |
 | jean-skinny-rasgado.png | https://pngimg.com/image/5779 (jeans) |
+| pantalon-vaquero.png | https://pngimg.com/image/5771 (jeans) |
 | vestido-blanco-verano.png | https://pngimg.com/image/82 (dress) |
 | vestido-floral-rojo.png | https://pngimg.com/image/147 (dress) |
 | vestido-largo-gala.png | https://pngimg.com/image/137 (dress) |

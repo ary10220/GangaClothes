@@ -57,14 +57,17 @@ Future<double> measureShoulderLine(ui.Image image) async {
     widths.add(first < 0 ? 0 : last - first + step);
   }
   if (widths.isEmpty) return GarmentPainter.defaultShoulderY;
-  final maxWidth = widths.reduce(math.max);
+  // Solo cuenta la parte superior: en un vestido o una chaqueta abierta lo
+  // más ancho está abajo y no dice nada de dónde van los hombros.
+  final top = widths.sublist(0, math.max(1, (widths.length * .4).round()));
+  final maxWidth = top.reduce(math.max);
   if (maxWidth == 0) return GarmentPainter.defaultShoulderY;
-  for (var i = 0; i < widths.length; i++) {
-    if (widths[i] >= maxWidth * .6) {
+  for (var i = 0; i < top.length; i++) {
+    if (top[i] >= maxWidth * .6) {
       final y = i * step / h;
       // Un poco por debajo del borde: el cuello suele sobresalir de la línea
       // de hombros.
-      return (y + .03).clamp(0, .5);
+      return (y + .03).clamp(0, .4);
     }
   }
   return GarmentPainter.defaultShoulderY;
@@ -81,11 +84,14 @@ class GarmentPainter extends CustomPainter {
     required this.sleeves,
     required this.scale,
     required this.showPoints,
+    this.anchor = GarmentAnchor.shoulders,
     this.shoulderY = defaultShoulderY,
     this.showGarment = true,
   });
 
   static const double defaultShoulderY = .08;
+
+  final GarmentAnchor anchor;
 
   final BodyPose? pose;
   final Size previewSize;
@@ -124,16 +130,35 @@ class GarmentPainter extends CustomPainter {
 
     if (showGarment) {
       final image = garment;
-      if (image != null) {
-        _paintImage(canvas, geometry, image);
-      } else {
+      if (image == null) {
         _paintVector(canvas, geometry);
+      } else if (anchor == GarmentAnchor.hips) {
+        _paintOnHips(canvas, geometry, image);
+      } else {
+        _paintImage(canvas, geometry, image);
       }
     }
     if (showPoints) _paintPoints(canvas, pose, mapper);
   }
 
   // --------------------------------------------------------------- PNG
+
+  /// Pantalones y faldas: la cintura de la foto va sobre la cadera y el ancho
+  /// se toma de la distancia entre caderas (no hay mangas).
+  void _paintOnHips(Canvas canvas, GarmentGeometry g, ui.Image image) {
+    final w = image.width.toDouble();
+    final hips = math.max(g.hipWidth, g.shoulderWidth * .7);
+    final s = hips * 1.35 * scale / w;
+    final paint = Paint()..filterQuality = FilterQuality.medium;
+    canvas.save();
+    canvas.translate(g.hipMid.x, g.hipMid.y);
+    canvas.rotate(g.hipAngle);
+    canvas.scale(s);
+    // La cintura queda un poco por encima de las articulaciones de la cadera.
+    canvas.translate(-w / 2, -hips * .18 / s);
+    canvas.drawImage(image, Offset.zero, paint);
+    canvas.restore();
+  }
 
   void _paintImage(Canvas canvas, GarmentGeometry g, ui.Image image) {
     final w = image.width.toDouble();
@@ -407,5 +432,7 @@ class GarmentPainter extends CustomPainter {
       old.previewSize != previewSize ||
       old.scale != scale ||
       old.sleeves != sleeves ||
+      old.anchor != anchor ||
+      old.shoulderY != shoulderY ||
       old.fallbackColor != fallbackColor;
 }

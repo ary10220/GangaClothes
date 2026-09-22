@@ -539,6 +539,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
                 fallbackColor: color,
                 sleeves: _sleeves,
                 scale: _garmentIsOverlay ? widget.overlayScale : 1,
+                anchor: anchorFor(widget.productName),
                 shoulderY: _garmentShoulderY,
                 showPoints: _showPoints,
               ),
