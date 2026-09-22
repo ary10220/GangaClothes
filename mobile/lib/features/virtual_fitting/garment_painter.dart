@@ -108,6 +108,7 @@ class GarmentPainter extends CustomPainter {
   // colgando o extendida) rota entera con el brazo y no queda un pedazo
   // pegado al torso. En manga larga la franja se parte a la altura del codo.
   static const double _shoulderX = .25;
+  static const double _overlap = .015;
   static const double _elbowY = .45;
 
   /// Ángulo (respecto de la vertical) con el que cuelgan las mangas en la foto.
@@ -161,8 +162,10 @@ class GarmentPainter extends CustomPainter {
     canvas.scale(s);
     canvas.translate(-w / 2, -h * shoulderY);
     if (leftActive || rightActive) {
-      final left = leftActive ? w * _shoulderX : 0.0;
-      final right = rightActive ? w * (1 - _shoulderX) : w;
+      // El torso solapa un poco la franja de la manga para que no quede una
+      // línea de antialias entre ambos.
+      final left = leftActive ? w * (_shoulderX - _overlap) : 0.0;
+      final right = rightActive ? w * (1 - _shoulderX + _overlap) : w;
       canvas.clipRect(Rect.fromLTRB(left, 0, right, h));
     }
     canvas.drawImage(image, Offset.zero, paint);
