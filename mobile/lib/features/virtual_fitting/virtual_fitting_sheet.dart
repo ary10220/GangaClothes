@@ -62,6 +62,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
   bool _loggedFrame = false;
 
   ui.Image? _garment;
+  double _garmentShoulderY = GarmentPainter.defaultShoulderY;
   bool _garmentIsOverlay = false;
   bool _garmentFailed = false;
   ImageStream? _garmentStream;
@@ -131,10 +132,13 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     final isOverlay = url == widget.overlayUrl?.trim();
     final stream = NetworkImage(url).resolve(ImageConfiguration.empty);
     final listener = ImageStreamListener(
-      (info, _) {
+      (info, _) async {
+        if (!mounted) return;
+        final shoulderY = await measureShoulderLine(info.image);
         if (!mounted) return;
         setState(() {
           _garment = info.image;
+          _garmentShoulderY = shoulderY;
           _garmentIsOverlay = isOverlay;
           _garmentFailed = false;
         });
@@ -535,6 +539,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
                 fallbackColor: color,
                 sleeves: _sleeves,
                 scale: _garmentIsOverlay ? widget.overlayScale : 1,
+                shoulderY: _garmentShoulderY,
                 showPoints: _showPoints,
               ),
             ),

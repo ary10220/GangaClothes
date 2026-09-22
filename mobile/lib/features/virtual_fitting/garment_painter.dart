@@ -31,6 +31,42 @@ class PreviewMapper {
   }
 }
 
+/// Dónde está la línea de hombros dentro del PNG, como fracción de su alto.
+/// Se calcula mirando el alfa: la primera fila en la que la prenda ya es
+/// ancha. Así un gancho de percha o una mano angosta arriba no desplazan la
+/// prenda hacia abajo.
+Future<double> measureShoulderLine(ui.Image image) async {
+  final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+  if (data == null) return GarmentPainter.defaultShoulderY;
+  final w = image.width;
+  final h = image.height;
+  final step = math.max(1, (math.max(w, h) / 160).round());
+  final widths = <int>[];
+  for (var y = 0; y < h; y += step) {
+    var first = -1;
+    var last = -1;
+    for (var x = 0; x < w; x += step) {
+      if (data.getUint8((y * w + x) * 4 + 3) > 40) {
+        if (first < 0) first = x;
+        last = x;
+      }
+    }
+    widths.add(first < 0 ? 0 : last - first + step);
+  }
+  if (widths.isEmpty) return GarmentPainter.defaultShoulderY;
+  final maxWidth = widths.reduce(math.max);
+  if (maxWidth == 0) return GarmentPainter.defaultShoulderY;
+  for (var i = 0; i < widths.length; i++) {
+    if (widths[i] >= maxWidth * .6) {
+      final y = i * step / h;
+      // Un poco por debajo del borde: el cuello suele sobresalir de la línea
+      // de hombros.
+      return (y + .03).clamp(0, .5);
+    }
+  }
+  return GarmentPainter.defaultShoulderY;
+}
+
 /// Dibuja la prenda (PNG recortado o forma vectorial) siguiendo hombros y
 /// brazos, y opcionalmente los puntos del cuerpo.
 class GarmentPainter extends CustomPainter {
@@ -42,12 +78,18 @@ class GarmentPainter extends CustomPainter {
     required this.sleeves,
     required this.scale,
     required this.showPoints,
+    this.shoulderY = defaultShoulderY,
     this.showGarment = true,
   });
+
+  static const double defaultShoulderY = .08;
 
   final BodyPose? pose;
   final Size previewSize;
   final ui.Image? garment;
+
+  /// Fracción del alto del PNG donde está la línea de hombros.
+  final double shoulderY;
   final Color fallbackColor;
   final SleeveMode sleeves;
 
@@ -59,11 +101,11 @@ class GarmentPainter extends CustomPainter {
   // Proporciones del PNG (ya recortado a la silueta): los hombros caen en
   // x = 25 % / 75 % del ancho y en y = 8 % del alto; las mangas viven en las
   // franjas laterales.
+  // Las franjas laterales abarcan toda la altura: así la manga (corta o larga,
+  // colgando o extendida) rota entera con el brazo y no queda un pedazo
+  // pegado al torso. En manga larga la franja se parte a la altura del codo.
   static const double _shoulderX = .25;
-  static const double _shoulderY = .08;
-  static const double _shortSleeveBottom = .45;
   static const double _elbowY = .45;
-  static const double _longSleeveBottom = .82;
 
   /// Ángulo (respecto de la vertical) con el que cuelgan las mangas en la foto.
   static const double _restSpread = .30;
@@ -105,22 +147,15 @@ class GarmentPainter extends CustomPainter {
     canvas.translate(g.shoulderMid.x, g.shoulderMid.y);
     canvas.rotate(g.angle);
     canvas.scale(s);
-    canvas.translate(-w / 2, -h * _shoulderY);
+    canvas.translate(-w / 2, -h * shoulderY);
     if (sleeves != SleeveMode.none) {
-      final bottom = _sleeveBottom * h;
-      final clip = Path()
-        ..fillType = PathFillType.evenOdd
-        ..addRect(Rect.fromLTWH(0, 0, w, h))
-        ..addRect(Rect.fromLTWH(0, 0, w * _shoulderX, bottom))
-        ..addRect(Rect.fromLTWH(w * (1 - _shoulderX), 0, w * _shoulderX, bottom));
-      canvas.clipPath(clip);
+      canvas.clipRect(
+        Rect.fromLTWH(w * _shoulderX, 0, w * (1 - 2 * _shoulderX), h),
+      );
     }
     canvas.drawImage(image, Offset.zero, paint);
     canvas.restore();
   }
-
-  double get _sleeveBottom =>
-      sleeves == SleeveMode.long ? _longSleeveBottom : _shortSleeveBottom;
 
   void _paintSleeve(
     Canvas canvas,
@@ -149,7 +184,7 @@ class GarmentPainter extends CustomPainter {
         rotation: arm.upper.angle - rest,
         scale: s,
         src: Rect.fromLTWH(stripX, 0, stripWidth, upperBottom),
-        offset: Offset(-anchorX, -h * _shoulderY),
+        offset: Offset(-anchorX, -h * shoulderY),
       );
       _drawStrip(
         canvas,
@@ -158,12 +193,7 @@ class GarmentPainter extends CustomPainter {
         anchor: arm.lower.start,
         rotation: arm.lower.angle - rest,
         scale: s,
-        src: Rect.fromLTWH(
-          stripX,
-          upperBottom,
-          stripWidth,
-          h * (_longSleeveBottom - _elbowY),
-        ),
+        src: Rect.fromLTWH(stripX, upperBottom, stripWidth, h - upperBottom),
         offset: Offset(-stripWidth / 2, 0),
       );
       return;
@@ -175,8 +205,8 @@ class GarmentPainter extends CustomPainter {
       anchor: arm.upper.start,
       rotation: arm.upper.angle - rest,
       scale: s,
-      src: Rect.fromLTWH(stripX, 0, stripWidth, h * _shortSleeveBottom),
-      offset: Offset(-anchorX, -h * _shoulderY),
+      src: Rect.fromLTWH(stripX, 0, stripWidth, h),
+      offset: Offset(-anchorX, -h * shoulderY),
     );
   }
 
