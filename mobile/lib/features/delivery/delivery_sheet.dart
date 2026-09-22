@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../app/theme.dart';
 import '../../shared/widgets/gc_button.dart';
@@ -6,6 +7,7 @@ import '../../shared/widgets/gc_feedback.dart';
 import '../../shared/widgets/gc_field.dart';
 import '../cart/cart_controller.dart';
 import '../cart/cart_models.dart';
+import 'delivery_map.dart';
 import 'delivery_models.dart';
 
 class DeliverySheet extends StatefulWidget {
@@ -27,8 +29,9 @@ class _DeliverySheetState extends State<DeliverySheet> {
   late final TextEditingController _address;
   late final TextEditingController _reference;
   late final TextEditingController _phone;
-  late final TextEditingController _latitude;
-  late final TextEditingController _longitude;
+
+  /// Punto marcado en el mapa (destino de la entrega).
+  LatLng? _picked;
   bool _deliverySelected = false;
   bool _attempted = false;
 
@@ -44,12 +47,9 @@ class _DeliverySheetState extends State<DeliverySheet> {
     _phone = TextEditingController(
       text: shipment?.contactPhone ?? widget.initialPhone,
     );
-    _latitude = TextEditingController(
-      text: shipment?.latitude?.toString() ?? '',
-    );
-    _longitude = TextEditingController(
-      text: shipment?.longitude?.toString() ?? '',
-    );
+    final lat = shipment?.latitude;
+    final lng = shipment?.longitude;
+    if (lat != null && lng != null) _picked = LatLng(lat, lng);
     _expressValue = shipment?.express == true;
     widget.controller.beginDeliveryEditing(notify: false);
     widget.controller.addListener(_onControllerChanged);
@@ -62,8 +62,6 @@ class _DeliverySheetState extends State<DeliverySheet> {
     _address.dispose();
     _reference.dispose();
     _phone.dispose();
-    _latitude.dispose();
-    _longitude.dispose();
     super.dispose();
   }
 
@@ -90,19 +88,25 @@ class _DeliverySheetState extends State<DeliverySheet> {
   }
 
   DeliveryInput? _readInput() {
-    if (!(_formKey.currentState?.validate() ?? false)) return null;
-    final latitude = double.tryParse(_latitude.text.trim());
-    final longitude = double.tryParse(_longitude.text.trim());
-    if (latitude == null || longitude == null) return null;
+    final valid = _formKey.currentState?.validate() ?? false;
+    final point = _picked;
+    if (!valid || point == null) return null;
     return DeliveryInput(
       saleId: widget.controller.cart!.id,
       address: _address.text.trim(),
       reference: _reference.text,
       contactPhone: _phone.text.trim(),
-      latitude: latitude,
-      longitude: longitude,
+      latitude: point.latitude,
+      longitude: point.longitude,
       express: _expressValue,
     );
+  }
+
+  void _pick(LatLng point) {
+    if (widget.controller.deliveryLoading || widget.controller.deliverySaving) {
+      return;
+    }
+    setState(() => _picked = point);
   }
 
   bool _expressValue = false;
@@ -114,16 +118,15 @@ class _DeliverySheetState extends State<DeliverySheet> {
   }
 
   DeliveryInput? get _currentInput {
-    final latitude = double.tryParse(_latitude.text.trim());
-    final longitude = double.tryParse(_longitude.text.trim());
-    if (latitude == null || longitude == null) return null;
+    final point = _picked;
+    if (point == null) return null;
     return DeliveryInput(
       saleId: widget.controller.cart?.id ?? 0,
       address: _address.text.trim(),
       reference: _reference.text,
       contactPhone: _phone.text.trim(),
-      latitude: latitude,
-      longitude: longitude,
+      latitude: point.latitude,
+      longitude: point.longitude,
       express: _expressValue,
     );
   }
@@ -162,15 +165,12 @@ class _DeliverySheetState extends State<DeliverySheet> {
     return null;
   }
 
-  String? _coordinate(String? value, {required bool latitude}) {
-    final parsed = double.tryParse((value ?? '').trim());
-    if (parsed == null || !parsed.isFinite) {
-      return 'Ingresa una coordenada válida.';
-    }
-    final valid = latitude
-        ? parsed >= -90 && parsed <= 90
-        : parsed >= -180 && parsed <= 180;
-    return valid ? null : 'La coordenada está fuera de rango.';
+  LatLng? get _origin {
+    final origin = widget.controller.deliveryQuote?.origin;
+    final lat = origin?.latitude;
+    final lng = origin?.longitude;
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
   }
 
   @override
@@ -223,7 +223,7 @@ class _DeliverySheetState extends State<DeliverySheet> {
                         value: true,
                         title: const Text('Entrega a domicilio'),
                         subtitle: const Text(
-                          'El backend cotiza el costo y el tiempo.',
+                          'Te lo llevamos; el costo depende de la distancia.',
                         ),
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -238,11 +238,21 @@ class _DeliverySheetState extends State<DeliverySheet> {
                   ),
                 ],
                 if (_deliverySelected) ...[
-                  const SizedBox(height: 8),
-                  const GcFeedback(
-                    message:
-                        'No hay mapa ni permisos de ubicación instalados. Ingresa las coordenadas explícitamente; la app no hace geocodificación ni cálculo de rutas.',
+                  const SizedBox(height: 10),
+                  DeliveryMap(
+                    destination: _picked,
+                    origin: _origin,
+                    originName: quote?.origin?.name,
+                    enabled: !busy,
+                    onPick: _pick,
                   ),
+                  if (_attempted && _picked == null) ...[
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Toca el mapa para marcar dónde quieres recibir tu compra.',
+                      style: TextStyle(color: GangaColors.alert, fontSize: 12),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   GcField(
                     label: 'Dirección',
@@ -273,47 +283,11 @@ class _DeliverySheetState extends State<DeliverySheet> {
                         : null,
                     onChanged: (_) => setState(() {}),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GcField(
-                          label: 'Latitud',
-                          controller: _latitude,
-                          enabled: !busy,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                          validator: (value) => _attempted
-                              ? _coordinate(value, latitude: true)
-                              : null,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: GcField(
-                          label: 'Longitud',
-                          controller: _longitude,
-                          enabled: !busy,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                            signed: true,
-                          ),
-                          validator: (value) => _attempted
-                              ? _coordinate(value, latitude: false)
-                              : null,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
-                    ],
-                  ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Entrega express'),
                     subtitle: const Text(
-                      'El backend aplicará el recargo y el tiempo correspondiente.',
+                      'Llega más rápido, con un recargo en el envío.',
                     ),
                     value: _expressValue,
                     onChanged: busy ? null : _setExpress,
@@ -372,8 +346,7 @@ class _DeliverySheetState extends State<DeliverySheet> {
     }
     if (!quote.isComplete) {
       return const GcFeedback(
-        message:
-            'La cotización del backend está incompleta. Vuelve a intentarlo.',
+        message: 'La cotización está incompleta. Vuelve a intentarlo.',
         variant: GcFeedbackVariant.error,
       );
     }
@@ -386,10 +359,7 @@ class _DeliverySheetState extends State<DeliverySheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'COTIZACIÓN DEL BACKEND',
-              style: GangaTextStyles.eyebrow,
-            ),
+            const Text('COTIZACIÓN DEL ENVÍO', style: GangaTextStyles.eyebrow),
             const SizedBox(height: 8),
             if (quote.coverageMessage?.isNotEmpty == true)
               Text(quote.coverageMessage!, style: GangaTextStyles.metadata),
@@ -433,12 +403,10 @@ class _DeliverySheetState extends State<DeliverySheet> {
               const SizedBox(height: 6),
             ],
             if (quote.shippingCost != null)
-              Text(
-                'Envío según backend: Bs ${formatCartMoney(quote.shippingCost)}',
-              ),
+              Text('Envío: Bs ${formatCartMoney(quote.shippingCost)}'),
             if (quote.totalToPay != null)
               Text(
-                'Total a pagar según backend: Bs ${formatCartMoney(quote.totalToPay)}',
+                'Total a pagar: Bs ${formatCartMoney(quote.totalToPay)}',
                 style: const TextStyle(fontWeight: FontWeight.w800),
               ),
           ],

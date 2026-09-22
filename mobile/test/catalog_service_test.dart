@@ -66,6 +66,21 @@ void main() {
                 'disponibilidad': [
                   {'sucursal_id': 8, 'sucursal': 'Centro', 'disponible': 4},
                 ],
+                'tiene_probador': true,
+                'recursos_ar': [
+                  {
+                    'id': 1,
+                    'tipo': 'png_overlay',
+                    'url_recurso': '/img/prendas/viejo.png',
+                    'escala': 1,
+                  },
+                  {
+                    'id': 2,
+                    'tipo': 'png_overlay',
+                    'url_recurso': '/img/prendas/oxford.png',
+                    'escala': '1.5',
+                  },
+                ],
               },
             ],
           },
@@ -137,6 +152,13 @@ void main() {
       expect(products.first.promotion?.endDate, '2030-12-31');
       expect(products.first.variants.single.availability.single.available, 4);
       expect(products.first.variants.single.colorHex, '#112233');
+      expect(products.first.variants.single.hasFittingRoom, isTrue);
+      expect(products.first.variants.single.arResources, hasLength(2));
+      expect(
+        products.first.variants.single.pngOverlay?.url,
+        '/img/prendas/oxford.png',
+      );
+      expect(products.first.variants.single.pngOverlay?.scale, 1.5);
       expect(products[1].promotion, isNull);
       expect(products[1].finalPrice, 80);
       expect(products[2].discount, 0);

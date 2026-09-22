@@ -276,7 +276,7 @@ def editar(db: Session, prenda_id: int, cambios: dict) -> dict:
 
 # ---------------------------------------------------------------- catalogo
 def _recurso_ar(a: AssetAR) -> dict:
-    return {"id": a.id, "tipo": a.tipo, "url_recurso": a.url_recurso, "escala": float(a.escala or 1)}
+    return {"id": a.id, "tipo": a.tipo, "url_recurso": url_imagen(a.url_recurso), "escala": float(a.escala or 1)}
 
 
 def recursos_ar_publicos(db: Session, variante_id: int) -> dict:

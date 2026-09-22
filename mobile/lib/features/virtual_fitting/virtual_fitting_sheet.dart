@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
@@ -9,7 +10,8 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 import '../../shared/widgets/gc_button.dart';
 import '../catalog/catalog_models.dart';
-import 'pose_placement_controller.dart';
+import 'body_model.dart';
+import 'garment_painter.dart';
 
 typedef CameraEnumerator = Future<List<CameraDescription>> Function();
 
@@ -18,13 +20,21 @@ class VirtualFittingSheet extends StatefulWidget {
     required this.productName,
     required this.variant,
     required this.imageUrl,
+    this.overlayUrl,
+    this.overlayScale = 1,
     this.cameraEnumerator,
     super.key,
   });
 
   final String productName;
   final Variant variant;
+
+  /// Foto de la prenda; se usa si no hay PNG del probador o si este falla.
   final String imageUrl;
+
+  /// PNG con fondo transparente registrado como recurso AR de la variante.
+  final String? overlayUrl;
+  final double overlayScale;
   final CameraEnumerator? cameraEnumerator;
 
   @override
@@ -33,32 +43,56 @@ class VirtualFittingSheet extends StatefulWidget {
 
 class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     with WidgetsBindingObserver {
+  static const _initTimeout = Duration(seconds: 12);
+  static const _maxRetries = 3;
+  static final _jointByName = {for (final j in BodyJoint.values) j.name: j};
+
   CameraController? _camera;
   PoseDetector? _poseDetector;
-  final _placement = PosePlacementController();
-  Map<PoseLandmarkType, PosePoint> _visibleLandmarks = const {};
+  final _tracker = BodyTracker();
   String? _error;
   bool _loading = true;
   bool _initializing = false;
   bool _processingFrame = false;
   DateTime? _lastProcessedAt;
   int _cameraGeneration = 0;
+  int _retries = 0;
+  bool _showPoints = false;
+  bool _mirror = true;
+  bool _loggedFrame = false;
+
+  ui.Image? _garment;
+  double _garmentShoulderY = GarmentPainter.defaultShoulderY;
+  bool _garmentIsOverlay = false;
+  bool _garmentFailed = false;
+  ImageStream? _garmentStream;
+  ImageStreamListener? _garmentListener;
+  late final List<String> _garmentCandidates;
+  int _garmentIndex = 0;
 
   bool get _mobilePlatform =>
       defaultTargetPlatform == TargetPlatform.android ||
       defaultTargetPlatform == TargetPlatform.iOS;
 
+  SleeveMode get _sleeves => sleeveModeFor(widget.productName);
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.imageUrl.trim().isEmpty) {
+    final overlay = widget.overlayUrl?.trim();
+    _garmentCandidates = [
+      if (overlay != null && overlay.isNotEmpty) overlay,
+      if (widget.imageUrl.trim().isNotEmpty) widget.imageUrl.trim(),
+    ];
+    if (_garmentCandidates.isEmpty) {
       _loading = false;
       _error = 'No hay una imagen disponible para esta prenda.';
     } else if (!_mobilePlatform && widget.cameraEnumerator == null) {
       _loading = false;
       _error = 'El vestidor virtual solo está disponible en Android y iOS.';
     } else {
+      _loadGarment();
       unawaited(_initializeCamera());
     }
   }
@@ -66,22 +100,63 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _garmentStream?.removeListener(_garmentListener!);
     unawaited(_disposeCamera());
     super.dispose();
   }
 
+  // `inactive` llega con el diálogo de permiso, la barra de notificaciones o
+  // cualquier ventana del sistema: ahí la cámara se queda como está. Solo se
+  // libera cuando la app realmente pasa a segundo plano.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       if (_camera == null && !_initializing && _error == null) {
+        _retries = 0;
         unawaited(_initializeCamera());
       }
-    } else if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
+    } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       unawaited(_disposeCamera());
     }
   }
+
+  // ------------------------------------------------------------- imagen
+
+  void _loadGarment() {
+    if (_garmentIndex >= _garmentCandidates.length) {
+      if (mounted) setState(() => _garmentFailed = true);
+      return;
+    }
+    final url = _garmentCandidates[_garmentIndex];
+    final isOverlay = url == widget.overlayUrl?.trim();
+    final stream = NetworkImage(url).resolve(ImageConfiguration.empty);
+    final listener = ImageStreamListener(
+      (info, _) async {
+        if (!mounted) return;
+        final shoulderY = await measureShoulderLine(info.image);
+        if (!mounted) return;
+        setState(() {
+          _garment = info.image;
+          _garmentShoulderY = shoulderY;
+          _garmentIsOverlay = isOverlay;
+          _garmentFailed = false;
+        });
+      },
+      onError: (error, _) {
+        debugPrint('[POSE] No se pudo cargar la prenda $url: $error');
+        if (!mounted) return;
+        _garmentIndex++;
+        _loadGarment();
+      },
+    );
+    _garmentStream?.removeListener(_garmentListener!);
+    _garmentStream = stream;
+    _garmentListener = listener;
+    stream.addListener(listener);
+  }
+
+  // ------------------------------------------------------------- cámara
 
   Future<void> _initializeCamera() async {
     if (_initializing ||
@@ -107,6 +182,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
         (item) => item.lensDirection == CameraLensDirection.front,
         orElse: () => cameras.first,
       );
+      _mirror = description.lensDirection == CameraLensDirection.front;
       camera = CameraController(
         description,
         ResolutionPreset.medium,
@@ -115,7 +191,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
             ? ImageFormatGroup.nv21
             : ImageFormatGroup.bgra8888,
       );
-      await camera.initialize();
+      await camera.initialize().timeout(_initTimeout);
       if (!mounted || generation != _cameraGeneration) {
         await camera.dispose();
         return;
@@ -126,11 +202,6 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
           model: PoseDetectionModel.base,
         ),
       );
-      if (!mounted || generation != _cameraGeneration) {
-        await detector.close();
-        await camera.dispose();
-        return;
-      }
       _camera = camera;
       _poseDetector = detector;
       await camera.startImageStream(_processCameraImage);
@@ -143,6 +214,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
       }
       camera = null;
       detector = null;
+      _retries = 0;
       setState(() => _loading = false);
     } catch (caught) {
       await detector?.close();
@@ -156,6 +228,24 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
       });
     } finally {
       _initializing = false;
+      if (mounted && _camera == null && _error == null) {
+        // La inicialización fue invalidada (p. ej. por un `paused` mientras
+        // se pedía el permiso). Si la app está en primer plano, se reintenta.
+        final lifecycle = WidgetsBinding.instance.lifecycleState;
+        final foreground =
+            lifecycle == null || lifecycle == AppLifecycleState.resumed;
+        if (foreground && _retries < _maxRetries) {
+          _retries++;
+          unawaited(
+            Future<void>.delayed(
+              const Duration(milliseconds: 250),
+              _initializeCamera,
+            ),
+          );
+        } else if (_loading) {
+          setState(() => _loading = false);
+        }
+      }
     }
   }
 
@@ -165,7 +255,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     final detector = _poseDetector;
     _camera = null;
     _poseDetector = null;
-    _visibleLandmarks = const {};
+    _tracker.clear();
     _processingFrame = false;
     if (camera != null) {
       try {
@@ -176,19 +266,27 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
       await camera.dispose();
     }
     await detector?.close();
-    if (mounted && _error == null && !_initializing) {
-      setState(() => _loading = false);
-    }
   }
+
+  void _retry() {
+    _retries = 0;
+    _error = null;
+    unawaited(_initializeCamera());
+  }
+
+  // ------------------------------------------------------------- frames
 
   Future<void> _processCameraImage(CameraImage image) async {
     if (_processingFrame || _poseDetector == null || _camera == null) return;
     final now = DateTime.now();
     if (_lastProcessedAt != null &&
-        now.difference(_lastProcessedAt!) < const Duration(milliseconds: 180)) {
+        now.difference(_lastProcessedAt!) < const Duration(milliseconds: 120)) {
       return;
     }
-    final inputImage = _inputImageFromCameraImage(image);
+    final camera = _camera!;
+    final rotation = _rotationFor(camera.description);
+    if (rotation == null) return;
+    final inputImage = _inputImageFromCameraImage(image, rotation);
     if (inputImage == null) {
       debugPrint(
         '[POSE] Frame descartado: no se pudo crear InputImage. '
@@ -196,6 +294,14 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
         'planes=${image.planes.length} size=${image.width}x${image.height}',
       );
       return;
+    }
+    if (!_loggedFrame) {
+      _loggedFrame = true;
+      debugPrint(
+        '[POSE] frame=${image.width}x${image.height} rotation=$rotation '
+        'preview=${camera.value.previewSize} '
+        'sensor=${camera.description.sensorOrientation} mirror=$_mirror',
+      );
     }
 
     _processingFrame = true;
@@ -209,53 +315,25 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
           detector != _poseDetector) {
         return;
       }
-      debugPrint('[POSE] ML Kit devolvió ${poses.length} pose(s)');
       final pose = poses.firstOrNull;
-      if (pose == null) {
-        if (_visibleLandmarks.isNotEmpty || _placement.placement == null) {
-          setState(() => _visibleLandmarks = const {});
-        }
-        return;
-      }
-
-      final camera = _camera;
-      if (camera == null) return;
-      final rotation = _rotationFor(camera.description);
-      if (rotation == null) {
-        debugPrint('[POSE] No se pudo calcular la rotación del frame');
-        return;
-      }
-
-      final visibleLandmarks = _normalizedPoseLandmarks(
-        pose,
-        image.width,
-        image.height,
-        rotation,
-      );
-      final landmarks = _torsoLandmarksFromMap(visibleLandmarks);
-
-      if (landmarks == null) {
-        debugPrint('[POSE] Pose encontrada, pero faltan landmarks del torso');
-        setState(() => _visibleLandmarks = visibleLandmarks);
-        return;
-      }
-
-      final updated = _placement.update(landmarks);
-      if (updated) {
-        debugPrint(
-          '[POSE] Placement actualizado: '
-          'L=${_placement.placement?.left.toStringAsFixed(3)} '
-          'T=${_placement.placement?.top.toStringAsFixed(3)} '
-          'W=${_placement.placement?.width.toStringAsFixed(3)} '
-          'H=${_placement.placement?.height.toStringAsFixed(3)}',
-        );
-      } else {
-        debugPrint(
-          '[POSE] Landmarks recibidos, pero PosePlacement los rechazó',
-        );
-      }
-
-      setState(() => _visibleLandmarks = visibleLandmarks);
+      final body = pose == null
+          ? null
+          : BodyPose.fromLandmarks(
+              raw: {
+                for (final landmark in pose.landmarks.values)
+                  if (_jointByName[landmark.type.name] != null)
+                    _jointByName[landmark.type.name]!: BodyPoint(
+                      landmark.x,
+                      landmark.y,
+                      landmark.likelihood,
+                    ),
+              },
+              imageWidth: image.width,
+              imageHeight: image.height,
+              rotationDegrees: _degrees(rotation),
+              mirror: _mirror,
+            );
+      if (_tracker.update(body) && mounted) setState(() {});
     } catch (error, stackTrace) {
       debugPrint('[POSE] Error procesando frame: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -264,35 +342,15 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     }
   }
 
-  InputImage? _inputImageFromCameraImage(CameraImage image) {
-    final camera = _camera;
-    if (camera == null) return null;
-
-    final rotation = _rotationFor(camera.description);
-    if (rotation == null) {
-      debugPrint('[POSE] Rotación inválida');
-      return null;
-    }
-
+  InputImage? _inputImageFromCameraImage(
+    CameraImage image,
+    InputImageRotation rotation,
+  ) {
     final format = InputImageFormatValue.fromRawValue(image.format.raw);
     final expectedFormat = defaultTargetPlatform == TargetPlatform.android
         ? InputImageFormat.nv21
         : InputImageFormat.bgra8888;
-
-    if (format != expectedFormat) {
-      debugPrint(
-        '[POSE] Formato no soportado. recibido=$format esperado=$expectedFormat',
-      );
-      return null;
-    }
-
-    if (image.planes.length != 1) {
-      debugPrint(
-        '[POSE] Número de planos no soportado: ${image.planes.length}. '
-        'NV21/BGRA8888 debe llegar como un solo plano.',
-      );
-      return null;
-    }
+    if (format != expectedFormat || image.planes.length != 1) return null;
 
     final plane = image.planes.first;
     return InputImage.fromBytes(
@@ -328,125 +386,17 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     return InputImageRotationValue.fromRawValue(compensation);
   }
 
-  Map<PoseLandmarkType, PosePoint> _normalizedPoseLandmarks(
-    Pose pose,
-    int width,
-    int height,
-    InputImageRotation rotation,
-  ) {
-    final camera = _camera;
-    if (camera == null || width <= 0 || height <= 0) return const {};
-
-    final result = <PoseLandmarkType, PosePoint>{};
-
-    // Para el vestidor ignoramos por completo los landmarks de la cara.
-    // ML Kit puede detectarlos internamente, pero no se dibujan ni se usan
-    // para calcular la colocación de la prenda.
-    const ignoredFaceLandmarks = <PoseLandmarkType>{
-      PoseLandmarkType.nose,
-      PoseLandmarkType.leftEyeInner,
-      PoseLandmarkType.leftEye,
-      PoseLandmarkType.leftEyeOuter,
-      PoseLandmarkType.rightEyeInner,
-      PoseLandmarkType.rightEye,
-      PoseLandmarkType.rightEyeOuter,
-      PoseLandmarkType.leftEar,
-      PoseLandmarkType.rightEar,
-      PoseLandmarkType.leftMouth,
-      PoseLandmarkType.rightMouth,
-    };
-
-    for (final entry in pose.landmarks.entries) {
-      if (ignoredFaceLandmarks.contains(entry.key)) continue;
-
-      final landmark = entry.value;
-      double x;
-      double y;
-
-      // Conservamos exactamente la misma conversión que utiliza la prenda.
-      switch (rotation) {
-        case InputImageRotation.rotation90deg:
-          x =
-              landmark.x /
-              (defaultTargetPlatform == TargetPlatform.iOS ? width : height);
-          y =
-              landmark.y /
-              (defaultTargetPlatform == TargetPlatform.iOS ? height : width);
-          break;
-        case InputImageRotation.rotation270deg:
-          x =
-              1 -
-              landmark.x /
-                  (defaultTargetPlatform == TargetPlatform.iOS
-                      ? width
-                      : height);
-          y =
-              landmark.y /
-              (defaultTargetPlatform == TargetPlatform.iOS ? height : width);
-          break;
-        case InputImageRotation.rotation0deg:
-        case InputImageRotation.rotation180deg:
-          x = landmark.x / width;
-          y = landmark.y / height;
-          if (camera.description.lensDirection == CameraLensDirection.front) {
-            x = 1 - x;
-          }
-          break;
-      }
-
-      if (!x.isFinite || !y.isFinite) continue;
-
-      // Dibujamos únicamente puntos visibles dentro del preview.
-      if (x < 0 || x > 1 || y < 0 || y > 1) continue;
-
-      result[entry.key] = PosePoint(x, y, landmark.z / math.max(width, height));
-    }
-
-    for (final type in const [
-      PoseLandmarkType.leftShoulder,
-      PoseLandmarkType.rightShoulder,
-      PoseLandmarkType.leftHip,
-      PoseLandmarkType.rightHip,
-    ]) {
-      final point = result[type];
-      final raw = pose.landmarks[type];
-      if (point != null && raw != null) {
-        debugPrint(
-          '[POSE] $type raw=(${raw.x.toStringAsFixed(1)}, '
-          '${raw.y.toStringAsFixed(1)}) normalized='
-          '(${point.x.toStringAsFixed(3)}, ${point.y.toStringAsFixed(3)}) '
-          'rotation=$rotation',
-        );
-      }
-    }
-
-    return result;
-  }
-
-  TorsoLandmarks? _torsoLandmarksFromMap(
-    Map<PoseLandmarkType, PosePoint> points,
-  ) {
-    final leftShoulder = points[PoseLandmarkType.leftShoulder];
-    final rightShoulder = points[PoseLandmarkType.rightShoulder];
-    final leftHip = points[PoseLandmarkType.leftHip];
-    final rightHip = points[PoseLandmarkType.rightHip];
-
-    if (leftShoulder == null ||
-        rightShoulder == null ||
-        leftHip == null ||
-        rightHip == null) {
-      return null;
-    }
-
-    return TorsoLandmarks(
-      leftShoulder: leftShoulder,
-      rightShoulder: rightShoulder,
-      leftHip: leftHip,
-      rightHip: rightHip,
-    );
-  }
+  static int _degrees(InputImageRotation rotation) => switch (rotation) {
+    InputImageRotation.rotation0deg => 0,
+    InputImageRotation.rotation90deg => 90,
+    InputImageRotation.rotation180deg => 180,
+    InputImageRotation.rotation270deg => 270,
+  };
 
   String _cameraError(Object error) {
+    if (error is TimeoutException) {
+      return 'La cámara tardó demasiado en iniciar. Intenta de nuevo.';
+    }
     if (error is CameraException) {
       return switch (error.code) {
         'CameraAccessDenied' => 'Permiso de cámara denegado.',
@@ -459,6 +409,8 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     }
     return 'La cámara no está disponible en este dispositivo.';
   }
+
+  // ----------------------------------------------------------------- UI
 
   @override
   Widget build(BuildContext context) => Material(
@@ -474,7 +426,7 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
   );
 
   Widget _buildHeader() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+    padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
     child: Row(
       children: [
         const Icon(Icons.checkroom_outlined, color: Colors.white),
@@ -505,6 +457,20 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
           ),
         ),
         IconButton(
+          tooltip: 'Ver puntos',
+          isSelected: _showPoints,
+          selectedIcon: const Icon(Icons.polyline, color: Color(0xFF00E5FF)),
+          onPressed: () => setState(() => _showPoints = !_showPoints),
+          icon: const Icon(Icons.polyline_outlined, color: Colors.white70),
+        ),
+        IconButton(
+          tooltip: 'Espejo',
+          isSelected: _mirror,
+          selectedIcon: const Icon(Icons.flip, color: Colors.white),
+          onPressed: () => setState(() => _mirror = !_mirror),
+          icon: const Icon(Icons.flip, color: Colors.white38),
+        ),
+        IconButton(
           tooltip: 'Cerrar',
           onPressed: () => Navigator.of(context).pop(),
           icon: const Icon(Icons.close, color: Colors.white),
@@ -526,204 +492,120 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
         ),
       );
     }
-    if (_error != null || _camera == null) {
+    final camera = _camera;
+    if (_error != null || camera == null) {
       return _ErrorState(
         message: _error ?? 'La cámara no está disponible.',
+        onRetry: _retry,
         onClose: () => Navigator.of(context).pop(),
       );
     }
-    return _buildCameraStage(_camera!);
+    return _buildCameraStage(camera);
   }
 
-  Widget _buildCameraStage(CameraController camera) => LayoutBuilder(
-    builder: (context, constraints) {
-      final placement = _placement.placement;
-      return Stack(
-        fit: StackFit.expand,
-        children: [
-          CameraPreview(camera),
-          if (placement != null)
-            Positioned(
-              left: placement.left * constraints.maxWidth,
-              top: placement.top * constraints.maxHeight,
-              width: placement.width * constraints.maxWidth,
-              height: placement.height * constraints.maxHeight,
-              child: IgnorePointer(
-                child: Transform.rotate(
-                  angle: placement.rotation,
-                  alignment: Alignment.topCenter,
-                  child: Transform(
-                    alignment: Alignment.topCenter,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.0012)
-                      ..rotateX(placement.pitch),
-                    child: Image.network(
-                      widget.imageUrl,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.topCenter,
-                      errorBuilder: (_, _, _) => const Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: Colors.white,
-                          size: 40,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          if (_visibleLandmarks.isNotEmpty)
-            Positioned.fill(
-              child: IgnorePointer(
-                // child: CustomPaint(
-                //   painter: _PoseLandmarksPainter(_visibleLandmarks),
-                // ),
-              ),
-            ),
-          if (placement == null)
-            const Positioned(top: 18, left: 18, right: 18, child: _PoseHint()),
-          Positioned(left: 12, right: 12, bottom: 12, child: _buildNotice()),
-        ],
-      );
-    },
-  );
+  Size _portraitPreviewSize(CameraController camera) {
+    final size = camera.value.previewSize ?? const Size(480, 640);
+    return Size(
+      math.min(size.width, size.height),
+      math.max(size.width, size.height),
+    );
+  }
 
-  Widget _buildNotice() => Container(
-    padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-    decoration: BoxDecoration(
-      color: Colors.black.withValues(alpha: .78),
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: const Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+  Widget _buildCameraStage(CameraController camera) {
+    final preview = _portraitPreviewSize(camera);
+    final pose = _tracker.pose;
+    final color = _colorFromHex(widget.variant.colorHex);
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        Text(
-          'Colocación automática',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+        ClipRect(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            clipBehavior: Clip.hardEdge,
+            child: SizedBox(
+              width: preview.width,
+              height: preview.height,
+              child: CameraPreview(camera),
+            ),
+          ),
         ),
-        SizedBox(height: 3),
-        Text(
-          'Usamos solo el cuerpo desde los hombros hacia abajo. La cara se ignora por completo.',
-          style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3),
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(
+              painter: GarmentPainter(
+                pose: pose,
+                previewSize: preview,
+                garment: _garment,
+                fallbackColor: color,
+                sleeves: _sleeves,
+                scale: _garmentIsOverlay ? widget.overlayScale : 1,
+                anchor: anchorFor(widget.productName),
+                shoulderY: _garmentShoulderY,
+                showPoints: _showPoints,
+              ),
+            ),
+          ),
         ),
-        SizedBox(height: 5),
-        Text(
-          'La imagen puede incluir fondo y se muestra tal como está.',
-          style: TextStyle(color: Colors.white54, fontSize: 11, height: 1.3),
-        ),
+        if (pose == null)
+          const Positioned(top: 18, left: 18, right: 18, child: _PoseHint()),
+        Positioned(left: 12, right: 12, bottom: 12, child: _buildNotice()),
       ],
-    ),
-  );
-}
-
-class _PoseLandmarksPainter extends CustomPainter {
-  const _PoseLandmarksPainter(this.landmarks);
-
-  final Map<PoseLandmarkType, PosePoint> landmarks;
-
-  static const _torsoTypes = <PoseLandmarkType>{
-    PoseLandmarkType.leftShoulder,
-    PoseLandmarkType.rightShoulder,
-    PoseLandmarkType.leftHip,
-    PoseLandmarkType.rightHip,
-  };
-
-  static const _connections = <(PoseLandmarkType, PoseLandmarkType)>[
-    (PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder),
-    (PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip),
-    (PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip),
-    (PoseLandmarkType.leftHip, PoseLandmarkType.rightHip),
-    (PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow),
-    (PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist),
-    (PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow),
-    (PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist),
-    (PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee),
-    (PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle),
-    (PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee),
-    (PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle),
-  ];
-
-  Offset _offset(PosePoint point, Size size) =>
-      Offset(point.x * size.width, point.y * size.height);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final skeletonPaint = Paint()
-      ..color = Colors.cyanAccent.withValues(alpha: .9)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    for (final connection in _connections) {
-      final first = landmarks[connection.$1];
-      final second = landmarks[connection.$2];
-      if (first == null || second == null) continue;
-      canvas.drawLine(
-        _offset(first, size),
-        _offset(second, size),
-        skeletonPaint,
-      );
-    }
-
-    final normalPointPaint = Paint()
-      ..color = Colors.yellowAccent
-      ..style = PaintingStyle.fill;
-    final torsoPointPaint = Paint()
-      ..color = Colors.redAccent
-      ..style = PaintingStyle.fill;
-    final outlinePaint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    for (final entry in landmarks.entries) {
-      final position = _offset(entry.value, size);
-      final isTorso = _torsoTypes.contains(entry.key);
-      final radius = isTorso ? 7.0 : 4.0;
-      canvas.drawCircle(
-        position,
-        radius,
-        isTorso ? torsoPointPaint : normalPointPaint,
-      );
-      canvas.drawCircle(position, radius, outlinePaint);
-    }
-
-    _drawLabel(canvas, size, PoseLandmarkType.leftShoulder, 'Hombro I');
-    _drawLabel(canvas, size, PoseLandmarkType.rightShoulder, 'Hombro D');
-    _drawLabel(canvas, size, PoseLandmarkType.leftHip, 'Cadera I');
-    _drawLabel(canvas, size, PoseLandmarkType.rightHip, 'Cadera D');
+    );
   }
 
-  void _drawLabel(
-    Canvas canvas,
-    Size size,
-    PoseLandmarkType type,
-    String label,
-  ) {
-    final point = landmarks[type];
-    if (point == null) return;
+  static Color _colorFromHex(String? hex) {
+    final value = hex?.replaceAll('#', '').trim();
+    if (value == null || value.length != 6) return const Color(0xFFD62828);
+    final parsed = int.tryParse(value, radix: 16);
+    return parsed == null
+        ? const Color(0xFFD62828)
+        : Color(0xFF000000 | parsed);
+  }
 
-    final position = _offset(point, size);
-    final textPainter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          shadows: [Shadow(color: Colors.black, blurRadius: 3)],
-        ),
+  Widget _buildNotice() {
+    final String mode;
+    if (_garment == null) {
+      mode = _garmentFailed
+          ? 'Sin imagen: se dibuja la silueta del color elegido.'
+          : 'Cargando la prenda…';
+    } else if (_garmentIsOverlay) {
+      mode = 'Prenda: PNG del probador (fondo transparente).';
+    } else {
+      mode = 'Prenda: foto del producto.';
+    }
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .78),
+        borderRadius: BorderRadius.circular(16),
       ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-
-    textPainter.paint(canvas, position + const Offset(9, -13));
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Colocación automática',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            'La prenda sigue tus hombros y brazos. Mueve los brazos o inclínate '
+            'para verla acompañarte; la cara se ignora por completo.',
+            style: TextStyle(color: Colors.white70, fontSize: 12, height: 1.3),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            mode,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant _PoseLandmarksPainter oldDelegate) =>
-      oldDelegate.landmarks != landmarks;
 }
 
 class _PoseHint extends StatelessWidget {
@@ -738,7 +620,7 @@ class _PoseHint extends StatelessWidget {
     child: const Padding(
       padding: EdgeInsets.all(12),
       child: Text(
-        'Párate frente a la cámara para detectar hombros y cadera.',
+        'Párate frente a la cámara, a 1–2 metros, para detectar tus hombros.',
         textAlign: TextAlign.center,
         style: TextStyle(color: Colors.white, height: 1.3),
       ),
@@ -747,9 +629,14 @@ class _PoseHint extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onClose});
+  const _ErrorState({
+    required this.message,
+    required this.onRetry,
+    required this.onClose,
+  });
 
   final String message;
+  final VoidCallback onRetry;
   final VoidCallback onClose;
 
   @override
@@ -771,6 +658,8 @@ class _ErrorState extends StatelessWidget {
             style: const TextStyle(color: Colors.white, height: 1.4),
           ),
           const SizedBox(height: 18),
+          GcButton(label: 'Reintentar', onPressed: onRetry),
+          const SizedBox(height: 10),
           GcButton(
             label: 'Cerrar',
             variant: GcButtonVariant.outlined,

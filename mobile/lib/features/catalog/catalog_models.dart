@@ -17,6 +17,31 @@ class Availability {
   );
 }
 
+/// Recurso del probador virtual registrado por el admin para una variante
+/// (`asset_ar`): un PNG con fondo transparente y su escala.
+class ArResource {
+  const ArResource({
+    required this.id,
+    required this.type,
+    required this.url,
+    required this.scale,
+  });
+
+  final int id;
+  final String type;
+  final String url;
+  final double scale;
+
+  bool get isPngOverlay => type == 'png_overlay';
+
+  factory ArResource.fromJson(Map<String, dynamic> json) => ArResource(
+    id: _requiredInt(json, 'id'),
+    type: _nullableString(json['tipo']) ?? 'png_overlay',
+    url: _requiredString(json, 'url_recurso'),
+    scale: _nullableDouble(json['escala']) ?? 1,
+  );
+}
+
 class Variant {
   const Variant({
     required this.id,
@@ -29,6 +54,8 @@ class Variant {
     required this.imageUrl,
     required this.availableTotal,
     required this.availability,
+    this.hasFittingRoom = false,
+    this.arResources = const [],
   });
 
   final int id;
@@ -41,6 +68,19 @@ class Variant {
   final String? imageUrl;
   final int availableTotal;
   final List<Availability> availability;
+  final bool hasFittingRoom;
+  final List<ArResource> arResources;
+
+  /// Último PNG registrado: el backend solo agrega recursos, así que el más
+  /// reciente reemplaza a los anteriores.
+  ArResource? get pngOverlay {
+    for (final resource in arResources.reversed) {
+      if (resource.isPngOverlay && resource.url.trim().isNotEmpty) {
+        return resource;
+      }
+    }
+    return null;
+  }
 
   factory Variant.fromJson(Map<String, dynamic> json) => Variant(
     id: _requiredInt(json, 'id'),
@@ -55,6 +95,12 @@ class Variant {
     availability: _list(
       json['disponibilidad'],
     ).map(Availability.fromJson).toList(growable: false),
+    hasFittingRoom: json['tiene_probador'] == true,
+    arResources: json['recursos_ar'] is List
+        ? _list(
+            json['recursos_ar'],
+          ).map(ArResource.fromJson).toList(growable: false)
+        : const [],
   );
 }
 
