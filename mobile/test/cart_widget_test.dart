@@ -10,6 +10,7 @@ import 'package:mobile/features/cart/cart_models.dart';
 import 'package:mobile/features/cart/cart_screen.dart';
 import 'package:mobile/features/cart/cart_service.dart';
 import 'package:mobile/features/cart/payment_sheet.dart';
+import 'package:mobile/features/delivery/delivery_map.dart';
 import 'package:mobile/features/delivery/delivery_models.dart';
 import 'package:mobile/features/delivery/delivery_service.dart';
 import 'package:mobile/features/purchase_history/purchase_history_models.dart';
@@ -78,38 +79,38 @@ void main() {
     );
   });
 
-  testWidgets(
-    'delivery sheet exposes explicit fields and backend quote without a map',
-    (tester) async {
-      final controller = CartController(api: _FakeCartApi(cart: _deliveryCart));
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: GangaTheme.light(),
-          home: CartScreen(
-            apiClient: ApiClient(),
-            session: null,
-            controller: controller,
-          ),
+  testWidgets('delivery sheet shows the map picker, the fields and the quote', (
+    tester,
+  ) async {
+    final controller = CartController(api: _FakeCartApi(cart: _deliveryCart));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: GangaTheme.light(),
+        home: CartScreen(
+          apiClient: ApiClient(),
+          session: null,
+          controller: controller,
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.drag(find.byType(ListView), const Offset(0, -500));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Editar entrega'));
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Editar entrega'));
+    await tester.pumpAndSettle();
 
-      expect(find.text('Dirección'), findsOneWidget);
-      expect(find.text('Referencia (opcional)'), findsOneWidget);
-      expect(find.text('Teléfono de contacto'), findsOneWidget);
-      expect(find.text('Latitud'), findsOneWidget);
-      expect(find.text('Longitud'), findsOneWidget);
-      expect(find.text('Entrega express'), findsOneWidget);
-      expect(find.text('COTIZACIÓN DEL BACKEND'), findsOneWidget);
-      expect(find.textContaining('No hay mapa ni permisos'), findsOneWidget);
-      expect(find.textContaining('Simular'), findsNothing);
-      expect(find.byIcon(Icons.map), findsNothing);
-    },
-  );
+    expect(find.text('Dirección'), findsOneWidget);
+    expect(find.text('Referencia (opcional)'), findsOneWidget);
+    expect(find.text('Teléfono de contacto'), findsOneWidget);
+    expect(find.byType(DeliveryMap), findsOneWidget);
+    expect(find.textContaining('Ubicación marcada'), findsOneWidget);
+    expect(find.text('Latitud'), findsNothing);
+    expect(find.text('Entrega express'), findsOneWidget);
+    expect(find.text('COTIZACIÓN DEL ENVÍO'), findsOneWidget);
+    expect(find.textContaining('backend'), findsNothing);
+    expect(find.textContaining('No hay mapa'), findsNothing);
+    expect(find.textContaining('Simular'), findsNothing);
+  });
 
   testWidgets('validates test payment fields without sending card data', (
     tester,
