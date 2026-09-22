@@ -27,3 +27,22 @@ rastrear cada imagen. Se bajaron recortadas a 800 x 1000 px desde
 | camisa-blanca-formal.jpg | Camisa blanca formal | 1598033129183-c4f50c736f10 |
 | falda-plisada-negra.jpg | Falda plisada negra | 1583496661160-fb5886a0aaaa |
 | falda-midi-beige.jpg | Falda midi beige | 1592301933927-35b597393c0a |
+
+## Imagenes del probador virtual (`*.png`, fondo transparente)
+
+El vestidor virtual de la app movil dibuja la prenda sola sobre el cuerpo, asi
+que necesita un PNG con fondo transparente (`asset_ar` tipo `png_overlay`).
+La mayoria se obtuvo recortando la foto de Unsplash correspondiente con
+[rembg](https://github.com/danielgatis/rembg) (modelos `u2net` y
+`u2net_cloth_seg`). Para las fotos donde la prenda no se podia aislar (modelo
+de cuerpo entero, prenda parcial) se usaron PNG de
+[pngimg.com](https://pngimg.com), uso libre no comercial con atribucion:
+
+| Archivo | Fuente |
+|---|---|
+| camisa-blanca-formal.png | https://pngimg.com/image/8084 (dress shirt) |
+| jean-clasico.png | https://pngimg.com/image/5762 (jeans) |
+| jean-skinny-rasgado.png | https://pngimg.com/image/5779 (jeans) |
+| vestido-blanco-verano.png | https://pngimg.com/image/82 (dress) |
+| vestido-floral-rojo.png | https://pngimg.com/image/147 (dress) |
+| vestido-largo-gala.png | https://pngimg.com/image/137 (dress) |
