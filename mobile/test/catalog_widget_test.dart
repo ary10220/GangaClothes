@@ -319,6 +319,55 @@ void main() {
     );
   });
 
+  testWidgets('passes the latest transparent PNG of the variant, resolved '
+      'against the product photo', (tester) async {
+    await tester.pumpWidget(
+      _host(
+        Scaffold(
+          body: CatalogDetailSheet(
+            product: _product(
+              available: 2,
+              productImageUrl: 'https://cdn.example.com/img/product.jpg',
+              arResources: const [
+                ArResource(
+                  id: 1,
+                  type: 'png_overlay',
+                  url: 'https://old.example.com/old.png',
+                  scale: 1,
+                ),
+                ArResource(
+                  id: 2,
+                  type: 'png_overlay',
+                  url: '/img/prendas/camisa.png',
+                  scale: 1.2,
+                ),
+                ArResource(id: 3, type: 'modelo_3d', url: '/x.glb', scale: 1),
+              ],
+            ),
+            branches: const [],
+            actionService: _FakeDetailApi(),
+            cameraEnumerator: () async => const [],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Vestidor virtual'),
+      -240,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Vestidor virtual'));
+    await tester.pumpAndSettle();
+
+    final sheet = tester.widget<VirtualFittingSheet>(
+      find.byType(VirtualFittingSheet),
+    );
+    expect(sheet.imageUrl, 'https://cdn.example.com/img/product.jpg');
+    expect(sheet.overlayUrl, 'https://cdn.example.com/img/prendas/camisa.png');
+    expect(sheet.overlayScale, 1.2);
+  });
+
   testWidgets('ellipsizes long branch labels on a narrow detail sheet', (
     tester,
   ) async {
@@ -472,6 +521,7 @@ Product _product({
   CatalogPromotion? promotion,
   String? productImageUrl,
   String? variantImageUrl,
+  List<ArResource> arResources = const [],
 }) => Product(
   id: 1,
   name: 'Camisa Oxford',
@@ -497,6 +547,8 @@ Product _product({
       imageUrl: variantImageUrl,
       availableTotal: 1,
       availability: [],
+      hasFittingRoom: arResources.isNotEmpty,
+      arResources: arResources,
     ),
     Variant(
       id: 2,

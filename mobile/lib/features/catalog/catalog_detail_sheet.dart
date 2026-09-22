@@ -365,21 +365,44 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
   }
 
   Widget? _buildVirtualFittingAction() {
-    final variantImage = _controller.selectedVariant?.imageUrl?.trim();
+    final variant = _controller.selectedVariant;
+    if (variant == null) return null;
+    final variantImage = variant.imageUrl?.trim();
     final imageUrl = variantImage?.isNotEmpty == true
         ? variantImage
         : widget.product.imageUrl?.trim();
     if (imageUrl == null || imageUrl.isEmpty) return null;
+    final overlay = variant.pngOverlay;
     return GcButton(
       expand: true,
       label: 'Vestidor virtual',
       variant: GcButtonVariant.outlined,
       icon: const Icon(Icons.checkroom_outlined, size: 18),
-      onPressed: () => _openVirtualFitting(imageUrl),
+      onPressed: () => _openVirtualFitting(
+        variant: variant,
+        imageUrl: imageUrl,
+        overlayUrl: overlay == null ? null : _resolveUrl(overlay.url, imageUrl),
+        overlayScale: overlay?.scale ?? 1,
+      ),
     );
   }
 
-  void _openVirtualFitting(String imageUrl) {
+  /// El backend puede devolver el PNG del probador como ruta relativa
+  /// (`/img/...`); se resuelve contra la URL absoluta de la foto.
+  static String _resolveUrl(String url, String base) {
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return Uri.parse(base).resolve(trimmed).toString();
+  }
+
+  void _openVirtualFitting({
+    required Variant variant,
+    required String imageUrl,
+    required String? overlayUrl,
+    required double overlayScale,
+  }) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -389,8 +412,10 @@ class _CatalogDetailSheetState extends State<CatalogDetailSheet> {
         heightFactor: .96,
         child: VirtualFittingSheet(
           productName: widget.product.name,
-          variant: _controller.selectedVariant!,
+          variant: variant,
           imageUrl: imageUrl,
+          overlayUrl: overlayUrl,
+          overlayScale: overlayScale,
           cameraEnumerator: widget.cameraEnumerator,
         ),
       ),
