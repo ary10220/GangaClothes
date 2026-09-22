@@ -26,6 +26,3 @@ certificados/
 
 # Otros
 .DS_Store
-# Herramientas locales (no se suben)
-.claude/
-CLAUDE.md
