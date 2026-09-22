@@ -556,7 +556,9 @@ class _VirtualFittingSheetState extends State<VirtualFittingSheet>
     final value = hex?.replaceAll('#', '').trim();
     if (value == null || value.length != 6) return const Color(0xFFD62828);
     final parsed = int.tryParse(value, radix: 16);
-    return parsed == null ? const Color(0xFFD62828) : Color(0xFF000000 | parsed);
+    return parsed == null
+        ? const Color(0xFFD62828)
+        : Color(0xFF000000 | parsed);
   }
 
   Widget _buildNotice() {

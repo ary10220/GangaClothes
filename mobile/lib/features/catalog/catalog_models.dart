@@ -97,9 +97,9 @@ class Variant {
     ).map(Availability.fromJson).toList(growable: false),
     hasFittingRoom: json['tiene_probador'] == true,
     arResources: json['recursos_ar'] is List
-        ? _list(json['recursos_ar'])
-              .map(ArResource.fromJson)
-              .toList(growable: false)
+        ? _list(
+            json['recursos_ar'],
+          ).map(ArResource.fromJson).toList(growable: false)
         : const [],
   );
 }

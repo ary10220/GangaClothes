@@ -9,7 +9,10 @@ import 'body_model.dart';
 /// transformación `cover` con la que se muestra el preview de la cámara.
 class PreviewMapper {
   PreviewMapper({required this.stage, required this.preview})
-    : scale = math.max(stage.width / preview.width, stage.height / preview.height) {
+    : scale = math.max(
+        stage.width / preview.width,
+        stage.height / preview.height,
+      ) {
     dx = (stage.width - preview.width * scale) / 2;
     dy = (stage.height - preview.height * scale) / 2;
   }
@@ -138,8 +141,17 @@ class GarmentPainter extends CustomPainter {
     final s = g.shoulderWidth * scale / (w * (1 - 2 * _shoulderX));
     final paint = Paint()..filterQuality = FilterQuality.medium;
 
-    if (sleeves != SleeveMode.none) {
+    // Una manga solo se separa de la foto cuando el brazo se aleja de la
+    // posición de reposo; si no, la foto se dibuja entera y sin costuras.
+    final leftActive =
+        sleeves != SleeveMode.none && _sleeveMoves(g.screenLeftArm, left: true);
+    final rightActive =
+        sleeves != SleeveMode.none &&
+        _sleeveMoves(g.screenRightArm, left: false);
+    if (leftActive) {
       _paintSleeve(canvas, g.screenLeftArm, image, s, paint, left: true);
+    }
+    if (rightActive) {
       _paintSleeve(canvas, g.screenRightArm, image, s, paint, left: false);
     }
 
@@ -148,13 +160,39 @@ class GarmentPainter extends CustomPainter {
     canvas.rotate(g.angle);
     canvas.scale(s);
     canvas.translate(-w / 2, -h * shoulderY);
-    if (sleeves != SleeveMode.none) {
-      canvas.clipRect(
-        Rect.fromLTWH(w * _shoulderX, 0, w * (1 - 2 * _shoulderX), h),
-      );
+    if (leftActive || rightActive) {
+      final left = leftActive ? w * _shoulderX : 0.0;
+      final right = rightActive ? w * (1 - _shoulderX) : w;
+      canvas.clipRect(Rect.fromLTRB(left, 0, right, h));
     }
     canvas.drawImage(image, Offset.zero, paint);
     canvas.restore();
+  }
+
+  /// Zona muerta alrededor del reposo para no partir la manga por ruido.
+  static const double _deadZone = .26;
+
+  double _restAngle({required bool left}) =>
+      math.pi / 2 + (left ? _restSpread : -_restSpread);
+
+  /// Rotación efectiva de un segmento respecto del reposo, con zona muerta y
+  /// envuelta a (-π, π].
+  double _rotation(double angle, {required bool left}) {
+    var delta = angle - _restAngle(left: left);
+    while (delta > math.pi) {
+      delta -= 2 * math.pi;
+    }
+    while (delta <= -math.pi) {
+      delta += 2 * math.pi;
+    }
+    if (delta.abs() <= _deadZone) return 0;
+    return delta - delta.sign * _deadZone;
+  }
+
+  bool _sleeveMoves(ArmGeometry arm, {required bool left}) {
+    if (_rotation(arm.upper.angle, left: left) != 0) return true;
+    return sleeves == SleeveMode.long &&
+        _rotation(arm.lower.angle, left: left) != 0;
   }
 
   void _paintSleeve(
@@ -171,7 +209,7 @@ class GarmentPainter extends CustomPainter {
     final stripX = left ? 0.0 : w * (1 - _shoulderX);
     // La manga de la foto cuelga hacia abajo y un poco hacia afuera; se rota
     // solo la diferencia entre esa posición de reposo y el brazo real.
-    final rest = math.pi / 2 + (left ? _restSpread : -_restSpread);
+    final upperRotation = _rotation(arm.upper.angle, left: left);
     final anchorX = left ? stripWidth : 0.0;
 
     if (sleeves == SleeveMode.long) {
@@ -181,7 +219,7 @@ class GarmentPainter extends CustomPainter {
         image,
         paint,
         anchor: arm.upper.start,
-        rotation: arm.upper.angle - rest,
+        rotation: upperRotation,
         scale: s,
         src: Rect.fromLTWH(stripX, 0, stripWidth, upperBottom),
         offset: Offset(-anchorX, -h * shoulderY),
@@ -191,7 +229,7 @@ class GarmentPainter extends CustomPainter {
         image,
         paint,
         anchor: arm.lower.start,
-        rotation: arm.lower.angle - rest,
+        rotation: _rotation(arm.lower.angle, left: left),
         scale: s,
         src: Rect.fromLTWH(stripX, upperBottom, stripWidth, h - upperBottom),
         offset: Offset(-stripWidth / 2, 0),
@@ -203,7 +241,7 @@ class GarmentPainter extends CustomPainter {
       image,
       paint,
       anchor: arm.upper.start,
-      rotation: arm.upper.angle - rest,
+      rotation: upperRotation,
       scale: s,
       src: Rect.fromLTWH(stripX, 0, stripWidth, h),
       offset: Offset(-anchorX, -h * shoulderY),
@@ -272,12 +310,12 @@ class GarmentPainter extends CustomPainter {
     final k = sleeves == SleeveMode.none ? .12 : .22;
     final ls = _o(g.screenLeftShoulder);
     final rs = _o(g.screenRightShoulder);
-    final lh = _o(g.leftShoulder.x <= g.rightShoulder.x
-        ? _hip(g, true)
-        : _hip(g, false));
-    final rh = _o(g.leftShoulder.x <= g.rightShoulder.x
-        ? _hip(g, false)
-        : _hip(g, true));
+    final lh = _o(
+      g.leftShoulder.x <= g.rightShoulder.x ? _hip(g, true) : _hip(g, false),
+    );
+    final rh = _o(
+      g.leftShoulder.x <= g.rightShoulder.x ? _hip(g, false) : _hip(g, true),
+    );
     final hem = down(.18);
     final body = Path()
       ..moveTo(

@@ -99,13 +99,16 @@ void main() {
       expect(lw.y, greaterThan(pose[BodyJoint.leftElbow].y));
     });
 
-    test('mantiene puntos fuera de cuadro (una muñeca fuera sigue dando dirección)', () {
-      final raw = _upright();
-      raw[BodyJoint.leftWrist] = const BodyPoint(520, 700, .9);
-      final pose = _pose(raw: raw);
-      expect(pose[BodyJoint.leftWrist].x, greaterThan(1));
-      expect(pose.estimated, isNot(contains(BodyJoint.leftWrist)));
-    });
+    test(
+      'mantiene puntos fuera de cuadro (una muñeca fuera sigue dando dirección)',
+      () {
+        final raw = _upright();
+        raw[BodyJoint.leftWrist] = const BodyPoint(520, 700, .9);
+        final pose = _pose(raw: raw);
+        expect(pose[BodyJoint.leftWrist].x, greaterThan(1));
+        expect(pose.estimated, isNot(contains(BodyJoint.leftWrist)));
+      },
+    );
   });
 
   group('BodyTracker', () {
@@ -135,17 +138,20 @@ void main() {
   group('GarmentGeometry', () {
     math.Point<double> map(BodyPoint p) => math.Point(p.x * 400, p.y * 800);
 
-    test('mide hombros y torso en píxeles y calcula el ángulo de cada brazo', () {
-      final g = GarmentGeometry.compute(_pose(), map);
-      expect(g.shoulderWidth, closeTo(160, .5));
-      expect(g.shoulderMid.x, closeTo(200, .5));
-      expect(g.angle, closeTo(0, .001));
-      expect(g.torsoLength, closeTo(320, .5));
-      // Brazo izquierdo hacia abajo y afuera (x crece, y crece).
-      expect(g.leftArm.upper.angle, greaterThan(0));
-      expect(g.leftArm.upper.angle, lessThan(math.pi / 2));
-      expect(g.leftArm.upper.estimated, isFalse);
-    });
+    test(
+      'mide hombros y torso en píxeles y calcula el ángulo de cada brazo',
+      () {
+        final g = GarmentGeometry.compute(_pose(), map);
+        expect(g.shoulderWidth, closeTo(160, .5));
+        expect(g.shoulderMid.x, closeTo(200, .5));
+        expect(g.angle, closeTo(0, .001));
+        expect(g.torsoLength, closeTo(320, .5));
+        // Brazo izquierdo hacia abajo y afuera (x crece, y crece).
+        expect(g.leftArm.upper.angle, greaterThan(0));
+        expect(g.leftArm.upper.angle, lessThan(math.pi / 2));
+        expect(g.leftArm.upper.estimated, isFalse);
+      },
+    );
 
     test('la manga sigue al codo cuando el brazo se levanta', () {
       final raised = _upright();
