@@ -19,6 +19,7 @@ import { SesionStore } from '../../core/sesion';
         @if (esCliente()) {
           <a routerLink="/mis-reservas" routerLinkActive="on">Mis reservas</a>
           <a routerLink="/mis-compras" routerLinkActive="on">Mis compras</a>
+          <a routerLink="/mis-envios" routerLinkActive="on">Mis pedidos</a>
           <a routerLink="/carrito" routerLinkActive="on">Carrito</a>
         }
       </nav>

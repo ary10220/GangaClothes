@@ -113,6 +113,12 @@ class _ReservationsScreenState extends State<ReservationsScreen> {
           ),
         if (customer)
           GcAppBarDestination(
+            label: 'Seguimiento',
+            onPressed: () =>
+                Navigator.of(context).pushNamed(AppRoutes.shipmentTracking),
+          ),
+        if (customer)
+          GcAppBarDestination(
             label: 'Carrito',
             onPressed: () => Navigator.of(context).pushNamed(AppRoutes.cart),
           ),

@@ -6,3 +6,9 @@ pydantic-settings==2.15.0
 pydantic[email]==2.13.5
 bcrypt==5.0.0
 PyJWT==2.13.0
+# Comprobante de venta en PDF (CU15)
+reportlab==4.4.4
+# QR de cobro dibujado por el simulador del BCP (CU17)
+qrcode==8.2
+# Leer el certificado .pfx que pide el TLS mutuo del BCP
+cryptography==46.0.3

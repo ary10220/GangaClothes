@@ -41,6 +41,15 @@
           <p class="pago">
             <b>Pago:</b> {{ metodoPago(pago?.metodo) }} · {{ estadoPago(pago?.estado) }}
           </p>
+          <p class="pago">
+            <b>Entrega:</b>
+            @if (compra.tipo_entrega === 'delivery' && compra.envio) {
+              a domicilio · {{ compra.envio.direccion }}
+              <a class="enlace seguimiento" routerLink="/mis-envios">seguir el pedido →</a>
+            } @else {
+              retiro en {{ compra.sucursal || 'la sucursal' }}
+            }
+          </p>
 
           <ul>
             @for (detalle of compra.detalle; track detalle.id) {
@@ -59,6 +68,9 @@
             <span>Subtotal Bs {{ moneda(compra.subtotal) }}</span>
             @if (compra.descuento > 0) {
               <span>Descuento −Bs {{ moneda(compra.descuento) }}</span>
+            }
+            @if (compra.tipo_entrega === 'delivery') {
+              <span>Envio {{ compra.costo_envio > 0 ? 'Bs ' + moneda(compra.costo_envio) : 'gratis' }}</span>
             }
             <strong>Total Bs {{ moneda(compra.total) }}</strong>
           </div>

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.auditoria import registrar
 from app.core.deps import get_current_user, get_db, permisos_de, require_permiso
-from app.modules.ventas import service
+from app.modules.ventas import comprobante_pdf as comprobante_pdf_mod, service
 from app.modules.ventas.schemas import CarritoIn, ItemIn, ItemUpd, VentaPresencialIn
 
 router = APIRouter()
@@ -85,3 +85,20 @@ def comprobante(id: int, db=Depends(get_db), usuario=Depends(get_current_user)):
     # El personal ve cualquiera; un cliente, solo los de sus compras.
     personal = "ventas:ver" in permisos_de(db, usuario.id)
     return service.comprobante(db, usuario, id, personal)
+
+
+@router.get("/{id}/comprobante.pdf", summary="CU15: el mismo comprobante en PDF, para imprimir o descargar")
+def comprobante_pdf(id: int, peticion: Request, descargar: bool = False,
+                    db=Depends(get_db), usuario=Depends(get_current_user)):
+    personal = "ventas:ver" in permisos_de(db, usuario.id)
+    datos = service.comprobante(db, usuario, id, personal)
+    pdf = comprobante_pdf_mod.generar(datos)
+    # inline abre el visor del navegador (de ahi se imprime); attachment descarga.
+    disposicion = "attachment" if descargar else "inline"
+    nombre = comprobante_pdf_mod.nombre_archivo(datos)
+    registrar(db, modulo="VENTAS", accion="VER", usuario=usuario, peticion=peticion,
+              entidad="venta", entidad_id=id,
+              detalle=f"Comprobante {datos['nro_comprobante']} de la venta #{id} "
+                      f"{'descargado' if descargar else 'abierto para imprimir'} en PDF")
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'{disposicion}; filename="{nombre}"'})

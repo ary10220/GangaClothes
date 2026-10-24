@@ -10,4 +10,6 @@ from app.models.inventario import (Inventario, MovimientoInventario,        # no
                                    ProductoProveedor, ProductoProveedorTemporada)
 from app.models.ventas import (Reserva, DetalleReserva, Venta, DetalleVenta,  # noqa
                                Pago, Promocion, PromocionPrenda)
-from app.models.ia import EventoNavegacion, Recomendacion                   # noqa
+from app.models.envios import Envio                                        # noqa
+from app.models.ia import (Conversacion, EventoNavegacion,                  # noqa
+                           MensajeChat, Recomendacion)

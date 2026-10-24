@@ -16,6 +16,7 @@ from app.modules.inventario.router import router as inventario_router, compras a
 from app.modules.reservas.router import router as reservas_router
 from app.modules.ventas.router import router as ventas_router
 from app.modules.pagos.router import router as pagos_router
+from app.modules.envios.router import router as envios_router
 from app.modules.promociones.router import router as promociones_router
 from app.modules.reportes.router import router as reportes_router
 from app.modules.proveedores.router import router as oferta_router
@@ -63,10 +64,11 @@ app.include_router(compras_router, prefix="/api/compras", tags=["6b. Compras a p
 app.include_router(reservas_router, prefix="/api/reservas", tags=["7. Reservas (CU13, CU23-CU24)"])
 app.include_router(ventas_router, prefix="/api/ventas", tags=["8. Ventas (CU14, CU17)"])
 app.include_router(pagos_router, prefix="/api/pagos", tags=["9. Pagos (CU15, pasarela CU17)"])
+app.include_router(envios_router, prefix="/api/envios", tags=["9b. Envios a domicilio (CU29)"])
 app.include_router(oferta_router, prefix="/api/oferta", tags=["6c. Oferta del proveedor (CU9)"])
 app.include_router(promociones_router, prefix="/api/promociones", tags=["10. Promociones (CU18)"])
 app.include_router(reportes_router, prefix="/api/reportes", tags=["11. Reportes y dashboard (CU19)"])
-app.include_router(ia_router, prefix="/api/ia", tags=["12. IA (CU28) [pendiente]"])
+app.include_router(ia_router, prefix="/api/ia", tags=["12. IA: recomendador y asistente (CU28)"])
 
 
 @app.get("/", tags=["raiz"])

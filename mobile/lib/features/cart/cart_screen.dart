@@ -4,6 +4,9 @@ import '../../app/routes.dart';
 import '../../app/theme.dart';
 import '../../core/network/api_client.dart';
 import '../../features/auth/session_model.dart';
+import '../../features/purchase_history/purchase_history_screen.dart';
+import '../../features/purchase_history/purchase_receipt_pdf.dart';
+import '../../features/purchase_history/purchase_history_service.dart';
 import '../../shared/widgets/gc_app_bar.dart';
 import '../../shared/widgets/gc_button.dart';
 import '../../shared/widgets/gc_feedback.dart';
@@ -12,6 +15,7 @@ import '../../shared/widgets/gc_status_badge.dart';
 import 'cart_controller.dart';
 import 'cart_models.dart';
 import 'cart_service.dart';
+import '../delivery/delivery_sheet.dart';
 import 'payment_sheet.dart';
 
 class CartScreen extends StatefulWidget {
@@ -19,6 +23,9 @@ class CartScreen extends StatefulWidget {
     required this.apiClient,
     required this.session,
     this.controller,
+    this.purchaseReceiptService,
+    this.purchaseReceiptPdfService,
+    this.receiptPdfPrinter,
     this.openPayment = false,
     this.onLogout,
     super.key,
@@ -27,6 +34,9 @@ class CartScreen extends StatefulWidget {
   final ApiClient apiClient;
   final Session? session;
   final CartController? controller;
+  final PurchaseReceiptDataSource? purchaseReceiptService;
+  final PurchaseReceiptPdfDataSource? purchaseReceiptPdfService;
+  final ReceiptPdfPrinter? receiptPdfPrinter;
   final bool openPayment;
   final VoidCallback? onLogout;
 
@@ -36,13 +46,22 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   late final CartController _controller;
+  late final PurchaseReceiptDataSource _receiptService;
+  late final PurchaseReceiptPdfDataSource? _receiptPdfService;
   bool _autoPaymentOpened = false;
+  bool _receiptLoading = false;
 
   @override
   void initState() {
     super.initState();
     _controller =
         widget.controller ?? CartController(api: CartService(widget.apiClient));
+    _receiptService =
+        widget.purchaseReceiptService ??
+        PurchaseHistoryService(widget.apiClient);
+    _receiptPdfService =
+        widget.purchaseReceiptPdfService ??
+        PurchaseHistoryService(widget.apiClient);
     _controller.addListener(_onChanged);
     _controller.load();
   }
@@ -80,6 +99,17 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  void _openDelivery() {
+    if (!_controller.canEditDelivery || !mounted) return;
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: GangaColors.white,
+      builder: (_) => DeliverySheet(controller: _controller),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: GcAppBar(
@@ -97,6 +127,11 @@ class _CartScreenState extends State<CartScreen> {
           label: 'Mis compras',
           onPressed: () =>
               Navigator.of(context).pushNamed(AppRoutes.purchaseHistory),
+        ),
+        GcAppBarDestination(
+          label: 'Seguimiento',
+          onPressed: () =>
+              Navigator.of(context).pushNamed(AppRoutes.shipmentTracking),
         ),
         GcAppBarDestination(label: 'Carrito', selected: true, onPressed: () {}),
       ],
@@ -203,6 +238,43 @@ class _CartScreenState extends State<CartScreen> {
               '${line.size} · ${line.color} · ${line.sku}',
               style: GangaTextStyles.metadata,
             ),
+            const SizedBox(height: 8),
+            if (line.hasPromotion) ...[
+              Text(
+                line.promotion?.displayName ?? 'Promoción aplicada',
+                style: const TextStyle(
+                  color: GangaColors.success,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+            ],
+            Row(
+              children: [
+                Text(
+                  'Precio unitario · Bs ${formatCartMoney(line.finalPrice)}',
+                  style: GangaTextStyles.metadata,
+                ),
+                if (line.hasPromotion) ...[
+                  const SizedBox(width: 8),
+                  Text(
+                    'Bs ${formatCartMoney(line.unitPrice)}',
+                    style: GangaTextStyles.metadata.copyWith(
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (line.hasPromotion && line.discount != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                'Ahorrás Bs ${formatCartMoney(line.discount)}',
+                style: GangaTextStyles.metadata.copyWith(
+                  color: GangaColors.success,
+                ),
+              ),
+            ],
             if (insufficient) ...[
               const SizedBox(height: 8),
               GcStatusBadge(
@@ -322,16 +394,73 @@ class _CartScreenState extends State<CartScreen> {
                 'Sucursal de despacho: ${cart.branchName ?? 'No disponible'}',
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
+            const SizedBox(height: 8),
+            Text(
+              cart.deliveryType == 'delivery'
+                  ? 'Entrega a domicilio'
+                  : 'Retiro en sucursal',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            if (cart.deliveryType == 'delivery' && cart.shipment != null) ...[
+              if (cart.shipment?.contactPhone != null)
+                Text(
+                  'Teléfono: ${cart.shipment!.contactPhone}',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.latitude != null &&
+                  cart.shipment?.longitude != null)
+                Text(
+                  'Coordenadas: ${cart.shipment!.latitude}, ${cart.shipment!.longitude}',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.express == true)
+                const Text('Entrega express', style: GangaTextStyles.metadata),
+              if (cart.shipment?.distanceKm != null)
+                Text(
+                  'Distancia backend: ${cart.shipment!.distanceKm} km',
+                  style: GangaTextStyles.metadata,
+                ),
+              if (cart.shipment?.estimatedAt != null)
+                Text(
+                  'Tiempo estimado backend: ${cart.shipment!.estimatedAt}',
+                  style: GangaTextStyles.metadata,
+                ),
+            ],
+            if (cart.shippingCost != null)
+              _totalRow('Envío', cart.shippingCost!),
+            if (cart.shipment?.address != null) ...[
+              const SizedBox(height: 3),
+              Text(
+                'Dirección: ${cart.shipment!.address}',
+                style: GangaTextStyles.metadata,
+              ),
+              if (cart.shipment?.reference != null)
+                Text(
+                  'Referencia: ${cart.shipment!.reference}',
+                  style: GangaTextStyles.metadata,
+                ),
+            ],
             const SizedBox(height: 5),
             const Text(
               'El stock se toma de esta sucursal.',
               style: TextStyle(color: GangaColors.gray, fontSize: 11.5),
+            ),
+            const SizedBox(height: 10),
+            GcButton(
+              label: cart.deliveryType == 'delivery'
+                  ? 'Editar entrega'
+                  : 'Elegir entrega a domicilio',
+              expand: true,
+              variant: GcButtonVariant.outlined,
+              onPressed: _controller.canEditDelivery ? _openDelivery : null,
             ),
             const Divider(height: 22),
             _totalRow(
               '${cart.units} ${cart.units == 1 ? 'prenda' : 'prendas'}',
               cart.subtotal,
             ),
+            _totalRow('Descuento', cart.discount),
             _totalRow('Total', cart.total, strong: true),
             if (cart.hasInsufficientStock) ...[
               const SizedBox(height: 8),
@@ -426,7 +555,24 @@ class _CartScreenState extends State<CartScreen> {
             'Referencia de la pasarela · ${result.externalReference ?? '—'}',
             style: GangaTextStyles.eyebrow,
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Método de pago · ${result.paymentLabel ?? 'Tarjeta'}',
+            style: GangaTextStyles.eyebrow,
+          ),
           const SizedBox(height: 14),
+          GcButton(
+            label: _receiptLoading
+                ? 'Cargando comprobante…'
+                : 'Ver comprobante autenticado',
+            expand: true,
+            variant: GcButtonVariant.outlined,
+            loading: _receiptLoading,
+            onPressed: _receiptLoading
+                ? null
+                : () => _openAuthenticatedReceipt(result.sale.id),
+          ),
+          const SizedBox(height: 8),
           GcButton(
             label: 'Seguir comprando',
             expand: true,
@@ -439,4 +585,36 @@ class _CartScreenState extends State<CartScreen> {
       ),
     ),
   );
+
+  Future<void> _openAuthenticatedReceipt(int saleId) async {
+    setState(() => _receiptLoading = true);
+    try {
+      final receipt = await _receiptService.fetchReceipt(saleId);
+      if (!mounted) return;
+      setState(() => _receiptLoading = false);
+      await showDialog<void>(
+        context: context,
+        builder: (_) => PurchaseReceiptDialog(
+          receipt: receipt,
+          onPdfPressed: _receiptPdfService == null
+              ? null
+              : () => _printReceiptPdf(saleId),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cargar el comprobante: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _receiptLoading = false);
+    }
+  }
+
+  Future<void> _printReceiptPdf(int saleId) async {
+    final source = _receiptPdfService;
+    if (source == null) return;
+    final bytes = await source.fetchReceiptPdf(saleId);
+    await printReceiptPdf(bytes, printer: widget.receiptPdfPrinter);
+  }
 }

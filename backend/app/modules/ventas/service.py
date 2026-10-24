@@ -10,10 +10,11 @@ from fastapi import HTTPException
 from sqlalchemy import update
 from sqlalchemy.orm import Session
 
-from app.core.fechas import utc_iso
+from app.core.fechas import texto_bolivia, utc_iso
 from app.models.catalogo import Color, Prenda, Talla, Variante
+from app.models.envios import Envio
 from app.models.inventario import Inventario
-from app.models.sucursales import Sucursal
+from app.models.sucursales import Ciudad, Sucursal
 from app.models.usuarios import Cliente, Usuario
 from app.models.ventas import DetalleReserva, DetalleVenta, Pago, Promocion, Reserva, Venta
 from app.modules.prendas.service import url_imagen
@@ -22,10 +23,24 @@ from app.modules.reservas import service as reservas
 
 ESTADOS = {"carrito", "pendiente", "pagada", "anulada"}
 CANALES = {"web", "movil", "caja"}
+# Como recibe el cliente la compra (CU29). En caja siempre es "sucursal".
+TIPOS_ENTREGA = {"sucursal", "delivery"}
 CENTAVO = Decimal("0.01")
 
 
 # ------------------------------------------------------------- utilidades
+# El nombre legible del metodo se define aqui y no en `pagos` porque ese modulo
+# ya importa este: al reves seria un ciclo.
+_ETIQUETA_METODO = {"efectivo": "Efectivo", "tarjeta": "Tarjeta", "qr": "QR"}
+_ETIQUETA_PASARELA = {"stripe": "Stripe", "bcp_qr": "BCP"}
+
+
+def etiqueta_metodo(metodo: str | None, pasarela: str | None = None) -> str:
+    base = _ETIQUETA_METODO.get(metodo or "", metodo or "—")
+    proveedor = _ETIQUETA_PASARELA.get(pasarela or "")
+    return f"{base} ({proveedor})" if proveedor else base
+
+
 def dinero(valor) -> Decimal:
     return Decimal(str(valor or 0)).quantize(CENTAVO)
 
@@ -104,12 +119,36 @@ def valorizar(db: Session, linea: DetalleVenta, prenda: Prenda, promos=None) -> 
     linea.promocion_id = calculo["promocion"].id if calculo["promocion"] else None
 
 
+def costo_envio_de(db: Session, venta: Venta, mercaderia: Decimal, hay_prendas: bool) -> Decimal:
+    """Lo que se le suma al total por llevarle la compra a su casa (CU29).
+
+    Mientras la compra no este pagada, el envio se recotiza en cada cambio del
+    carrito: la distancia no cambia, pero cruzar el minimo de envio gratis si.
+    Una vez pagada, el costo queda congelado en el que el cliente acepto.
+    """
+    if (venta.tipo_entrega or "sucursal") != "delivery":
+        return Decimal("0")
+    if venta.estado not in ("carrito", "pendiente"):
+        return dinero(venta.costo_envio)
+    # Importacion tardia a proposito: `envios` importa este modulo para el
+    # dinero y la salida de la venta; al reves, arriba, seria un ciclo.
+    from app.modules.envios import service as envios
+
+    return envios.recotizar(db, venta, mercaderia, hay_prendas)
+
+
 def recalcular(db: Session, venta: Venta, refrescar_precios: bool = False) -> None:
     """Rehace subtotales y total desde las lineas. En el carrito el precio y la
     promocion se actualizan a lo vigente: todavia no es una venta cerrada.
 
     venta.subtotal es la suma a precio de lista; venta.descuento, lo que rebajan
-    las promociones; venta.total, lo que se cobra. Cada linea guarda su neto."""
+    las promociones; venta.costo_envio, lo que cuesta el delivery si lo hay; y
+    venta.total, lo que se cobra:
+
+        total = subtotal - descuento + costo_envio
+
+    Cada linea guarda su neto, que nunca incluye el envio: el envio es de la
+    compra entera, no de una prenda."""
     db.flush()
     lineas = db.query(DetalleVenta).filter(DetalleVenta.venta_id == venta.id).all()
     if refrescar_precios and lineas:
@@ -128,7 +167,8 @@ def recalcular(db: Session, venta: Venta, refrescar_precios: bool = False) -> No
         rebaja += d.descuento
     venta.subtotal = bruto
     venta.descuento = rebaja
-    venta.total = bruto - rebaja
+    venta.costo_envio = costo_envio_de(db, venta, bruto - rebaja, bool(lineas))
+    venta.total = bruto - rebaja + venta.costo_envio
     db.flush()
 
 
@@ -191,6 +231,9 @@ def salida(db: Session, venta: Venta, con_stock: bool = False) -> dict:
             cajero = {"id": u.id, "nombre": " ".join(filter(None, [u.nombre, u.apellido]))}
 
     pagos = db.query(Pago).filter(Pago.venta_id == venta.id).order_by(Pago.id).all()
+    # CU29: si la compra se entrega a domicilio, su envio viaja con ella. Campos
+    # aditivos: la app movil, que solo hace retiro en sucursal, no cambia.
+    envio = db.query(Envio).filter(Envio.venta_id == venta.id).first()
     return {
         "id": venta.id,
         "estado": venta.estado,
@@ -204,6 +247,23 @@ def salida(db: Session, venta: Venta, con_stock: bool = False) -> dict:
         "unidades": sum(i["cantidad"] for i in detalle),
         "subtotal": float(dinero(venta.subtotal)),
         "descuento": float(dinero(venta.descuento)),
+        "tipo_entrega": venta.tipo_entrega or "sucursal",
+        "costo_envio": float(dinero(venta.costo_envio)),
+        "envio": {
+            "id": envio.id,
+            "estado": envio.estado,
+            "direccion": envio.direccion,
+            "referencia": envio.referencia,
+            "telefono_contacto": envio.telefono_contacto,
+            "latitud": envio.latitud,
+            "longitud": envio.longitud,
+            "distancia_km": float(dinero(envio.distancia_km)),
+            "costo_envio": float(dinero(envio.costo_envio)),
+            "express": bool(envio.express),
+            "repartidor": envio.repartidor,
+            "fecha_estimada": utc_iso(envio.fecha_estimada),
+            "fecha_entrega": utc_iso(envio.fecha_entrega),
+        } if envio else None,
         "total": float(dinero(venta.total)),
         "nro_comprobante": venta.nro_comprobante,
         "detalle": detalle,
@@ -262,6 +322,11 @@ def abrir_carrito(db: Session, usuario: Usuario, sucursal_id: int | None = None,
             venta.canal = canal
             cambio = True
         if cambio:
+            # Cambiar de sucursal mueve el punto desde el que sale el delivery:
+            # hay que rehacer la distancia y el costo del envio (CU29). Si la
+            # sucursal nueva no llega hasta esa direccion, el envio se descarta
+            # y la compra vuelve a retiro en sucursal (ver envios.recotizar).
+            recalcular(db, venta, refrescar_precios=True)
             db.commit()
     return salida(db, db.get(Venta, venta.id), con_stock=True), creado
 
@@ -496,13 +561,25 @@ def comprobante(db: Session, usuario: Usuario, venta_id: int, personal: bool) ->
     )
     datos = salida(db, venta)
     sucursal = db.get(Sucursal, venta.sucursal_id)
+    ciudad = db.get(Ciudad, sucursal.ciudad_id) if sucursal else None
     total = dinero(venta.total)
     recibido = dinero(pago.monto) if pago else total
+    # La fecha del comprobante es la del cobro; si por lo que sea no hay pago,
+    # la de la venta. Se manda en UTC ("Z") y tambien escrita en hora de Bolivia,
+    # que es la que se imprime en el papel.
+    instante = (pago.fecha if pago else venta.fecha)
     return {
         "nro_comprobante": venta.nro_comprobante,
-        "fecha": utc_iso(pago.fecha) if pago else None,
+        "fecha": utc_iso(instante),
+        "fecha_bolivia": texto_bolivia(utc_iso(instante)),
         "tienda": "GANGACLOTHES",
-        "sucursal": {"nombre": sucursal.nombre, "direccion": sucursal.direccion} if sucursal else None,
+        "sucursal": {
+            "nombre": sucursal.nombre,
+            "direccion": sucursal.direccion,
+            "telefono": sucursal.telefono,
+            "horario": sucursal.horario,
+            "ciudad": ciudad.nombre if ciudad else None,
+        } if sucursal else None,
         "canal": venta.canal,
         "venta_id": venta.id,
         "reserva_id": venta.reserva_id,
@@ -519,10 +596,26 @@ def comprobante(db: Session, usuario: Usuario, venta_id: int, personal: bool) ->
         } for i in datos["detalle"]],
         "subtotal": datos["subtotal"],
         "descuento": datos["descuento"],
+        # CU29: si se entrego a domicilio, el comprobante dice adonde fue y
+        # cuanto se cobro por llevarlo. En retiro en sucursal, `entrega` es None
+        # y el costo es 0: el ticket queda exactamente igual que antes.
+        "costo_envio": datos["costo_envio"],
+        "entrega": ({
+            "tipo": "delivery",
+            "direccion": datos["envio"]["direccion"],
+            "referencia": datos["envio"]["referencia"],
+            "telefono": datos["envio"]["telefono_contacto"],
+            "distancia_km": datos["envio"]["distancia_km"],
+            "express": datos["envio"]["express"],
+            "estado": datos["envio"]["estado"],
+            "repartidor": datos["envio"]["repartidor"],
+        } if datos["envio"] else None),
         "total": float(total),
         "moneda": pago.moneda if pago else "BOB",
         "pago": {
             "metodo": pago.metodo if pago else None,
+            "pasarela": pago.pasarela if pago else None,
+            "etiqueta": etiqueta_metodo(pago.metodo, pago.pasarela) if pago else "—",
             "recibido": float(recibido),
             "cambio": float(max(recibido - total, Decimal("0"))),
             "referencia_externa": pago.referencia_externa if pago else None,

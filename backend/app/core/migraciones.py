@@ -51,3 +51,14 @@ def aplicar(engine) -> None:
         _columna_nueva(conexion, "producto_proveedor", "prenda_id", "INTEGER REFERENCES prenda(id)")
         _columna_nueva(conexion, "detalle_compra", "producto_proveedor_id",
                        "INTEGER REFERENCES producto_proveedor(id)")
+        # Ciclo 5: delivery de las compras en linea (CU29). La tabla `envio` la
+        # crea create_all; aqui van las columnas que le faltan a lo que ya existe.
+        _columna_nueva(conexion, "sucursal", "latitud", "FLOAT")
+        _columna_nueva(conexion, "sucursal", "longitud", "FLOAT")
+        _columna_nueva(conexion, "venta", "tipo_entrega", "VARCHAR(15)")
+        _columna_nueva(conexion, "venta", "costo_envio", "NUMERIC(12, 2)")
+        # Las ventas anteriores al delivery se retiraban todas en sucursal.
+        if inspect(conexion).has_table("venta"):
+            conexion.execute(text(
+                "UPDATE venta SET tipo_entrega = 'sucursal' WHERE tipo_entrega IS NULL"))
+            conexion.execute(text("UPDATE venta SET costo_envio = 0 WHERE costo_envio IS NULL"))

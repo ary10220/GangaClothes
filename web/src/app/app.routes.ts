@@ -65,6 +65,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/tienda/mis-compras/mis-compras').then((m) => m.MisCompras),
   },
   {
+    // CU29: seguimiento de los pedidos que se entregan a domicilio.
+    path: 'mis-envios',
+    canActivate: [authGuard, rolGuard],
+    data: SOLO_CLIENTE,
+    loadComponent: () => import('./features/tienda/mis-envios/mis-envios').then((m) => m.MisEnvios),
+  },
+  {
     path: 'carrito',
     canActivate: [authGuard, rolGuard],
     data: SOLO_CLIENTE,
@@ -162,6 +169,13 @@ export const routes: Routes = [
         data: OPERACION_SUCURSAL,
         loadComponent: () =>
           import('./features/reservas/sucursal/reservas-sucursal').then((m) => m.ReservasSucursal),
+      },
+      {
+        // CU29: envios a domicilio de la sucursal (asignar, despachar, entregar).
+        path: 'envios',
+        canActivate: [rolGuard, permisoGuard],
+        data: { roles: ['administrador', 'encargado', 'cajero'], permiso: 'envios:ver' },
+        loadComponent: () => import('./features/envios/sucursal/envios-sucursal').then((m) => m.EnviosSucursal),
       },
       {
         path: 'caja',

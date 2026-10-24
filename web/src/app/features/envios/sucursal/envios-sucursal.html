@@ -1,0 +1,259 @@
+<!-- ---------------------------------------------------------- encabezado -->
+<div class="encabezado">
+  <div class="titulo">
+    <h1>
+      Envios a domicilio
+      @if (sucursal.actual(); as actual) {
+        · {{ actual.nombre }}
+      }
+    </h1>
+    <span class="ceja">compras pagadas que hay que llevar · las pendientes primero</span>
+  </div>
+  <app-selector-sucursal />
+  <button type="button" class="btn linea" [disabled]="cargando()" (click)="recargar()">Actualizar</button>
+</div>
+
+<div class="filtros">
+  <app-selector-estado [(valor)]="filtro" [opciones]="opciones()" />
+</div>
+
+@if (sucursal.error(); as error) {
+  <div class="mensaje error">
+    <p>{{ error }}</p>
+  </div>
+} @else if (sucursal.cargando() || (cargando() && envios().length === 0)) {
+  <p class="mensaje">Cargando…</p>
+} @else if (sucursal.id() === null) {
+  <div class="mensaje vacio">
+    <p>No hay sucursales activas. Un administrador tiene que crear una en «Sucursales».</p>
+  </div>
+} @else if (errorCarga()) {
+  <div class="mensaje error">
+    <p>{{ errorCarga() }}</p>
+    <button type="button" class="btn linea" (click)="recargar()">Reintentar</button>
+  </div>
+} @else if (envios().length === 0) {
+  <div class="mensaje vacio">
+    <p>
+      Esta sucursal todavia no despacho ningun pedido a domicilio. Aparecen aqui apenas
+      un cliente paga una compra con delivery.
+    </p>
+  </div>
+} @else {
+  <!-- ------------------------------------------ mapa de lo que falta llevar -->
+  @if (porDespachar().length > 0) {
+    <section class="mapa-sucursal">
+      <app-mapa [puntos]="puntos()" alto="300px" />
+      <p class="ceja">
+        {{ porDespachar().length }}
+        {{ porDespachar().length === 1 ? 'destino por entregar' : 'destinos por entregar' }} ·
+        el punto oscuro es la sucursal
+      </p>
+    </section>
+  }
+
+  @if (visibles().length === 0) {
+    <div class="mensaje vacio">
+      <p>{{ filtro() === 'activos' ? 'No queda ningun pedido por despachar.' : 'No hay envios en ese estado.' }}</p>
+      <button type="button" class="btn linea" (click)="filtro.set('todos')">Ver todos</button>
+    </div>
+  } @else {
+    <div class="marco-tabla">
+      <table>
+        <thead>
+          <tr>
+            <th>Pedido</th>
+            <th>Cliente</th>
+            <th>Destino</th>
+            <th>Prendas</th>
+            <th>Estado</th>
+            @if (puedeEditar()) {
+              <th class="col-acciones">Acciones</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (envio of visibles(); track envio.id) {
+            <tr [class.atrasado]="atrasado(envio)">
+              <td>
+                <b class="mono">{{ envio.venta?.nro_comprobante || '#E-' + envio.id }}</b>
+                <span class="secundario">{{ fecha(envio.fecha_creacion) }}</span>
+                <span class="secundario">
+                  Bs {{ moneda(envio.venta?.total) }} · envio
+                  {{ envio.costo_envio > 0 ? 'Bs ' + moneda(envio.costo_envio) : 'gratis' }}
+                </span>
+                <!-- Ya esta cobrado: el repartidor no cobra nada en la puerta. -->
+                <span class="secundario">Pagado con {{ envio.pago?.etiqueta || 'no informado' }}</span>
+              </td>
+              <td>
+                <b>{{ envio.cliente?.nombre || 'Cliente' }}</b>
+                <span class="secundario">{{ envio.telefono_contacto || envio.cliente?.email }}</span>
+              </td>
+              <td class="destino">
+                <b>{{ envio.direccion }}</b>
+                @if (envio.referencia) {
+                  <span class="secundario">{{ envio.referencia }}</span>
+                }
+                <span class="secundario">
+                  {{ envio.distancia_km }} km
+                  @if (envio.express) {
+                    · <span class="estado rosa">Express</span>
+                  }
+                </span>
+                @if (atrasado(envio)) {
+                  <span class="aviso-hora">paso la hora estimada ({{ fecha(envio.fecha_estimada) }})</span>
+                }
+              </td>
+              <td>
+                <ul class="prendas">
+                  @for (prenda of envio.prendas; track prenda.id) {
+                    <li>
+                      <span class="mono">{{ prenda.sku }}</span>
+                      {{ prenda.prenda }} · {{ prenda.talla }} · {{ prenda.color }}
+                      <b class="mono">×{{ prenda.cantidad }}</b>
+                    </li>
+                  }
+                </ul>
+              </td>
+              <td>
+                <span class="estado" [class]="claseEstado(envio.estado)">{{ envio.etiqueta_estado }}</span>
+                @if (envio.repartidor) {
+                  <span class="secundario">{{ envio.repartidor }}</span>
+                }
+                @if (envio.motivo_cancelacion) {
+                  <span class="secundario">«{{ envio.motivo_cancelacion }}»</span>
+                }
+              </td>
+              @if (puedeEditar()) {
+                <td class="col-acciones">
+                  @if (envio.estado === 'pendiente') {
+                    <button
+                      type="button"
+                      class="enlace principal"
+                      [disabled]="enProceso() === envio.id"
+                      (click)="pedirAsignar(envio)"
+                    >
+                      Asignar repartidor
+                    </button>
+                  } @else if (envio.estado === 'asignado') {
+                    <button
+                      type="button"
+                      class="enlace principal"
+                      [disabled]="enProceso() === envio.id"
+                      (click)="enCamino(envio)"
+                    >
+                      Marcar en camino
+                    </button>
+                  } @else if (envio.estado === 'en_camino') {
+                    <button
+                      type="button"
+                      class="enlace principal"
+                      [disabled]="enProceso() === envio.id"
+                      (click)="entregar(envio)"
+                    >
+                      Marcar entregado
+                    </button>
+                  }
+                  @if (envio.activo) {
+                    <span class="separador">·</span>
+                    <button
+                      type="button"
+                      class="enlace peligro"
+                      [disabled]="enProceso() === envio.id"
+                      (click)="pedirCancelar(envio)"
+                    >
+                      Cancelar
+                    </button>
+                  } @else {
+                    <span class="sin-acciones">—</span>
+                  }
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="ceja pie">{{ pie() }}</p>
+  }
+}
+
+<!-- ------------------------------------------------- asignar repartidor -->
+@if (aAsignar(); as envio) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Asignar repartidor</div>
+      <h2>Pedido {{ envio.venta?.nro_comprobante || '#E-' + envio.id }}</h2>
+      <p class="advertencia">
+        Va a <b>{{ envio.direccion }}</b>, a {{ envio.distancia_km }} km de {{ envio.sucursal?.nombre }}.
+        @if (envio.express) {
+          Es una <b>entrega express</b>: sale primero.
+        }
+      </p>
+
+      <div class="grupo">
+        <label class="etiqueta" for="a-repartidor">Quien lo lleva</label>
+        <input
+          id="a-repartidor"
+          class="campo"
+          placeholder="Marcos Pena"
+          [value]="repartidor()"
+          (input)="repartidor.set($any($event.target).value)"
+        />
+      </div>
+
+      @if (errorModal()) {
+        <p class="error-servidor" role="alert">{{ errorModal() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="enProceso() !== null" (click)="cerrarModal()">
+          Cancelar
+        </button>
+        <button type="button" class="btn rosa" [disabled]="enProceso() !== null" (click)="confirmarAsignar()">
+          {{ enProceso() !== null ? 'Asignando…' : 'Asignar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}
+
+<!-- ---------------------------------------------------- cancelar el envio -->
+@if (aCancelar(); as envio) {
+  <div class="fondo" (click)="cerrarModal()">
+    <div class="modal angosto" (click)="$event.stopPropagation()">
+      <div class="ceja">Confirmar</div>
+      <h2>¿Cancelar el envio #{{ envio.id }}?</h2>
+      <p class="advertencia">
+        La compra <b>{{ envio.venta?.nro_comprobante || '#' + envio.venta?.id }}</b> ya esta cobrada y su
+        stock ya salio: cancelar el envio <b>no anula la venta</b>. Hay que avisarle a
+        {{ envio.cliente?.nombre || 'el cliente' }} ({{ envio.telefono_contacto }}) para que la retire
+        en {{ envio.sucursal?.nombre }} o acordar la devolucion.
+      </p>
+
+      <div class="grupo">
+        <label class="etiqueta" for="c-motivo">Motivo (opcional)</label>
+        <input
+          id="c-motivo"
+          class="campo"
+          placeholder="Nadie atendio en la direccion"
+          [value]="motivo()"
+          (input)="motivo.set($any($event.target).value)"
+        />
+      </div>
+
+      @if (errorModal()) {
+        <p class="error-servidor" role="alert">{{ errorModal() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="enProceso() !== null" (click)="cerrarModal()">
+          Volver
+        </button>
+        <button type="button" class="btn peligro" [disabled]="enProceso() !== null" (click)="confirmarCancelar()">
+          {{ enProceso() !== null ? 'Cancelando…' : 'Si, cancelar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+}

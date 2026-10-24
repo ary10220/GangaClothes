@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, String
 
 from app.core.database import Base
 
@@ -18,4 +18,9 @@ class Sucursal(Base):
     direccion = Column(String(200))
     telefono = Column(String(20))
     horario = Column(String(100))
+    # Punto del mapa desde el que sale el delivery (CU29). Admiten nulo porque
+    # una sucursal nueva puede darse de alta sin coordenadas: sin ellas la
+    # tienda ofrece solo retiro en sucursal para esa tienda.
+    latitud = Column(Float)
+    longitud = Column(Float)
     activo = Column(Boolean, default=True)

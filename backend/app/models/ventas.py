@@ -34,8 +34,15 @@ class Venta(Base):
     canal = Column(String(10), nullable=False)                 # web | movil | caja
     fecha = Column(DateTime, server_default=func.now())
     estado = Column(String(20), default="carrito")             # carrito|pendiente|pagada|anulada
+    # Como recibe el cliente la compra (CU29). En caja siempre es "sucursal":
+    # se lleva las prendas puestas en la bolsa. Nulo se lee como "sucursal",
+    # que es lo que eran todas las ventas anteriores a este ciclo.
+    tipo_entrega = Column(String(15), default="sucursal")      # sucursal | delivery
     subtotal = Column(Numeric(12, 2), default=0)
     descuento = Column(Numeric(12, 2), default=0)
+    # Lo que se le cobra al cliente por llevarselo a su casa; 0 en retiro en
+    # sucursal y en las ventas de caja. Es parte de `total`.
+    costo_envio = Column(Numeric(12, 2), default=0)
     total = Column(Numeric(12, 2), default=0)
     nro_comprobante = Column(String(30))
 

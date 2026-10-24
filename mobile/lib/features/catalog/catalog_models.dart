@@ -17,6 +17,31 @@ class Availability {
   );
 }
 
+/// Recurso del probador virtual registrado por el admin para una variante
+/// (`asset_ar`): un PNG con fondo transparente y su escala.
+class ArResource {
+  const ArResource({
+    required this.id,
+    required this.type,
+    required this.url,
+    required this.scale,
+  });
+
+  final int id;
+  final String type;
+  final String url;
+  final double scale;
+
+  bool get isPngOverlay => type == 'png_overlay';
+
+  factory ArResource.fromJson(Map<String, dynamic> json) => ArResource(
+    id: _requiredInt(json, 'id'),
+    type: _nullableString(json['tipo']) ?? 'png_overlay',
+    url: _requiredString(json, 'url_recurso'),
+    scale: _nullableDouble(json['escala']) ?? 1,
+  );
+}
+
 class Variant {
   const Variant({
     required this.id,
@@ -29,6 +54,8 @@ class Variant {
     required this.imageUrl,
     required this.availableTotal,
     required this.availability,
+    this.hasFittingRoom = false,
+    this.arResources = const [],
   });
 
   final int id;
@@ -41,6 +68,19 @@ class Variant {
   final String? imageUrl;
   final int availableTotal;
   final List<Availability> availability;
+  final bool hasFittingRoom;
+  final List<ArResource> arResources;
+
+  /// Último PNG registrado: el backend solo agrega recursos, así que el más
+  /// reciente reemplaza a los anteriores.
+  ArResource? get pngOverlay {
+    for (final resource in arResources.reversed) {
+      if (resource.isPngOverlay && resource.url.trim().isNotEmpty) {
+        return resource;
+      }
+    }
+    return null;
+  }
 
   factory Variant.fromJson(Map<String, dynamic> json) => Variant(
     id: _requiredInt(json, 'id'),
@@ -55,6 +95,12 @@ class Variant {
     availability: _list(
       json['disponibilidad'],
     ).map(Availability.fromJson).toList(growable: false),
+    hasFittingRoom: json['tiene_probador'] == true,
+    arResources: json['recursos_ar'] is List
+        ? _list(
+            json['recursos_ar'],
+          ).map(ArResource.fromJson).toList(growable: false)
+        : const [],
   );
 }
 
@@ -65,6 +111,9 @@ class Product {
     required this.description,
     required this.brand,
     required this.salePrice,
+    required this.finalPrice,
+    this.discount,
+    this.promotion,
     required this.imageUrl,
     required this.categoryId,
     required this.collectionId,
@@ -77,6 +126,9 @@ class Product {
   final String? description;
   final String? brand;
   final double salePrice;
+  final double finalPrice;
+  final double? discount;
+  final CatalogPromotion? promotion;
   final String? imageUrl;
   final int categoryId;
   final int? collectionId;
@@ -89,6 +141,11 @@ class Product {
     description: _nullableString(json['descripcion']),
     brand: _nullableString(json['marca']),
     salePrice: _requiredDouble(json, 'precio_venta'),
+    finalPrice:
+        _nullableDouble(json['precio_final']) ??
+        _requiredDouble(json, 'precio_venta'),
+    discount: _nullableDouble(json['descuento']),
+    promotion: CatalogPromotion.fromJson(json['promocion']),
     imageUrl: _nullableString(json['imagen_url']),
     categoryId: _requiredInt(json, 'categoria_id'),
     collectionId: _nullableInt(json['coleccion_id']),
@@ -97,6 +154,37 @@ class Product {
       json['variantes'],
     ).map(Variant.fromJson).toList(growable: false),
   );
+}
+
+class CatalogPromotion {
+  const CatalogPromotion({
+    this.id,
+    this.name,
+    this.discountType,
+    this.value,
+    this.label,
+    this.endDate,
+  });
+
+  final int? id;
+  final String? name;
+  final String? discountType;
+  final double? value;
+  final String? label;
+  final String? endDate;
+
+  static CatalogPromotion? fromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = Map<String, dynamic>.from(value);
+    return CatalogPromotion(
+      id: _nullableInt(json['id']),
+      name: _nullableString(json['nombre']),
+      discountType: _nullableString(json['tipo_descuento']),
+      value: _nullableDouble(json['valor']),
+      label: _nullableString(json['etiqueta']),
+      endDate: _nullableString(json['fecha_fin']),
+    );
+  }
 }
 
 /// A record returned by the existing catalog option endpoints.
@@ -211,6 +299,11 @@ double _requiredDouble(Map<String, dynamic> json, String key) {
   final number = value is num ? value.toDouble() : double.tryParse('$value');
   if (number == null) throw FormatException('Missing number field: $key');
   return number;
+}
+
+double? _nullableDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  return value is String ? double.tryParse(value) : null;
 }
 
 String _requiredString(Map<String, dynamic> json, String key) {

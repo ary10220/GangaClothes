@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/network/api_error.dart';
 import 'catalog_detail_models.dart';
 import 'catalog_detail_service.dart';
 import 'catalog_models.dart';
+import '../ai/ai_service.dart';
 
 enum CatalogDetailMode { choose, reserve }
 
@@ -20,6 +23,7 @@ class CatalogDetailController extends ChangeNotifier {
     required this.branches,
     required this.api,
     this.preferredBranchId,
+    this.aiEventSink,
   }) {
     _initializeSelection();
   }
@@ -28,6 +32,7 @@ class CatalogDetailController extends ChangeNotifier {
   final List<BranchOption> branches;
   final CatalogActionDataSource api;
   final int? preferredBranchId;
+  final AiEventSink? aiEventSink;
 
   late int? colorId;
   late int? sizeId;
@@ -246,6 +251,16 @@ class CatalogDetailController extends ChangeNotifier {
           '${cart.units == 1 ? 'prenda' : 'prendas'} por '
           'Bs ${formatBolivianos(cart.total)}, desde '
           '${cart.branchName ?? selectedBranchName ?? 'la sucursal'}.';
+      final eventSink = aiEventSink;
+      if (eventSink != null) {
+        unawaited(
+          _bestEffortEvent(
+            eventSink,
+            productId: product.id,
+            eventType: 'carrito',
+          ),
+        );
+      }
       notifyListeners();
     } on ApiError catch (caught) {
       loading = false;
@@ -296,5 +311,17 @@ class CatalogDetailController extends ChangeNotifier {
     success = null;
     successRoute = null;
     cartConflict = null;
+  }
+
+  Future<void> _bestEffortEvent(
+    AiEventSink sink, {
+    required int productId,
+    required String eventType,
+  }) async {
+    try {
+      await sink.reportProductEvent(productId: productId, eventType: eventType);
+    } catch (_) {
+      // Analytics failures must not affect cart actions.
+    }
   }
 }

@@ -116,5 +116,9 @@ export const SUCURSALES: ConfigCrud = {
     { nombre: 'direccion', etiqueta: 'Direccion', tipo: 'texto', marcador: 'Av. Principal #123' },
     { nombre: 'telefono', etiqueta: 'Telefono', tipo: 'texto', marcador: '3-3456789' },
     { nombre: 'horario', etiqueta: 'Horario', tipo: 'texto', marcador: 'Lun-Sab 9:00-20:00', ancho: 'completo' },
+    // CU29: el punto del mapa desde el que sale el delivery de esta sucursal.
+    // Se sacan de OpenStreetMap o de Google Maps (clic derecho sobre el local).
+    { nombre: 'latitud', etiqueta: 'Latitud', tipo: 'numero', paso: 0.000001, marcador: '-17.783400' },
+    { nombre: 'longitud', etiqueta: 'Longitud', tipo: 'numero', paso: 0.000001, marcador: '-63.182100' },
   ],
 };

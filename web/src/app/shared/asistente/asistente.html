@@ -1,0 +1,116 @@
+@if (visible()) {
+  <button
+    type="button"
+    class="burbuja"
+    [class.activa]="abierto()"
+    [attr.aria-label]="abierto() ? 'Cerrar el asistente' : 'Abrir el asistente'"
+    (click)="alternar()"
+  >
+    {{ abierto() ? '✕' : '💬' }}
+  </button>
+}
+
+@if (visible() && abierto()) {
+  <section class="asistente" role="dialog" aria-label="Asistente de GangaClothes">
+    <header>
+      <div>
+        <b>{{ esPersonal() ? 'Asistente del negocio' : 'Asistente de compras' }}</b>
+        <small>{{ esPersonal() ? 'Preguntame por ventas, stock o ganancia.' : 'Preguntame que buscás y te ayudo.' }}</small>
+      </div>
+      <div class="acciones-cabecera">
+        @if (turnos().length > 0) {
+          <button type="button" class="icono" aria-label="Vaciar la conversacion" (click)="limpiar()">🗑</button>
+        }
+        <button type="button" class="icono" aria-label="Cerrar" (click)="cerrar()">✕</button>
+      </div>
+    </header>
+
+    <div class="conversacion" #caja>
+      @if (turnos().length === 0) {
+        <div class="bienvenida">
+          <p>
+            {{ esPersonal()
+              ? 'Puedo consultar las ventas, el inventario y la ganancia de la tienda. Respondo con los números reales.'
+              : 'Puedo buscarte prendas, contarte las promociones y recomendarte según lo que ya compraste.' }}
+          </p>
+          <div class="sugerencias">
+            @for (s of sugerencias(); track s) {
+              <button type="button" class="chip" (click)="usar(s)">{{ s }}</button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (turno of turnos(); track $index) {
+        <div class="turno" [class.mio]="turno.de === 'yo'">
+          <p class="globo">{{ turno.texto }}</p>
+
+          @if (turno.prendas?.length) {
+            <div class="prendas">
+              @for (p of turno.prendas; track p.id) {
+                <article class="prenda">
+                  <b>{{ p.nombre }}</b>
+                  <span class="precio mono">Bs {{ moneda(p.precio) }}</span>
+                  @if (p.promocion) {
+                    <span class="estado rosa">{{ p.promocion }}</span>
+                  }
+                  <small>
+                    {{ p.colores_disponibles.join(' · ') }}
+                    @if (p.tallas_disponibles.length) {
+                      · tallas {{ p.tallas_disponibles.join(', ') }}
+                    }
+                  </small>
+                  @if (p.por_que_se_sugiere) {
+                    <small class="motivo">{{ p.por_que_se_sugiere }}</small>
+                  }
+                </article>
+              }
+            </div>
+          }
+
+          <!-- De donde salio la respuesta: es lo que permite comprobar que no
+               se invento nada. Se muestra plegado para no molestar. -->
+          @if (turno.de === 'asistente' && turno.consultas?.length) {
+            <button type="button" class="fuente" (click)="verDetalle($index)">
+              {{ detalleVisible() === $index ? '▾' : '▸' }} de dónde salió esto
+            </button>
+            @if (detalleVisible() === $index) {
+              <p class="fuente-detalle">
+                Consultó: {{ turno.consultas!.length === 1 ? nombreLegible(turno.consultas![0]) : '' }}
+                @if (turno.consultas!.length > 1) {
+                  @for (c of turno.consultas; track $index) {
+                    {{ nombreLegible(c) }}{{ $last ? '' : ', ' }}
+                  }
+                }
+              </p>
+            }
+          }
+        </div>
+      }
+
+      @if (pensando()) {
+        <div class="turno">
+          <p class="globo pensando"><span></span><span></span><span></span></p>
+        </div>
+      }
+
+      @if (error()) {
+        <p class="error-servidor">{{ error() }}</p>
+      }
+    </div>
+
+    <form (submit)="$event.preventDefault(); enviar()">
+      <input
+        class="campo"
+        placeholder="Escribí tu mensaje…"
+        autocomplete="off"
+        [value]="borrador()"
+        [disabled]="pensando()"
+        (input)="borrador.set($any($event.target).value)"
+      />
+      <button type="submit" class="enviar" aria-label="Enviar" [disabled]="pensando() || !borrador().trim()">
+        ➤
+      </button>
+    </form>
+  </section>
+}

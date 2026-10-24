@@ -226,7 +226,19 @@
             <span>La reserva #R-{{ c.reservaAtendida }} quedo atendida.</span>
           }
         </div>
-        <button type="button" class="btn rosa bloque" (click)="nuevaVenta()">Nueva venta</button>
+        <div class="acciones-comprobante">
+          <button type="button" class="btn rosa" (click)="comprobantes.imprimir(c.comprobante.venta_id)">
+            Imprimir comprobante
+          </button>
+          <button
+            type="button"
+            class="btn linea"
+            (click)="comprobantes.descargar(c.comprobante.venta_id, c.comprobante.nro_comprobante)"
+          >
+            Descargar PDF
+          </button>
+        </div>
+        <button type="button" class="btn linea bloque" (click)="nuevaVenta()">Nueva venta</button>
       } @else {
         <div class="ticket">
           <div class="centro espaciado">GANGACLOTHES</div>

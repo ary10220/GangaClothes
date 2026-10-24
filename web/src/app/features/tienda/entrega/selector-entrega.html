@@ -1,0 +1,217 @@
+<section class="entrega">
+  <span class="etiqueta">Como quieres recibir tu compra</span>
+
+  <div class="opciones" role="group" aria-label="Forma de entrega">
+    <button
+      type="button"
+      class="opcion"
+      [class.on]="!esDelivery() && !abierto()"
+      [disabled]="deshabilitado() || guardando()"
+      (click)="elegirRetiro()"
+    >
+      <span class="icono" aria-hidden="true">🏬</span>
+      <span class="texto">
+        <b>Retiro en sucursal</b>
+        <small>lo recoges en {{ venta().sucursal }} · sin costo</small>
+      </span>
+    </button>
+    <button
+      type="button"
+      class="opcion"
+      [class.on]="esDelivery() || abierto()"
+      [disabled]="deshabilitado() || guardando()"
+      (click)="elegirDelivery()"
+    >
+      <span class="icono" aria-hidden="true">🛵</span>
+      <span class="texto">
+        <b>Delivery a domicilio</b>
+        <small>te lo llevamos donde estes</small>
+      </span>
+    </button>
+  </div>
+
+  <!-- ------------------------------------------- delivery ya confirmado -->
+  @if (esDelivery() && !abierto()) {
+    @let e = envio()!;
+    <div class="resumen">
+      <p class="destino"><b>{{ e.direccion }}</b></p>
+      @if (e.referencia) {
+        <p class="nota">{{ e.referencia }}</p>
+      }
+      <p class="nota">
+        {{ e.distancia_km }} km desde {{ venta().sucursal }}
+        @if (cotizacion(); as c) {
+          · llega en unos {{ duracion(c.minutos_estimados) }}
+        }
+        @if (e.express) {
+          <span class="estado rosa">Express</span>
+        }
+      </p>
+
+      @if (cotizacion(); as c) {
+        <ul class="desglose">
+          @for (linea of c.desglose; track linea.concepto) {
+            <li [class.ahorro]="esAhorro(linea.importe)">
+              <span>
+                {{ linea.concepto }}
+                <small>{{ linea.detalle }}</small>
+              </span>
+              <b class="mono">
+                {{ esAhorro(linea.importe) ? '− Bs ' + moneda(-linea.importe) : 'Bs ' + moneda(linea.importe) }}
+              </b>
+            </li>
+          }
+        </ul>
+      }
+      <div class="costo" [class.gratis]="e.costo_envio === 0">
+        <span>Costo del envio</span>
+        <b class="mono">{{ e.costo_envio > 0 ? 'Bs ' + moneda(e.costo_envio) : 'GRATIS' }}</b>
+      </div>
+
+      <div class="acciones-linea">
+        <button type="button" class="enlace" [disabled]="deshabilitado() || guardando()" (click)="elegirDelivery()">
+          Cambiar direccion
+        </button>
+        <span class="separador">·</span>
+        <button
+          type="button"
+          class="enlace peligro"
+          [disabled]="deshabilitado() || guardando()"
+          (click)="elegirRetiro()"
+        >
+          {{ guardando() ? 'Quitando…' : 'Mejor lo retiro' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ------------------------------------------ elegir donde lo recibimos -->
+  @if (abierto()) {
+    <div class="formulario">
+      <div class="mapa-fila">
+        <app-mapa
+          [puntos]="puntos()"
+          [seleccionable]="true"
+          [unirPuntos]="true"
+          alto="280px"
+          pista="Toca el mapa para marcar donde quieres recibir tu compra"
+          (elegido)="marcar($event)"
+        />
+        <button type="button" class="btn linea ubicacion" (click)="usarMiUbicacion()">
+          Usar mi ubicacion actual
+        </button>
+        @if (error_('punto'); as e) {
+          <p class="ayuda-error">{{ e }}</p>
+        }
+      </div>
+
+      <div class="grupo">
+        <label class="etiqueta" for="e-direccion">Direccion</label>
+        <input
+          id="e-direccion"
+          class="campo"
+          placeholder="Av. Banzer #1200, 4to anillo"
+          [class.invalido]="error_('direccion')"
+          [value]="direccion()"
+          (input)="direccion.set($any($event.target).value)"
+        />
+        @if (error_('direccion'); as e) {
+          <p class="ayuda-error">{{ e }}</p>
+        }
+      </div>
+
+      <div class="rejilla">
+        <div class="grupo">
+          <label class="etiqueta" for="e-referencia">Referencia (opcional)</label>
+          <input
+            id="e-referencia"
+            class="campo"
+            placeholder="Porton blanco, al lado de la farmacia"
+            [value]="referencia()"
+            (input)="referencia.set($any($event.target).value)"
+          />
+        </div>
+        <div class="grupo">
+          <label class="etiqueta" for="e-telefono">Telefono de contacto</label>
+          <input
+            id="e-telefono"
+            class="campo mono"
+            inputmode="tel"
+            placeholder="70011223"
+            [class.invalido]="error_('telefono')"
+            [value]="telefono()"
+            (input)="telefono.set($any($event.target).value)"
+          />
+          @if (error_('telefono'); as e) {
+            <p class="ayuda-error">{{ e }}</p>
+          }
+        </div>
+      </div>
+
+      <label class="express">
+        <input type="checkbox" [checked]="express()" (change)="cambiarExpress($any($event.target).checked)" />
+        <span>
+          <b>Entrega express</b>
+          <small>lo preparamos primero y sale antes; tiene un recargo</small>
+        </span>
+      </label>
+
+      <!-- --------------------------------------- lo que va a costar -->
+      @if (cotizando()) {
+        <p class="nota">Calculando el costo del envio…</p>
+      } @else if (cotizacion(); as c) {
+        @if (!c.dentro_de_cobertura) {
+          <p class="error-servidor">{{ c.mensaje_cobertura }}</p>
+        } @else {
+          <div class="calculo">
+            <p class="ceja">desglose del envio · {{ c.distancia_km }} km desde {{ c.sucursal?.nombre }}</p>
+            <ul class="desglose">
+              @for (linea of c.desglose; track linea.concepto) {
+                <li [class.ahorro]="esAhorro(linea.importe)">
+                  <span>
+                    {{ linea.concepto }}
+                    <small>{{ linea.detalle }}</small>
+                  </span>
+                  <b class="mono">
+                    {{ esAhorro(linea.importe) ? '− Bs ' + moneda(-linea.importe) : 'Bs ' + moneda(linea.importe) }}
+                  </b>
+                </li>
+              }
+            </ul>
+            <div class="costo" [class.gratis]="c.gratis">
+              <span>Costo del envio</span>
+              <b class="mono">{{ c.gratis ? 'GRATIS' : 'Bs ' + moneda(c.costo_envio) }}</b>
+            </div>
+            <div class="costo total">
+              <span>Total de la compra con envio</span>
+              <b class="mono">Bs {{ moneda(c.total_a_pagar) }}</b>
+            </div>
+            <p class="nota">
+              Llega en unos <b>{{ duracion(c.minutos_estimados) }}</b> desde que confirmes el pago.
+              @if (!c.gratis && c.falta_para_envio_gratis > 0) {
+                Sumando Bs {{ moneda(c.falta_para_envio_gratis) }} mas a tu compra, el envio te sale gratis.
+              }
+            </p>
+          </div>
+        }
+      } @else {
+        <p class="nota">Marca tu ubicacion en el mapa para ver cuanto cuesta el envio.</p>
+      }
+
+      @if (error()) {
+        <p class="error-servidor">{{ error() }}</p>
+      }
+
+      <div class="acciones">
+        <button type="button" class="btn linea" [disabled]="guardando()" (click)="cerrar()">Cancelar</button>
+        <button type="button" class="btn rosa" [disabled]="guardando() || cotizando()" (click)="confirmar()">
+          {{ guardando() ? 'Guardando…' : 'Usar esta direccion' }}
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (error() && !abierto()) {
+    <p class="error-servidor">{{ error() }}</p>
+  }
+</section>

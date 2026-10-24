@@ -157,6 +157,7 @@
                     [type]="campo.tipo === 'numero' ? 'number' : campo.tipo === 'fecha' ? 'date' : 'text'"
                     class="campo"
                     [class.invalido]="invalido(campo)"
+                    [attr.step]="campo.tipo === 'numero' ? (campo.paso ?? 1) : null"
                     [formControlName]="campo.nombre"
                     [placeholder]="campo.marcador ?? ''"
                   />

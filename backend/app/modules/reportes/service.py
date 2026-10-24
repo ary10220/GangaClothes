@@ -126,7 +126,12 @@ def _ventas_pagadas(db: Session, desde: date, hasta: date, sucursal_id: int | No
             "canal": v.canal,
             "subtotal": Decimal(str(v.subtotal or 0)),
             "descuento": Decimal(str(v.descuento or 0)),
-            "total": Decimal(str(v.total or 0)),
+            # CU29: `venta.total` incluye el costo del envio a domicilio, que el
+            # cliente paga pero NO es venta de mercaderia: es el servicio de
+            # reparto. Los reportes miden lo vendido en prendas, asi que se
+            # descuenta; si no, el margen saldria inflado en las compras con
+            # delivery. En retiro en sucursal el costo es 0 y no cambia nada.
+            "total": Decimal(str(v.total or 0)) - Decimal(str(v.costo_envio or 0)),
             "unidades": sum(l["cantidad"] for l in ls),
             "costo": sum((l["costo"] for l in ls), Decimal("0")),
             "ganancia": sum((l["ganancia"] for l in ls), Decimal("0")),

@@ -7,6 +7,7 @@ import { mensajeDeError } from '../../core/errores.interceptor';
 import { Notificaciones } from '../../core/notificaciones';
 import { SesionStore } from '../../core/sesion';
 import { SucursalActual } from '../../core/sucursal-actual';
+import { Comprobantes } from '../../shared/comprobante';
 import { OpcionFiltro, SelectorEstado } from '../../shared/estado/selector-estado';
 import { fechaLocal, fechaSinZona, moneda } from '../../shared/formato';
 import { SelectorSucursal } from '../../shared/sucursal/selector-sucursal';
@@ -148,6 +149,7 @@ export class Caja {
   private http = inject(HttpClient);
   private avisos = inject(Notificaciones);
   readonly sesion = inject(SesionStore);
+  readonly comprobantes = inject(Comprobantes);
   readonly sucursal = inject(SucursalActual);
 
   readonly metodos = METODOS;

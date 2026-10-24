@@ -119,3 +119,9 @@ li {
   font-size: 15px;
   margin-left: auto;
 }
+
+/* CU29: enlace al seguimiento del pedido, en las compras con delivery. */
+.seguimiento {
+  color: var(--ganga);
+  margin-left: 4px;
+}

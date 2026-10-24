@@ -155,6 +155,7 @@ Product _product() => const Product(
   description: 'Algodón',
   brand: 'Ganga',
   salePrice: 120,
+  finalPrice: 120,
   imageUrl: null,
   categoryId: 1,
   collectionId: null,

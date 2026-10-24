@@ -13,6 +13,11 @@ export interface CampoCrud {
   /** Por defecto todos los campos se muestran en la tabla. */
   enTabla?: boolean;
   marcador?: string;
+  /**
+   * Solo para tipo 'numero': el salto del campo. Sin esto el navegador solo
+   * acepta enteros, y hay datos que no lo son (las coordenadas de una sucursal).
+   */
+  paso?: number;
   /** Solo para tipo 'select': de donde salen las opciones. */
   origen?: OrigenOpciones;
   /** Ocupa las dos columnas del formulario. */
