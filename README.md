@@ -56,7 +56,7 @@ Usuarios de prueba del seed:
 | cajero@gangaclothes.com | Cajero123 | cajero |
 | sofia@gangaclothes.com | Cliente#2026 | cliente (tiene compras y reservas de historial) |
 | diego@gangaclothes.com | Cliente#2026 | cliente |
-| valeria@gangaclothes.com | Cliente#2026 | cliente |
+| valeria@gangaclothes.com | Cliente#2026 | cliendite |
 | proveedor@gangaclothes.com | Proveedor123 | proveedor — Textiles Andinos SRL |
 | oriente@gangaclothes.com | Proveedor123 | proveedor — Confecciones Oriente |
 
