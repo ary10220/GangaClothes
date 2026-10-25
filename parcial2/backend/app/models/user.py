@@ -21,6 +21,8 @@ class User(Base, TenantMixin):
     email: Mapped[str] = mapped_column(String(200), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     nombre: Mapped[str] = mapped_column(String(200), nullable=False)
+    apellido: Mapped[str | None] = mapped_column(String(200))
+    telefono: Mapped[str | None] = mapped_column(String(50))
     rol: Mapped[str] = mapped_column(String(50), nullable=False, default="admin")
     """admin | encargado | cajero | ..."""
     estado: Mapped[str] = mapped_column(String(20), nullable=False, default="activo")

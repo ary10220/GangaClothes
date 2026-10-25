@@ -6,8 +6,9 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ...models import Plan, Sucursal, Suscripcion, User
+from ...models import Plan, Producto, Sucursal, Suscripcion, User
 from . import schemas
+
 
 
 def suscripcion_vigente(db: Session, tenant_id: int) -> tuple[Suscripcion | None, Plan | None]:
@@ -39,6 +40,7 @@ def consumo(db: Session, tenant_id: int) -> schemas.EstadoSuscripcionOut:
     consumos = [
         schemas.ConsumoLimite.build("sucursales", _count(db, Sucursal, tenant_id), plan.max_sucursales),
         schemas.ConsumoLimite.build("usuarios", _count(db, User, tenant_id), plan.max_usuarios),
+        schemas.ConsumoLimite.build("productos", _count(db, Producto, tenant_id), plan.max_productos),
     ]
 
     return schemas.EstadoSuscripcionOut(
@@ -86,7 +88,7 @@ def exigir_capacidad(db: Session, tenant_id: int, recurso: str) -> tuple[Plan, i
             "La empresa no tiene un plan de suscripcion activo. Contrata un plan antes de continuar.",
         )
 
-    modelo_por_recurso = {"sucursales": Sucursal, "usuarios": User}
+    modelo_por_recurso = {"sucursales": Sucursal, "usuarios": User, "productos": Producto}
     limite_por_recurso = {
         "sucursales": plan.max_sucursales,
         "usuarios": plan.max_usuarios,
@@ -97,9 +99,6 @@ def exigir_capacidad(db: Session, tenant_id: int, recurso: str) -> tuple[Plan, i
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Recurso desconocido: {recurso}")
 
     limite = limite_por_recurso[recurso]
-    if recurso == "productos":
-        return plan, 0, limite
-
     modelo = modelo_por_recurso[recurso]
     actual = _count(db, modelo, tenant_id)
     if actual >= limite:
@@ -109,3 +108,4 @@ def exigir_capacidad(db: Session, tenant_id: int, recurso: str) -> tuple[Plan, i
             f"Contrata un plan superior para seguir dando de alta {recurso}.",
         )
     return plan, actual, limite
+

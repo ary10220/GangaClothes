@@ -6,10 +6,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from .core.config import get_settings
 from .core.database import init_db
 from .modules.auth.router import router as auth_router
+from .modules.catalogos.router import (
+    categorias_router,
+    colores_router,
+    tallas_router,
+    temporadas_router,
+)
 from .modules.planes.router import router as planes_router
 from .modules.sucursales.router import router as sucursales_router
 from .modules.suscripciones.router import router as suscripciones_router
 from .modules.tenants.router import router as tenants_router
+from .modules.usuarios.router import router as usuarios_router
+from .modules.proveedores.router import router as proveedores_router
+from .modules.productos.router import router as productos_router, router_alias as prendas_router
+from .modules.clientes.router import router as clientes_router
+
+
+
+
 
 
 settings = get_settings()
@@ -48,6 +62,27 @@ def create_app() -> FastAPI:
     app.include_router(sucursales_router, prefix=prefix)
     app.include_router(suscripciones_router, prefix=prefix)
     app.include_router(planes_router, prefix=prefix)
+    app.include_router(categorias_router, prefix=prefix)
+    app.include_router(tallas_router, prefix=prefix)
+    app.include_router(colores_router, prefix=prefix)
+    app.include_router(temporadas_router, prefix=prefix)
+    app.include_router(usuarios_router, prefix=prefix)
+    app.include_router(proveedores_router, prefix=prefix)
+    app.include_router(productos_router, prefix=prefix)
+    app.include_router(prendas_router, prefix=prefix)
+    app.include_router(clientes_router, prefix=prefix)
+
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+
+    static_index = Path(__file__).parent / "static" / "index.html"
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/app", include_in_schema=False)
+    def web_app():
+        if static_index.exists():
+            return FileResponse(static_index)
+        return {"status": "ok", "app": settings.app_name}
 
     @app.get("/health", tags=["health"])
     def health():

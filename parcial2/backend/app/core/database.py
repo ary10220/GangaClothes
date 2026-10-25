@@ -106,6 +106,6 @@ def attach_scope(db: Session, scope: TenantScope) -> None:
 
 def init_db() -> None:
     """Crea tablas si no existen. Importa aqui para registrar modelos."""
-    from ..models import tenant, plan, suscripcion, user, superadmin, sucursal, operacion  # noqa: F401
+    from ..models import tenant, plan, suscripcion, user, superadmin, sucursal, operacion, catalogos, proveedor, producto, cliente  # noqa: F401
 
     Base.metadata.create_all(bind=engine)

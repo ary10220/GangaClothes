@@ -72,6 +72,11 @@ def token_luna(client):
 
 
 @pytest.fixture()
+def token_luna_encargado(client):
+    return _auth(client, "luna", "encargado@boutique-luna.bo", "Luna12345")
+
+
+@pytest.fixture()
 def token_andina(client):
     return _auth(client, "andina", "rodrigo@modaandina.bo", "Andina12345")
 

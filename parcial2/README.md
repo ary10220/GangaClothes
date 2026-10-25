@@ -371,3 +371,186 @@ Cuando armes tus endpoints:
   crear — devuelve 409 con mensaje consistente al resto del sistema.
 - Agregá tus endpoints documentándolos acá debajo cuando los termines.
 
+---
+
+## 10. Endpoints de CU-09 — Categorías, Tallas, Colores y Temporadas
+
+Aislamiento completo por `tenant_id` heredando de `TenantMixin`.
+- Lectura (`GET`): cualquier usuario autenticado del tenant (`Depends(require_tenant)`).
+- Escritura (`POST`, `PATCH`, `DELETE`): administradores del tenant (`Depends(require_roles("admin"))`).
+- Duplicados en el mismo tenant devuelven `409 CONFLICT`. Mismo nombre en empresas distintas es permitido.
+- Acceso o modificación por id directo de otra empresa devuelve `404 NOT FOUND`.
+
+### 10.1 Categorías (`/api/v1/categorias`)
+- `GET /api/v1/categorias`: Lista categorías del tenant.
+- `POST /api/v1/categorias`: Crea categoría.
+  - Body: `{"nombre": "Poleras", "descripcion": "Poleras y camisetas", "activo": true}`
+- `GET /api/v1/categorias/{id}`: Detalle de categoría.
+- `PATCH /api/v1/categorias/{id}`: Actualiza campos (`nombre`, `descripcion`, `activo`).
+- `DELETE /api/v1/categorias/{id}`: Elimina categoría.
+
+### 10.2 Tallas (`/api/v1/tallas`)
+- `GET /api/v1/tallas`: Lista tallas ordenadas por `orden, id`.
+- `POST /api/v1/tallas`: Crea talla.
+  - Body: `{"nombre": "M", "orden": 2, "activo": true}`
+- `GET /api/v1/tallas/{id}`: Detalle de talla.
+- `PATCH /api/v1/tallas/{id}`: Actualiza talla.
+- `DELETE /api/v1/tallas/{id}`: Elimina talla.
+
+### 10.3 Colores (`/api/v1/colores`)
+- `GET /api/v1/colores`: Lista colores del tenant.
+- `POST /api/v1/colores`: Crea color.
+  - Body: `{"nombre": "Rojo", "codigo_hex": "#FF0000", "activo": true}`
+- `GET /api/v1/colores/{id}`: Detalle de color.
+- `PATCH /api/v1/colores/{id}`: Actualiza color.
+- `DELETE /api/v1/colores/{id}`: Elimina color.
+
+### 10.4 Temporadas (`/api/v1/temporadas`)
+- `GET /api/v1/temporadas`: Lista temporadas del tenant.
+- `POST /api/v1/temporadas`: Crea temporada.
+  - Body: `{"nombre": "Verano 2026", "fecha_inicio": "2026-01-01", "fecha_fin": "2026-03-31", "activo": true}`
+- `GET /api/v1/temporadas/{id}`: Detalle de temporada.
+- `PATCH /api/v1/temporadas/{id}`: Actualiza temporada.
+- `DELETE /api/v1/temporadas/{id}`: Elimina temporada.
+
+---
+
+## 11. Endpoints de CU-03 — Administrar Usuarios y Roles del Tenant (`/api/v1/usuarios`)
+
+Aislamiento completo por `tenant_id` y control por rol `admin`.
+- Solo administradores del tenant (`Depends(require_roles("admin"))`) pueden acceder y gestionar usuarios.
+- El correo tiene `UNIQUE(tenant_id, email)`: el mismo correo puede existir en dos empresas distintas sin conflicto.
+- Si se intenta dar de alta un usuario superando el límite del plan contratado (ej. Básico máx 3 usuarios), el backend devuelve `409 CONFLICT` con mensaje detallado.
+- La contraseña se guarda con hash seguro (`bcrypt`).
+- Los roles disponibles son: `admin`, `encargado`, `cajero`.
+- Soporta tanto `PATCH` como `PUT` para actualización y reactivación/archivado de usuarios.
+
+### 11.1 Endpoints
+- `GET /api/v1/usuarios`: Lista los usuarios del tenant autenticado.
+- `POST /api/v1/usuarios`: Da de alta un nuevo usuario.
+  - Body: `{"nombre": "Carlos", "apellido": "Vaca", "email": "carlos@boutique-luna.bo", "password": "Password123", "telefono": "70099887", "rol": "cajero", "activo": true}`
+- `GET /api/v1/usuarios/{id}`: Detalle del usuario.
+- `PATCH /api/v1/usuarios/{id}` / `PUT /api/v1/usuarios/{id}`: Actualiza datos (rol, nombre, apellido, teléfono, activo, contraseña).
+- `DELETE /api/v1/usuarios/{id}`: Elimina el usuario del tenant (no permite autoeliminarse al admin logueado).
+
+---
+
+## 12. Endpoints de CU-10 — Gestionar Proveedores (`/api/v1/proveedores`)
+
+Aislamiento completo por `tenant_id` y control por rol `admin` / `encargado`.
+- Lectura (`GET`): cualquier usuario del tenant (`Depends(require_tenant)`).
+- Creación y edición (`POST`, `PATCH`, `PUT`): usuarios con rol `admin` o `encargado`.
+- Eliminación (`DELETE`): administradores (`admin`).
+- Restricción `UNIQUE(tenant_id, nombre)`: dos empresas pueden tener proveedores con nombres similares sin conflicto; duplicados dentro del mismo tenant devuelven `409 CONFLICT`.
+
+### 12.1 Endpoints
+- `GET /api/v1/proveedores`: Lista proveedores del tenant autenticado.
+- `POST /api/v1/proveedores`: Registra un proveedor.
+  - Body: `{"nombre": "Textiles Andinos SRL", "nit": "1020304025", "contacto": "Rosa Mamani", "telefono": "70012345", "email": "ventas@proveedor.bo", "direccion": "Av. Principal 456", "activo": true}`
+- `GET /api/v1/proveedores/{id}`: Detalle de proveedor.
+- `PATCH /api/v1/proveedores/{id}` / `PUT /api/v1/proveedores/{id}`: Actualiza proveedor.
+- `DELETE /api/v1/proveedores/{id}`: Elimina proveedor.
+
+---
+
+## 13. Endpoints de CU-08 — Gestionar Productos del Catálogo y Variantes (`/api/v1/productos` y alias `/api/v1/prendas`)
+
+Aislamiento completo por `tenant_id` y control por rol `admin` / `encargado`.
+- Soporta tanto `/api/v1/productos` como el alias `/api/v1/prendas` para plena compatibilidad con el frontend Angular existente.
+- Entidades vinculadas con `TenantMixin`: `Producto` y `Variante`.
+- Relaciones validadas: `categoria_id`, `temporada_id`, `proveedor_id`, `talla_id`, `color_id` deben pertenecer a la misma empresa (`404` si pertenecen a otro tenant o no existen).
+- Restricciones de unicidad:
+  - `UNIQUE(tenant_id, nombre)`: Unicidad de nombre de producto por tenant.
+  - `UNIQUE(tenant_id, sku)`: Código de barras / SKU único por tenant.
+  - `UNIQUE(producto_id, talla_id, color_id)`: No se permiten variantes duplicadas para un mismo producto.
+- Control de suscripción: Valida `exigir_capacidad(db, tenant_id, "productos")` comparando contra `plan.max_productos` (`409 CONFLICT` al superar límite).
+- Estado de publicación: Endpoints dedicados para activar/desactivar publicación en tienda en línea (`/publicar`, `/despublicar`).
+
+### 13.1 Endpoints de Producto
+- `GET /api/v1/productos` (o `/api/v1/prendas`): Lista productos con filtros opcionales (`categoria_id`, `temporada_id`, `proveedor_id`, `publicado`, `activo`).
+- `GET /api/v1/productos/catalogo-interno` (o `/api/v1/prendas/catalogo-interno`): Catálogo para caja y compras (prendas activas con variantes).
+- `POST /api/v1/productos`: Da de alta un nuevo producto y sus variantes opcionales.
+  - Body:
+    ```json
+    {
+      "nombre": "Jean Slim Fit Denim",
+      "categoria_id": 1,
+      "temporada_id": 1,
+      "proveedor_id": 1,
+      "descripcion": "Jean stretch de mezclilla azul oscuro",
+      "marca": "Luna Denim",
+      "genero": "unisex",
+      "precio_venta": 180.0,
+      "costo": 70.0,
+      "activo": true,
+      "publicado": false,
+      "variantes": [
+        {
+          "talla_id": 1,
+          "color_id": 2,
+          "sku": "LUNA-JEAN-S-NEG",
+          "precio_adicional": 0.0
+        }
+      ]
+    }
+    ```
+- `GET /api/v1/productos/{id}`: Detalle del producto con sus variantes.
+- `PATCH /api/v1/productos/{id}` / `PUT /api/v1/productos/{id}`: Actualización parcial o completa.
+- `DELETE /api/v1/productos/{id}`: Elimina el producto y sus variantes en cascada (rol `admin`).
+- `POST /api/v1/productos/{id}/publicar`: Publica el producto en la tienda (`{"confirmar_sin_stock": true}`).
+- `POST /api/v1/productos/{id}/despublicar`: Retira el producto de la tienda.
+
+### 13.2 Endpoints de Variantes
+- `GET /api/v1/productos/{producto_id}/variantes`: Lista variantes de un producto.
+- `POST /api/v1/productos/{producto_id}/variantes`: Agrega una variante al producto.
+  - Body: `{"talla_id": 2, "color_id": 1, "sku": "LUNA-POL-M-BLA", "precio_adicional": 5.0, "activo": true}`
+- `GET /api/v1/productos/variantes/{variante_id}`: Detalle de variante.
+- `PATCH /api/v1/productos/variantes/{variante_id}` / `PUT /api/v1/productos/variantes/{variante_id}`: Actualiza variante (SKU, precio adicional, imagen, estado).
+- `DELETE /api/v1/productos/variantes/{variante_id}`: Elimina la variante (rol `admin`).
+
+---
+
+## 14. Endpoints de CU-11 — Gestionar Clientes del Tenant (`/api/v1/clientes`)
+
+Aislamiento completo por `tenant_id` y permisos para el personal del tenant (`admin`, `encargado`, `cajero`).
+- Entidad `Cliente` vinculada con `TenantMixin`.
+- Cada empresa gestiona su propia cartera de clientes (compradores en tienda física, compras web y reservas).
+- Restricciones de unicidad por tenant:
+  - `UNIQUE(tenant_id, email)`: No se permiten correos duplicados dentro de la misma empresa (`409 CONFLICT`).
+  - `UNIQUE(tenant_id, ci_nit)`: No se permiten CI/NIT duplicados dentro de la misma empresa (`409 CONFLICT`).
+  - Diferentes empresas pueden registrar clientes con el mismo correo o CI/NIT de forma independiente sin conflicto.
+- Búsqueda y filtrado:
+  - Búsqueda textual mediante parámetro `q` sobre `nombre`, `apellido`, `ci_nit`, `telefono` y `email`.
+  - Filtro por `tipo` de cliente (`regular`, `mayorista`, `vip`) y por estado `activo`.
+- Roles y permisos:
+  - Lectura (`GET`): cualquier usuario autenticado del tenant (`Depends(require_tenant)`).
+  - Creación y edición (`POST`, `PATCH`, `PUT`): usuarios con rol `admin`, `encargado` o `cajero`.
+  - Eliminación (`DELETE`): administradores o encargados (`admin`, `encargado`).
+  - Sin token: rechazo con `401 UNAUTHORIZED`.
+
+### 14.1 Endpoints
+- `GET /api/v1/clientes`: Lista clientes del tenant autenticado con filtros opcionales (`q`, `tipo`, `activo`).
+- `POST /api/v1/clientes`: Da de alta un nuevo cliente.
+  - Body:
+    ```json
+    {
+      "nombre": "Valeria",
+      "apellido": "Morales",
+      "ci_nit": "8765432",
+      "telefono": "78945612",
+      "email": "valeria.morales@gmail.com",
+      "direccion": "Condominio La Riviera Dpto 4B",
+      "ciudad": "Santa Cruz",
+      "tipo": "vip",
+      "notas": "Prefiere vestidos largos y colores oscuros",
+      "activo": true
+    }
+    ```
+- `GET /api/v1/clientes/{id}`: Detalle del cliente. Devuelve `404 NOT FOUND` si pertenece a otra empresa.
+- `PATCH /api/v1/clientes/{id}` / `PUT /api/v1/clientes/{id}`: Actualización de datos (parcial o completa).
+- `DELETE /api/v1/clientes/{id}`: Elimina el cliente del tenant.
+
+
+
+
+
